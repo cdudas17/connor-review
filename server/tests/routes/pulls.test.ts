@@ -25,6 +25,8 @@ const PR_GRAPHQL_RESPONSE = JSON.stringify({
         author: { login: 'octocat' },
         state: 'OPEN',
         merged: false,
+        isDraft: false,
+        reviewDecision: 'REVIEW_REQUIRED',
         baseRefName: 'main',
         headRefName: 'feature',
         headRefOid: 'sha-1',

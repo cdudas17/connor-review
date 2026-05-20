@@ -5,9 +5,9 @@ import { PRList } from '../../src/components/PRList.js';
 import type { TrackedPR } from '../../src/types.js';
 
 const PRS: TrackedPR[] = [
-  { owner: 'a', repo: 'b', number: 1, title: 'First', authorLogin: 'alice', status: 'untouched', addedAt: 1 },
-  { owner: 'a', repo: 'b', number: 2, title: 'Second', authorLogin: 'bob', status: 'reviewed', addedAt: 2 },
-  { owner: 'a', repo: 'b', number: 3, title: 'Third', authorLogin: 'carol', status: 'approved', addedAt: 3 },
+  { owner: 'a', repo: 'b', number: 1, title: 'First', authorLogin: 'alice', status: 'untouched', ghStatus: 'open', addedAt: 1 },
+  { owner: 'a', repo: 'b', number: 2, title: 'Second', authorLogin: 'bob', status: 'reviewed', ghStatus: 'open', addedAt: 2 },
+  { owner: 'a', repo: 'b', number: 3, title: 'Third', authorLogin: 'carol', status: 'approved', ghStatus: 'merged', addedAt: 3 },
 ];
 
 describe('PRList', () => {

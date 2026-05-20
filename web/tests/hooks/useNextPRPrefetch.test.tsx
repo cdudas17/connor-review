@@ -7,8 +7,8 @@ import { useNextPRPrefetch } from '../../src/hooks/useNextPRPrefetch.js';
 import type { TrackedPR } from '../../src/types.js';
 
 const PRS: TrackedPR[] = [
-  { owner: 'a', repo: 'b', number: 1, title: 'one', authorLogin: 'x', status: 'untouched', addedAt: 1 },
-  { owner: 'a', repo: 'b', number: 2, title: 'two', authorLogin: 'x', status: 'untouched', addedAt: 2 },
+  { owner: 'a', repo: 'b', number: 1, title: 'one', authorLogin: 'x', status: 'untouched', ghStatus: 'open', addedAt: 1 },
+  { owner: 'a', repo: 'b', number: 2, title: 'two', authorLogin: 'x', status: 'untouched', ghStatus: 'open', addedAt: 2 },
 ];
 
 describe('useNextPRPrefetch', () => {

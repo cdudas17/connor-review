@@ -8,7 +8,8 @@ import { ErrorToast } from './components/ErrorToast.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
 import { nextUntouchedAfter } from './hooks/useNextPRPrefetch.js';
 import { api, ApiCallError } from './lib/api.js';
-import type { PRStatus } from './types.js';
+import { computeGhStatus } from './lib/ghStatus.js';
+import type { PRStatus, PullRequestMeta } from './types.js';
 
 interface Identity { owner: string; repo: string; number: number; }
 function same(a: Identity, b: Identity) { return a.owner === b.owner && a.repo === b.repo && a.number === b.number; }
@@ -36,7 +37,7 @@ export function App() {
     for (const r of results) {
       if (r.status === 'fulfilled') {
         const { p, meta } = r.value;
-        update(p, { title: meta.title, authorLogin: meta.authorLogin });
+        update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta) });
       } else {
         const err = r.reason as ApiCallError;
         console.error('Failed to fetch PR meta', err);
@@ -68,6 +69,10 @@ export function App() {
 
   const currentPendingReviewId = current ? (pendingReviews[prKey(current)] ?? null) : null;
 
+  const handleMetaLoaded = useCallback((id: Identity, meta: PullRequestMeta) => {
+    update(id, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta) });
+  }, [update]);
+
   const setPendingReview = useCallback((id: Identity, reviewId: string | null) => {
     setPendingReviews((cur) => {
       const next = { ...cur };
@@ -93,6 +98,7 @@ export function App() {
           prs={prs}
           pendingReviewId={currentPendingReviewId}
           onPendingReviewChange={setPendingReview}
+          onMetaLoaded={handleMetaLoaded}
           onAdvance={handleAdvance}
           onClose={() => setCurrent(null)}
         />

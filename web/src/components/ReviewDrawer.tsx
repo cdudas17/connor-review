@@ -6,7 +6,7 @@ import { ErrorToast } from './ErrorToast.js';
 import { usePRDetails } from '../hooks/usePRDetails.js';
 import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
 import { api } from '../lib/api.js';
-import type { PRStatus, ReviewEvent, StagedInlineComment, TrackedPR } from '../types.js';
+import type { PRStatus, PullRequestMeta, ReviewEvent, StagedInlineComment, TrackedPR } from '../types.js';
 
 interface Identity { owner: string; repo: string; number: number; }
 
@@ -15,12 +15,13 @@ interface Props {
   prs: TrackedPR[];
   pendingReviewId: string | null;
   onPendingReviewChange: (id: Identity, reviewId: string | null) => void;
+  onMetaLoaded?: (id: Identity, meta: PullRequestMeta) => void;
   onAdvance: (id: Identity, newStatus: PRStatus) => void;
   onClose: () => void;
 }
 
 export function ReviewDrawer(props: Props) {
-  const { current, prs, pendingReviewId, onPendingReviewChange, onAdvance, onClose } = props;
+  const { current, prs, pendingReviewId, onPendingReviewChange, onMetaLoaded, onAdvance, onClose } = props;
   const { meta, diff, loading, error, reload } = usePRDetails(current);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -64,6 +65,12 @@ export function ReviewDrawer(props: Props) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [current, onClose]);
+
+  // Push fresh meta back to the App so the PR row's ghStatus stays in sync.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (current && meta && onMetaLoaded) onMetaLoaded(current, meta);
+  }, [current?.owner, current?.repo, current?.number, meta?.headSha]);
 
   if (!current) return null;
   if (loading || !meta || diff == null) {

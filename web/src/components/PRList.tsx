@@ -1,5 +1,6 @@
 import type { TrackedPR } from '../types.js';
 import { StatusBadge } from './StatusBadge.js';
+import { GhStatusBadge } from './GhStatusBadge.js';
 import type { FilterMode } from './FilterToggle.js';
 
 interface Props {
@@ -19,7 +20,10 @@ export function PRList({ prs, mode, onOpen }: Props) {
         <li key={`${p.owner}/${p.repo}#${p.number}`} className="pr-row" onClick={() => onOpen({ owner: p.owner, repo: p.repo, number: p.number })}>
           <span className="pr-title">{p.title}</span>
           <span className="pr-meta">{p.owner}/{p.repo}#{p.number} · {p.authorLogin ?? 'unknown'}</span>
-          <StatusBadge status={p.status} />
+          <span className="pr-badges">
+            <GhStatusBadge status={p.ghStatus} />
+            <StatusBadge status={p.status} />
+          </span>
         </li>
       ))}
     </ul>

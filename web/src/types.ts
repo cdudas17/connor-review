@@ -1,5 +1,7 @@
 export type PRStatus = 'untouched' | 'reviewed' | 'approved';
 
+export type GhStatus = 'draft' | 'open' | 'changes-requested' | 'approved' | 'merged' | 'closed';
+
 export interface TrackedPR {
   owner: string;
   repo: string;
@@ -7,6 +9,8 @@ export interface TrackedPR {
   title: string;
   authorLogin: string | null;
   status: PRStatus;
+  /** GitHub-side status (Draft/Open/Approved/etc.). null until meta is fetched. */
+  ghStatus: GhStatus | null;
   addedAt: number;
 }
 
@@ -17,6 +21,8 @@ export interface PullRequestMeta {
   authorLogin: string | null;
   state: 'OPEN' | 'CLOSED' | 'MERGED';
   merged: boolean;
+  isDraft: boolean;
+  reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   baseRefName: string;
   headRefName: string;
   headSha: string;

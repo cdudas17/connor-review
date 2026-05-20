@@ -8,6 +8,8 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
         author { login }
         state
         merged
+        isDraft
+        reviewDecision
         baseRefName
         headRefName
         headRefOid

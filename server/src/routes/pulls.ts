@@ -15,6 +15,8 @@ interface PullRequestMeta {
   authorLogin: string | null;
   state: 'OPEN' | 'CLOSED' | 'MERGED';
   merged: boolean;
+  isDraft: boolean;
+  reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   baseRefName: string;
   headRefName: string;
   headSha: string;
@@ -100,6 +102,8 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
     authorLogin: pr.author?.login ?? null,
     state: pr.state,
     merged: pr.merged,
+    isDraft: !!pr.isDraft,
+    reviewDecision: pr.reviewDecision ?? null,
     baseRefName: pr.baseRefName,
     headRefName: pr.headRefName,
     headSha: pr.headRefOid,

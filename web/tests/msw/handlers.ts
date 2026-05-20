@@ -8,6 +8,8 @@ export const META_FIXTURE: PullRequestMeta = {
   authorLogin: 'octocat',
   state: 'OPEN',
   merged: false,
+  isDraft: false,
+  reviewDecision: 'REVIEW_REQUIRED',
   baseRefName: 'main',
   headRefName: 'feature',
   headSha: 'sha-1',
