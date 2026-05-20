@@ -22,15 +22,29 @@ export function App() {
   const [addError, setAddError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
 
-  const handleAdd = useCallback(async (parsed: Identity) => {
+  const handleAdd = useCallback(async (parsed: Identity[]) => {
     setAddError(null);
-    try {
-      const meta = await api.getPullRequest(parsed.owner, parsed.repo, parsed.number);
-      add({ owner: parsed.owner, repo: parsed.repo, number: parsed.number, title: meta.title, authorLogin: meta.authorLogin });
-    } catch (e) {
-      const err = e as ApiCallError;
-      if (err.code === 'AUTH_REQUIRED') setAuthRequired(true);
-      else setAddError(err.message);
+    if (parsed.length === 0) return;
+    const results = await Promise.allSettled(
+      parsed.map((p) => api.getPullRequest(p.owner, p.repo, p.number).then((meta) => ({ p, meta }))),
+    );
+    const failures: ApiCallError[] = [];
+    let sawAuthRequired = false;
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        const { p, meta } = r.value;
+        add({ owner: p.owner, repo: p.repo, number: p.number, title: meta.title, authorLogin: meta.authorLogin });
+      } else {
+        const err = r.reason as ApiCallError;
+        if (err.code === 'AUTH_REQUIRED') sawAuthRequired = true;
+        else failures.push(err);
+      }
+    }
+    if (sawAuthRequired) setAuthRequired(true);
+    if (failures.length > 0) {
+      setAddError(failures.length === 1
+        ? failures[0].message
+        : `${failures.length} of ${parsed.length} PRs failed to load: ${failures[0].message}`);
     }
   }, [add]);
 
