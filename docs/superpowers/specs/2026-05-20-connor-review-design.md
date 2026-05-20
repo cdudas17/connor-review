@@ -89,10 +89,11 @@ connor-review/
 1. Click a line → inline comment editor mounts → on save, comment is staged in React state (not yet sent).
 2. Summary textarea content stays in React state.
 3. Replies on existing threads are staged the same way.
-4. Action buttons:
-   - `Approve` / `Request Changes` / `Comment` → POST `/reviews` with `{ event, body, comments }` plus any staged thread replies (one extra POST per reply). On 2xx → set status to `approved` (Approve) or `reviewed` (RC/Comment) in `localStorage` → advance drawer to next `untouched` PR.
-   - `Next` → no API call. Set status to `reviewed` locally → advance drawer. (Nothing is sent to GitHub.)
-5. End of queue → drawer shows empty state; next advance closes it.
+4. Staged comments and summary text persist across drawer close/reopen for the same PR (held in `App`-level state keyed by `owner/repo/number`, not in the drawer component). They do not persist across full page reloads — `localStorage` holds only the tracked PR list + statuses, never draft comment text.
+5. Action buttons:
+   - `Approve` / `Request Changes` / `Comment` → POST `/reviews` with `{ event, body, comments }` plus any staged thread replies (one extra POST per reply). On 2xx → set status to `approved` (Approve) or `reviewed` (RC/Comment) in `localStorage`, clear that PR's staged drafts, advance drawer to next `untouched` PR.
+   - `Next` → no API call. If there are any staged inline comments or non-empty summary text, show a confirmation modal: "Discard unsent comments?" with Discard / Cancel. On Discard → clear drafts for this PR, set status to `reviewed` locally, advance drawer. On Cancel → no state change.
+6. End of queue → drawer shows empty state; next advance closes it.
 
 ## 6. Error handling
 
@@ -131,8 +132,10 @@ connor-review/
 - `ReviewDrawer` flows with `msw` mocking backend:
   - Click row → drawer opens with PR meta and diff.
   - Click a diff line → inline editor mounts → staged comment appears.
-  - Submit Approve → POST fires with `{ event: "APPROVE", body, comments }` → on 2xx, status flips to `approved`, drawer advances to next untouched PR.
-  - Next → no POST → status flips to `reviewed`, drawer advances.
+  - Close + reopen drawer for the same PR → staged comment and summary text are still there.
+  - Submit Approve → POST fires with `{ event: "APPROVE", body, comments }` → on 2xx, status flips to `approved`, drafts cleared, drawer advances to next untouched PR.
+  - Next with no staged drafts → no POST, no modal → status flips to `reviewed`, drawer advances.
+  - Next with staged drafts → confirmation modal appears; cancel preserves state; discard advances and clears drafts.
   - End of queue → empty state.
 - `useNextPRPrefetch`: opening a PR triggers exactly one background fetch for the next `untouched` PR (assert via msw call count).
 
