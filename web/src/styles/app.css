@@ -10,7 +10,46 @@
   --ok: #15803d;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --fg: #f1f5f9; --bg: #0f172a; --muted: #94a3b8; --border: #1e293b; }
+  :root {
+    --fg: #f1f5f9; --bg: #0f172a; --muted: #94a3b8; --border: #1e293b;
+
+    /* react-diff-view dark palette (GitHub-style) — overrides its :root light defaults */
+    --diff-background-color: transparent;
+    --diff-text-color: #e2e8f0;
+    --diff-gutter-background-color: #0f172a;
+    --diff-gutter-selected-background-color: #1e293b;
+    --diff-code-insert-background-color: #0d3a1d;
+    --diff-code-insert-text-color: #c8f0d6;
+    --diff-code-delete-background-color: #4a1015;
+    --diff-code-delete-text-color: #ffd0cb;
+    --diff-gutter-insert-background-color: #0e4a26;
+    --diff-gutter-insert-text-color: #c8f0d6;
+    --diff-gutter-delete-background-color: #5d1620;
+    --diff-gutter-delete-text-color: #ffd0cb;
+    --diff-code-insert-edit-background-color: #1e6b3a;
+    --diff-code-delete-edit-background-color: #8a1d2d;
+    --diff-omit-gutter-line-color: #6366f1;
+    --diff-selection-background-color: #1e3a8a;
+    --diff-selection-text-color: #f8fafc;
+  }
+  .change-widget { background: rgba(99, 102, 241, 0.12); }
+  .change-widget-comment { color: #c7d2fe; border-color: #4338ca; }
+  .change-widget-comment:hover { background: rgba(99, 102, 241, 0.2); }
+}
+
+@media (prefers-color-scheme: light) {
+  /* Library's defaults are mostly fine; nudge insert/delete to GitHub-light */
+  :root {
+    --diff-text-color: #0f172a;
+    --diff-code-insert-background-color: #e6ffec;
+    --diff-code-insert-text-color: #064d24;
+    --diff-code-delete-background-color: #ffebe9;
+    --diff-code-delete-text-color: #82071e;
+    --diff-gutter-insert-background-color: #abf2bc;
+    --diff-gutter-insert-text-color: #064d24;
+    --diff-gutter-delete-background-color: #ffcecb;
+    --diff-gutter-delete-text-color: #82071e;
+  }
 }
 body { margin: 0; color: var(--fg); background: var(--bg); }
 .app { max-width: 1100px; margin: 0 auto; padding: 16px; }
