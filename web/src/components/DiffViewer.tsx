@@ -4,6 +4,8 @@ import {
   Hunk,
   parseDiff,
   getChangeKey,
+  tokenize,
+  markEdits,
   type ViewType,
   type ChangeData,
   type FileData,
@@ -83,6 +85,20 @@ function DiffFile({
   const path = fileToPath(file);
   const [view, setView] = useState<ViewType>('unified');
   const anchors = useMemo(() => buildAnchors(file), [file]);
+  // Intra-line edit marks (GitHub-style brighter highlight on the chars that changed).
+  // `markEdits` is a tokenize enhancer that adds .diff-code-edit spans for the changed
+  // ranges. We don't syntax-highlight, so `highlight: false` skips refractor.
+  const tokens = useMemo(() => {
+    try {
+      return tokenize(file.hunks, {
+        highlight: false,
+        enhancers: [markEdits(file.hunks, { type: 'block' })],
+      });
+    } catch (err) {
+      console.warn('tokenize failed; rendering diff without intra-line edit marks', err);
+      return undefined;
+    }
+  }, [file.hunks]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<DragRange | null>(null);
   const [editor, setEditor] = useState<EditorRange | null>(null);
@@ -290,6 +306,7 @@ function DiffFile({
           diffType={file.type}
           hunks={file.hunks}
           widgets={widgets}
+          tokens={tokens}
         >
           {(hunks: HunkData[]) => hunks.map((h: HunkData) => <Hunk key={h.content} hunk={h} />)}
         </Diff>

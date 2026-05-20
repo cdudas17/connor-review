@@ -26,8 +26,8 @@
     --diff-gutter-insert-text-color: #f1f5f9;
     --diff-gutter-delete-background-color: #5d1620;
     --diff-gutter-delete-text-color: #f1f5f9;
-    --diff-code-insert-edit-background-color: #1e6b3a;
-    --diff-code-delete-edit-background-color: #8a1d2d;
+    --diff-code-insert-edit-background-color: #1f7a3a;
+    --diff-code-delete-edit-background-color: #a02a37;
     --diff-omit-gutter-line-color: #6366f1;
     --diff-selection-background-color: #1e3a8a;
     --diff-selection-text-color: #f8fafc;
@@ -49,6 +49,9 @@
     --diff-gutter-insert-text-color: #064d24;
     --diff-gutter-delete-background-color: #ffcecb;
     --diff-gutter-delete-text-color: #82071e;
+    /* Brighter shade for intra-line edits — pops against the row background */
+    --diff-code-insert-edit-background-color: #abf2bc;
+    --diff-code-delete-edit-background-color: #ff9492;
   }
 }
 body { margin: 0; color: var(--fg); background: var(--bg); }
