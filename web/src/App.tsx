@@ -35,6 +35,28 @@ export function App() {
     }
   }, [tab, teamPRs]);
 
+  // Backfill ciStatus / ghStatus for entries that were saved to localStorage before those
+  // fields existed. Runs silently — no banner / no spinner.
+  useEffect(() => {
+    const stale = myPRs.prs.filter((p) => p.ciStatus === undefined || p.ghStatus == null);
+    if (stale.length === 0) return;
+    let cancelled = false;
+    Promise.allSettled(
+      stale.map((p) => api.getPullRequest(p.owner, p.repo, p.number).then((meta) => ({ p, meta }))),
+    ).then((results) => {
+      if (cancelled) return;
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          const { p, meta } = r.value;
+          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus });
+        }
+      }
+    });
+    return () => { cancelled = true; };
+    // Intentional: run only once on initial load. Re-checking on every prs change would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const activePRs: TrackedPR[] = tab === 'my' ? myPRs.prs : teamPRs.prs;
   const activeSetStatus = tab === 'my' ? myPRs.setStatus : teamPRs.setStatus;
 
