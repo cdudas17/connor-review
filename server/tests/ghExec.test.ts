@@ -19,12 +19,12 @@ function mockExecFile(stdout: string, stderr = '', code = 0) {
         cb(null, stdout, stderr);
         return;
       }
-      const err = new Error(`exit ${code}`) as NodeJS.ErrnoException & {
+      const err = new Error(`exit ${code}`) as Error & {
         stdout?: string;
         stderr?: string;
-        code?: number;
+        exitCode?: number;
       };
-      err.code = code;
+      err.exitCode = code;
       err.stdout = stdout;
       err.stderr = stderr;
       cb(err, stdout, stderr);
