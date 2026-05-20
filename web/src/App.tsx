@@ -55,7 +55,7 @@ export function App() {
     for (const r of results) {
       if (r.status === 'fulfilled') {
         const { p, meta } = r.value;
-        myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta) });
+        myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus });
       } else {
         const err = r.reason as ApiCallError;
         console.error('Failed to fetch PR meta', err);
@@ -89,7 +89,7 @@ export function App() {
 
   const handleMetaLoaded = useCallback((id: Identity, meta: PullRequestMeta) => {
     if (tab === 'my') {
-      myPRs.update(id, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta) });
+      myPRs.update(id, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus });
     }
     // Team list updates only on refresh; we don't bake meta back into it here.
   }, [tab, myPRs]);
@@ -117,7 +117,7 @@ export function App() {
       for (const r of results) {
         if (r.status === 'fulfilled') {
           const { p, meta } = r.value;
-          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta) });
+          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus });
         } else {
           const err = r.reason as ApiCallError;
           console.error('Refresh failed for PR', err);

@@ -29,10 +29,10 @@ export function useTrackedPRs() {
 
   useEffect(() => { save(prs); }, [prs]);
 
-  const add = useCallback((pr: Omit<TrackedPR, 'status' | 'addedAt' | 'ghStatus'> & { ghStatus?: TrackedPR['ghStatus'] }) => {
+  const add = useCallback((pr: Omit<TrackedPR, 'status' | 'addedAt' | 'ghStatus' | 'ciStatus'> & { ghStatus?: TrackedPR['ghStatus']; ciStatus?: TrackedPR['ciStatus'] }) => {
     setPrs((cur) => (cur.some((p) => same(p, pr))
       ? cur
-      : [...cur, { ghStatus: null, ...pr, status: 'untouched', addedAt: Date.now() }]));
+      : [...cur, { ghStatus: null, ciStatus: null, ...pr, status: 'untouched', addedAt: Date.now() }]));
   }, []);
 
   const remove = useCallback((id: Identity) => {
@@ -43,7 +43,7 @@ export function useTrackedPRs() {
     setPrs((cur) => cur.map((p) => (same(p, id) ? { ...p, status } : p)));
   }, []);
 
-  const update = useCallback((id: Identity, patch: Partial<Pick<TrackedPR, 'title' | 'authorLogin' | 'ghStatus'>>) => {
+  const update = useCallback((id: Identity, patch: Partial<Pick<TrackedPR, 'title' | 'authorLogin' | 'ghStatus' | 'ciStatus'>>) => {
     setPrs((cur) => cur.map((p) => (same(p, id) ? { ...p, ...patch } : p)));
   }, []);
 

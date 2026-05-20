@@ -111,6 +111,15 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .gh-status-merged { color: #a371f7; }
 .gh-status-closed { color: #f85149; }
 
+/* CI / status-check rollup badge */
+.ci-badge { font-size: 0.75rem; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; background: transparent; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.ci-icon { font-size: 0.85em; line-height: 1; }
+.ci-success { color: #3fb950; }
+.ci-failure { color: #f85149; }
+.ci-error { color: #f85149; }
+.ci-pending { color: #d29922; }
+.ci-expected { color: #8b949e; }
+
 .pr-header-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pr-header-title h2 { margin: 0; }
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(13, 17, 23, 0.35); z-index: 10; cursor: pointer; }

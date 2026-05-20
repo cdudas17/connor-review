@@ -1,5 +1,6 @@
 import type { PullRequestMeta } from '../types.js';
 import { GhStatusBadge } from './GhStatusBadge.js';
+import { CiBadge } from './CiBadge.js';
 import { computeGhStatus } from '../lib/ghStatus.js';
 
 export function PRHeader({ meta }: { meta: PullRequestMeta }) {
@@ -9,6 +10,7 @@ export function PRHeader({ meta }: { meta: PullRequestMeta }) {
       <div className="pr-header-title">
         <h2>{meta.title}</h2>
         <GhStatusBadge status={status} />
+        <CiBadge status={meta.ciStatus} />
       </div>
       <p className="pr-header-meta">
         <a href={meta.url} target="_blank" rel="noopener noreferrer">#{meta.number}</a>

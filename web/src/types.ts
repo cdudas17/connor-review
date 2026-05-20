@@ -2,6 +2,8 @@ export type PRStatus = 'untouched' | 'reviewed' | 'approved';
 
 export type GhStatus = 'draft' | 'open' | 'changes-requested' | 'approved' | 'merged' | 'closed';
 
+export type CiStatus = 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' | null;
+
 export interface TrackedPR {
   owner: string;
   repo: string;
@@ -11,6 +13,8 @@ export interface TrackedPR {
   status: PRStatus;
   /** GitHub-side status (Draft/Open/Approved/etc.). null until meta is fetched. */
   ghStatus: GhStatus | null;
+  /** Status check rollup from GitHub (covers Buildkite + any other CI). null when unknown / no checks. */
+  ciStatus: CiStatus;
   addedAt: number;
 }
 
@@ -23,6 +27,7 @@ export interface PullRequestMeta {
   merged: boolean;
   isDraft: boolean;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+  ciStatus: CiStatus;
   baseRefName: string;
   headRefName: string;
   headSha: string;
@@ -77,6 +82,7 @@ export interface TeamPR {
   state: 'OPEN' | 'CLOSED' | 'MERGED';
   merged: boolean;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+  ciStatus: CiStatus;
   baseRefName: string;
   headRefName: string;
   headSha: string;

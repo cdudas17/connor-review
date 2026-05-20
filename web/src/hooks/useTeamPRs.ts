@@ -53,6 +53,7 @@ export function useTeamPRs() {
         authorLogin: p.authorLogin,
         status: statuses[key(p)] ?? 'untouched',
         ghStatus: computeGhStatus(p),
+        ciStatus: p.ciStatus,
         addedAt: Date.parse(p.updatedAt) || Date.now(),
       }));
       // Newest PRs first.

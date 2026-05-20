@@ -8,6 +8,8 @@ import { ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION } from '../queries/addPullReque
 import { ADD_PULL_REQUEST_REVIEW_THREAD_REPLY_MUTATION } from '../queries/addPullRequestReviewThreadReply.graphql.js';
 import { SUBMIT_PULL_REQUEST_REVIEW_MUTATION } from '../queries/submitPullRequestReview.graphql.js';
 
+type CiStatus = 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' | null;
+
 interface PullRequestMeta {
   id: string;
   number: number;
@@ -17,6 +19,7 @@ interface PullRequestMeta {
   merged: boolean;
   isDraft: boolean;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+  ciStatus: CiStatus;
   baseRefName: string;
   headRefName: string;
   headSha: string;
@@ -104,6 +107,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
     merged: pr.merged,
     isDraft: !!pr.isDraft,
     reviewDecision: pr.reviewDecision ?? null,
+    ciStatus: (pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
     baseRefName: pr.baseRefName,
     headRefName: pr.headRefName,
     headSha: pr.headRefOid,

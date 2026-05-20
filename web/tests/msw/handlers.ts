@@ -10,6 +10,7 @@ export const META_FIXTURE: PullRequestMeta = {
   merged: false,
   isDraft: false,
   reviewDecision: 'REVIEW_REQUIRED',
+  ciStatus: 'SUCCESS',
   baseRefName: 'main',
   headRefName: 'feature',
   headSha: 'sha-1',

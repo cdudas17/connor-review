@@ -17,6 +17,13 @@ export const TEAM_PR_SEARCH_QUERY = /* GraphQL */ `
           headRefName
           headRefOid
           updatedAt
+          commits(last: 1) {
+            nodes {
+              commit {
+                statusCheckRollup { state }
+              }
+            }
+          }
         }
       }
     }

@@ -3,6 +3,8 @@ import yaml from 'js-yaml';
 import { ghExec } from '../lib/ghExec.js';
 import { TEAM_PR_SEARCH_QUERY } from '../queries/teamPRs.graphql.js';
 
+type CiStatus = 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' | null;
+
 interface TeamPR {
   id: string;
   number: number;
@@ -15,6 +17,7 @@ interface TeamPR {
   state: 'OPEN' | 'CLOSED' | 'MERGED';
   merged: boolean;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+  ciStatus: CiStatus;
   baseRefName: string;
   headRefName: string;
   headSha: string;
@@ -65,6 +68,7 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
           headRefName: string;
           headRefOid: string;
           updatedAt: string;
+          commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string } } }> };
         }>;
       };
     };
@@ -84,6 +88,7 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
       state: n.state,
       merged: n.merged,
       reviewDecision: n.reviewDecision,
+      ciStatus: (n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
       baseRefName: n.baseRefName,
       headRefName: n.headRefName,
       headSha: n.headRefOid,

@@ -31,6 +31,7 @@ const PR_GRAPHQL_RESPONSE = JSON.stringify({
         headRefName: 'feature',
         headRefOid: 'sha-1',
         url: 'https://github.com/Gusto/zenpayroll/pull/1',
+        commits: { nodes: [{ commit: { statusCheckRollup: { state: 'SUCCESS' } } }] },
         reviewThreads: { nodes: [] },
       },
     },

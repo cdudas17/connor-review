@@ -14,6 +14,13 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
         headRefName
         headRefOid
         url
+        commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup { state }
+            }
+          }
+        }
         reviewThreads(first: 100) {
           nodes {
             id

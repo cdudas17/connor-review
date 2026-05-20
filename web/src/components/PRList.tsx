@@ -1,6 +1,7 @@
 import type { TrackedPR } from '../types.js';
 import { StatusBadge } from './StatusBadge.js';
 import { GhStatusBadge } from './GhStatusBadge.js';
+import { CiBadge } from './CiBadge.js';
 import type { FilterMode } from './FilterToggle.js';
 
 interface Props {
@@ -21,6 +22,7 @@ export function PRList({ prs, mode, onOpen }: Props) {
           <span className="pr-title">{p.title}</span>
           <span className="pr-meta">{p.owner}/{p.repo}#{p.number} · {p.authorLogin ?? 'unknown'}</span>
           <span className="pr-badges">
+            <CiBadge status={p.ciStatus} />
             <GhStatusBadge status={p.ghStatus} />
             <StatusBadge status={p.status} />
           </span>
