@@ -63,3 +63,22 @@ export interface ReviewDrafts {
   inlineComments: StagedInlineComment[];
   replies: StagedThreadReply[];
 }
+
+/** PR returned from the team search endpoint. Shape is similar to TrackedPR but tagged. */
+export interface TeamPR {
+  id: string;
+  owner: string;
+  repo: string;
+  number: number;
+  title: string;
+  url: string;
+  authorLogin: string | null;
+  isDraft: boolean;
+  state: 'OPEN' | 'CLOSED' | 'MERGED';
+  merged: boolean;
+  reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+  baseRefName: string;
+  headRefName: string;
+  headSha: string;
+  updatedAt: string;
+}

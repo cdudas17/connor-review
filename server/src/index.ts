@@ -1,12 +1,14 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { registerPullsRoutes } from './routes/pulls.js';
+import { registerTeamRoutes } from './routes/team.js';
 
 export async function buildServer() {
   const app = Fastify({ logger: { level: 'warn' } });
   await app.register(cors, { origin: 'http://localhost:5173' });
   app.get('/api/health', async () => ({ ok: true }));
   await registerPullsRoutes(app);
+  await registerTeamRoutes(app);
   return app;
 }
 

@@ -5,18 +5,22 @@ import { FilterToggle, type FilterMode } from './components/FilterToggle.js';
 import { ReviewDrawer } from './components/ReviewDrawer.js';
 import { AuthRequiredBanner } from './components/AuthRequiredBanner.js';
 import { ErrorToast } from './components/ErrorToast.js';
+import { Tabs, type TabId } from './components/Tabs.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
+import { useTeamPRs } from './hooks/useTeamPRs.js';
 import { nextUntouchedAfter } from './hooks/useNextPRPrefetch.js';
 import { api, ApiCallError } from './lib/api.js';
 import { computeGhStatus } from './lib/ghStatus.js';
-import type { PRStatus, PullRequestMeta } from './types.js';
+import type { PRStatus, PullRequestMeta, TrackedPR } from './types.js';
 
 interface Identity { owner: string; repo: string; number: number; }
 function same(a: Identity, b: Identity) { return a.owner === b.owner && a.repo === b.repo && a.number === b.number; }
 function prKey(id: Identity) { return `${id.owner}/${id.repo}#${id.number}`; }
 
 export function App() {
-  const { prs, add, setStatus, update } = useTrackedPRs();
+  const myPRs = useTrackedPRs();
+  const teamPRs = useTeamPRs();
+  const [tab, setTab] = useState<TabId>('my');
   const [mode, setMode] = useState<FilterMode>('untouched-only');
   const [current, setCurrent] = useState<Identity | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
@@ -24,11 +28,24 @@ export function App() {
   const [pendingReviews, setPendingReviews] = useState<Record<string, string>>({});
   const [refreshing, setRefreshing] = useState(false);
 
+  // Lazy-load team PRs the first time the Team tab is opened.
+  useEffect(() => {
+    if (tab === 'team' && !teamPRs.hasLoaded && !teamPRs.loading) {
+      teamPRs.fetch();
+    }
+  }, [tab, teamPRs]);
+
+  const activePRs: TrackedPR[] = tab === 'my' ? myPRs.prs : teamPRs.prs;
+  const activeSetStatus = tab === 'my' ? myPRs.setStatus : teamPRs.setStatus;
+
+  // Close the drawer when switching tabs so we don't show a PR from the other list.
+  useEffect(() => { setCurrent(null); }, [tab]);
+
   const handleAdd = useCallback(async (parsed: Identity[]) => {
     if (parsed.length === 0) return;
     setAddError(null);
     for (const p of parsed) {
-      add({ owner: p.owner, repo: p.repo, number: p.number, title: `PR #${p.number}`, authorLogin: null });
+      myPRs.add({ owner: p.owner, repo: p.repo, number: p.number, title: `PR #${p.number}`, authorLogin: null });
     }
     const results = await Promise.allSettled(
       parsed.map((p) => api.getPullRequest(p.owner, p.repo, p.number).then((meta) => ({ p, meta }))),
@@ -38,7 +55,7 @@ export function App() {
     for (const r of results) {
       if (r.status === 'fulfilled') {
         const { p, meta } = r.value;
-        update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta) });
+        myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta) });
       } else {
         const err = r.reason as ApiCallError;
         console.error('Failed to fetch PR meta', err);
@@ -52,56 +69,30 @@ export function App() {
         ? failures[0].message
         : `${failures.length} of ${parsed.length} PRs failed to load metadata. See devtools console for details.`);
     }
-  }, [add, update]);
+  }, [myPRs]);
 
   const handleAdvance = useCallback((id: Identity, newStatus: PRStatus) => {
-    setStatus(id, newStatus);
-    const projected = prs.map((p) => (same(p, id) ? { ...p, status: newStatus } : p));
+    activeSetStatus(id, newStatus);
+    const projected = activePRs.map((p) => (same(p, id) ? { ...p, status: newStatus } : p));
     setCurrent(nextUntouchedAfter(id, projected));
-  }, [prs, setStatus]);
+  }, [activePRs, activeSetStatus]);
 
   useEffect(() => {
     if (!current) return;
-    const cur = prs.find((p) => same(p, current));
+    const cur = activePRs.find((p) => same(p, current));
     if (mode === 'untouched-only' && cur && cur.status !== 'untouched') {
-      setCurrent(nextUntouchedAfter(current, prs));
+      setCurrent(nextUntouchedAfter(current, activePRs));
     }
-  }, [mode, prs, current]);
+  }, [mode, activePRs, current]);
 
   const currentPendingReviewId = current ? (pendingReviews[prKey(current)] ?? null) : null;
 
   const handleMetaLoaded = useCallback((id: Identity, meta: PullRequestMeta) => {
-    update(id, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta) });
-  }, [update]);
-
-  const refreshAll = useCallback(async () => {
-    if (prs.length === 0 || refreshing) return;
-    setRefreshing(true);
-    setAddError(null);
-    const results = await Promise.allSettled(
-      prs.map((p) => api.getPullRequest(p.owner, p.repo, p.number, { fresh: true }).then((meta) => ({ p, meta }))),
-    );
-    let sawAuthRequired = false;
-    const failures: ApiCallError[] = [];
-    for (const r of results) {
-      if (r.status === 'fulfilled') {
-        const { p, meta } = r.value;
-        update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta) });
-      } else {
-        const err = r.reason as ApiCallError;
-        console.error('Refresh failed for PR', err);
-        if (err.code === 'AUTH_REQUIRED') sawAuthRequired = true;
-        else failures.push(err);
-      }
+    if (tab === 'my') {
+      myPRs.update(id, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta) });
     }
-    if (sawAuthRequired) setAuthRequired(true);
-    if (failures.length > 0) {
-      setAddError(failures.length === 1
-        ? failures[0].message
-        : `${failures.length} of ${prs.length} PRs failed to refresh. See devtools console for details.`);
-    }
-    setRefreshing(false);
-  }, [prs, refreshing, update]);
+    // Team list updates only on refresh; we don't bake meta back into it here.
+  }, [tab, myPRs]);
 
   const setPendingReview = useCallback((id: Identity, reviewId: string | null) => {
     setPendingReviews((cur) => {
@@ -112,6 +103,42 @@ export function App() {
     });
   }, []);
 
+  const refreshAll = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    setAddError(null);
+    if (tab === 'my') {
+      if (myPRs.prs.length === 0) { setRefreshing(false); return; }
+      const results = await Promise.allSettled(
+        myPRs.prs.map((p) => api.getPullRequest(p.owner, p.repo, p.number, { fresh: true }).then((meta) => ({ p, meta }))),
+      );
+      let sawAuthRequired = false;
+      const failures: ApiCallError[] = [];
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          const { p, meta } = r.value;
+          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta) });
+        } else {
+          const err = r.reason as ApiCallError;
+          console.error('Refresh failed for PR', err);
+          if (err.code === 'AUTH_REQUIRED') sawAuthRequired = true;
+          else failures.push(err);
+        }
+      }
+      if (sawAuthRequired) setAuthRequired(true);
+      if (failures.length > 0) {
+        setAddError(failures.length === 1
+          ? failures[0].message
+          : `${failures.length} of ${myPRs.prs.length} PRs failed to refresh.`);
+      }
+    } else {
+      await teamPRs.fetch();
+    }
+    setRefreshing(false);
+  }, [tab, myPRs, teamPRs, refreshing]);
+
+  const untouchedCount = (list: TrackedPR[]) => list.filter((p) => p.status === 'untouched').length;
+
   return (
     <main className="app">
       <header className="app-header">
@@ -121,22 +148,51 @@ export function App() {
             type="button"
             className="refresh-button"
             onClick={refreshAll}
-            disabled={refreshing || prs.length === 0}
-            title="Refetch PR meta for every tracked PR"
+            disabled={refreshing}
+            title={tab === 'my' ? 'Refetch metadata for every tracked PR' : 'Refetch the team PR list'}
           >
             {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
           <FilterToggle mode={mode} onChange={setMode} />
         </div>
       </header>
-      <AddPRBar onAdd={handleAdd} />
-      {addError && <ErrorToast message={addError} onDismiss={() => setAddError(null)} />}
+
+      <Tabs
+        tabs={[
+          { id: 'my', label: 'My PRs', badge: untouchedCount(myPRs.prs) || null },
+          { id: 'team', label: 'Team PRs', badge: teamPRs.hasLoaded ? (untouchedCount(teamPRs.prs) || null) : null },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
+
+      {tab === 'my' && (
+        <>
+          <AddPRBar onAdd={handleAdd} />
+          {addError && <ErrorToast message={addError} onDismiss={() => setAddError(null)} />}
+        </>
+      )}
+      {tab === 'team' && (
+        <>
+          <p className="tab-context">PRs from <code>Gusto/zenpayroll</code>'s <code>config/teams/people_os/talent.yml</code> — open, non-draft, not yet approved.</p>
+          {teamPRs.loading && <p className="empty">Loading team PRs…</p>}
+          {teamPRs.error && (
+            <ErrorToast
+              message={`Failed to load team PRs: ${teamPRs.error.message}`}
+              onDismiss={() => { /* user can click Refresh */ }}
+            />
+          )}
+        </>
+      )}
+
       {authRequired && <AuthRequiredBanner onDismiss={() => setAuthRequired(false)} />}
-      <PRList prs={prs} mode={mode} onOpen={setCurrent} />
+
+      <PRList prs={activePRs} mode={mode} onOpen={setCurrent} />
+
       {current && (
         <ReviewDrawer
           current={current}
-          prs={prs}
+          prs={activePRs}
           pendingReviewId={currentPendingReviewId}
           onPendingReviewChange={setPendingReview}
           onMetaLoaded={handleMetaLoaded}

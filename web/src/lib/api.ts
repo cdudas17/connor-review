@@ -1,4 +1,4 @@
-import type { PullRequestMeta, ReviewEvent, StagedInlineComment } from '../types.js';
+import type { PullRequestMeta, ReviewEvent, StagedInlineComment, TeamPR } from '../types.js';
 
 export class ApiCallError extends Error {
   constructor(public code: string, message: string, public status: number) {
@@ -63,6 +63,13 @@ export const api = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
+  },
+  getTeamPRs(opts?: { repo?: string; path?: string }): Promise<{ members: string[]; prs: TeamPR[] }> {
+    const qs = new URLSearchParams();
+    if (opts?.repo) qs.set('repo', opts.repo);
+    if (opts?.path) qs.set('path', opts.path);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return call(`/api/team/prs${suffix}`);
   },
   replyToThread(owner: string, repo: string, number: number, threadId: string, body: string) {
     return call(`/api/pulls/${owner}/${repo}/${number}/threads/${threadId}/reply`, {

@@ -73,6 +73,14 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .app { max-width: 1100px; margin: 0 auto; padding: 16px; }
 .app-header { display: flex; justify-content: space-between; align-items: center; }
 .app-header-actions { display: flex; gap: 8px; align-items: center; }
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin: 8px 0 12px; }
+.tab { padding: 8px 14px; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); cursor: pointer; font: inherit; display: inline-flex; align-items: center; gap: 8px; }
+.tab:hover { color: var(--fg); background: var(--bg-subtle); }
+.tab-active { color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
+.tab-badge { font-size: 0.75rem; min-width: 20px; padding: 1px 6px; border-radius: 999px; background: var(--bg-subtle); border: 1px solid var(--border); color: var(--muted); }
+.tab-active .tab-badge { color: var(--fg); }
+.tab-context { color: var(--muted); font-size: 0.9rem; margin: 8px 0 12px; }
+.tab-context code { background: var(--bg-subtle); padding: 1px 4px; border-radius: 3px; }
 .refresh-button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); color: inherit; cursor: pointer; font: inherit; }
 .refresh-button:hover:not(:disabled) { background: var(--border-muted); }
 .refresh-button:disabled { opacity: 0.5; cursor: not-allowed; }
