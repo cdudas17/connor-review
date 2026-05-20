@@ -37,9 +37,14 @@ function summarizeArgs(args: string[]): string {
   return out.join(' ');
 }
 
-export function ghExec(args: string[]): Promise<string> {
+export interface GhExecOptions {
+  /** If set, the string is written to gh's stdin (and stdin is closed). */
+  input?: string;
+}
+
+export function ghExec(args: string[], opts: GhExecOptions = {}): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile('gh', args, { maxBuffer: 20 * 1024 * 1024 }, (err, stdout, stderr) => {
+    const child = execFile('gh', args, { maxBuffer: 20 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
         const code = classify(stderr || (err as Error).message);
         reject(new GhCliError(code, `gh ${summarizeArgs(args)} failed: ${stderr.trim()}`, stderr));
@@ -47,5 +52,8 @@ export function ghExec(args: string[]): Promise<string> {
       }
       resolve(stdout);
     });
+    if (opts.input != null) {
+      child.stdin?.end(opts.input);
+    }
   });
 }

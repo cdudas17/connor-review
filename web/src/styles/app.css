@@ -75,12 +75,18 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .pr-header-meta { color: var(--muted); font-size: 0.9rem; }
 .diff-viewer .diff-file { border: 1px solid var(--border); border-radius: 8px; margin: 16px 0; overflow: hidden; }
 .diff-file-header { display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(148, 163, 184, 0.12); align-items: center; }
-.change-widget { padding: 4px 12px; background: rgba(37, 99, 235, 0.05); border-bottom: 1px solid var(--border); }
-.change-widget-comment { font-size: 0.8rem; padding: 2px 8px; border: 1px dashed var(--border); border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
-.change-widget.active { background: rgba(37, 99, 235, 0.10); }
-.inline-editor { padding: 8px 0; }
-.inline-editor textarea, .thread textarea { width: 100%; min-height: 60px; padding: 6px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: inherit; }
+.diff-file-body { user-select: text; }
+.diff-file-body .diff-gutter { cursor: pointer; transition: background-color 80ms; }
+.diff-file-body .diff-gutter:hover { background-color: rgba(99, 102, 241, 0.2); }
+.diff-file-body.cr-dragging .diff-gutter { cursor: ns-resize; }
+.diff-file-body.cr-dragging .diff-line { user-select: none; }
+.diff-file-body tr.diff-line[data-cr-selected] td.diff-code { box-shadow: inset 2px 0 0 #6366f1; background-image: linear-gradient(rgba(99, 102, 241, 0.18), rgba(99, 102, 241, 0.18)); }
+.diff-file-body tr.diff-line[data-cr-selected] td.diff-gutter { background-image: linear-gradient(rgba(99, 102, 241, 0.28), rgba(99, 102, 241, 0.28)); }
+.inline-editor { padding: 8px 12px; background: rgba(99, 102, 241, 0.08); border-top: 1px solid var(--border); }
+.inline-editor-anchor { margin: 0 0 6px; color: var(--muted); font-size: 0.85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.inline-editor textarea, .thread textarea { width: 100%; min-height: 60px; padding: 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: inherit; font: inherit; box-sizing: border-box; }
 .inline-editor-actions { display: flex; gap: 8px; margin-top: 6px; }
+.inline-editor-actions button { padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: inherit; cursor: pointer; font: inherit; }
 .thread, .staged-comment { border-top: 1px dashed var(--border); padding: 8px 12px; background: rgba(37, 99, 235, 0.04); }
 .thread-comment { margin: 4px 0; }
 .thread-reply { margin-top: 8px; }

@@ -43,6 +43,8 @@ export interface StagedInlineComment {
   line: number;
   side: 'LEFT' | 'RIGHT';
   body: string;
+  startLine?: number;
+  startSide?: 'LEFT' | 'RIGHT';
 }
 
 export interface StagedThreadReply {

@@ -31,7 +31,14 @@ interface ReviewThread {
 interface ReviewSubmission {
   event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
   body?: string;
-  comments?: Array<{ path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string }>;
+  comments?: Array<{
+    path: string;
+    line: number;
+    side: 'LEFT' | 'RIGHT';
+    body: string;
+    startLine?: number;
+    startSide?: 'LEFT' | 'RIGHT';
+  }>;
 }
 
 function metaKey(p: { owner: string; repo: string; number: number }) {
@@ -155,17 +162,30 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     const params = parsePullParams(req.params);
     const meta = metaCache.get(metaKey(params)) ?? (await fetchMeta(params.owner, params.repo, params.number));
     metaCache.set(metaKey(params), meta);
-    const args = [
-      'api', 'graphql',
-      '-f', `query=${ADD_PULL_REQUEST_REVIEW_MUTATION}`,
-      '-F', `pullRequestId=${meta.id}`,
-      '-F', `event=${req.body.event}`,
-    ];
-    if (req.body.body) args.push('-f', `body=${req.body.body}`);
+
+    // GitHub's addPullRequestReview accepts a `threads` array of DraftPullRequestReviewThread,
+    // which natively supports multi-line (startLine/startSide). We translate from our internal
+    // "comment" shape so the frontend doesn't have to know the GraphQL name.
+    const variables: Record<string, unknown> = {
+      pullRequestId: meta.id,
+      event: req.body.event,
+    };
+    if (req.body.body) variables.body = req.body.body;
     if (req.body.comments?.length) {
-      args.push('-f', `comments=${JSON.stringify(req.body.comments)}`);
+      variables.threads = req.body.comments.map((c) => {
+        const t: Record<string, string | number> = { path: c.path, body: c.body, line: c.line, side: c.side };
+        if (c.startLine != null && c.startLine !== c.line) {
+          t.startLine = c.startLine;
+          t.startSide = c.startSide ?? c.side;
+        }
+        return t;
+      });
     }
-    const out = await ghExec(args);
+
+    // gh's -f/-F flags can't pass typed arrays, so we send the full GraphQL body via stdin.
+    const out = await ghExec(['api', 'graphql', '--input', '-'], {
+      input: JSON.stringify({ query: ADD_PULL_REQUEST_REVIEW_MUTATION, variables }),
+    });
     return JSON.parse(out);
   });
 

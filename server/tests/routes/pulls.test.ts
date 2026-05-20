@@ -77,23 +77,36 @@ describe('pulls routes', () => {
     await app.close();
   });
 
-  it('POST /reviews calls addPullRequestReview mutation with the right input', async () => {
+  it('POST /reviews calls addPullRequestReview mutation with the right variables via stdin', async () => {
     mocked.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE); // meta fetch (route looks up PR id)
     mocked.mockResolvedValueOnce(JSON.stringify({ data: { addPullRequestReview: { pullRequestReview: { id: 'R_1', state: 'APPROVED' } } } }));
     const app = await buildServer();
     const res = await app.inject({
       method: 'POST',
       url: '/api/pulls/Gusto/zenpayroll/1/reviews',
-      payload: { event: 'APPROVE', body: 'lgtm', comments: [{ path: 'file.txt', line: 2, side: 'RIGHT', body: 'nit' }] },
+      payload: {
+        event: 'APPROVE',
+        body: 'lgtm',
+        comments: [
+          { path: 'file.txt', line: 2, side: 'RIGHT', body: 'nit' },
+          { path: 'file.txt', line: 8, side: 'RIGHT', startLine: 5, startSide: 'RIGHT', body: 'these lines look off' },
+        ],
+      },
     });
     expect(res.statusCode).toBe(200);
-    const lastCall = mocked.mock.calls.at(-1)![0] as string[];
-    expect(lastCall[0]).toBe('api');
-    expect(lastCall[1]).toBe('graphql');
-    // verify the variables we passed include the pull request id and event
-    const joined = lastCall.join(' ');
-    expect(joined).toContain('pullRequestId=PR_abc');
-    expect(joined).toContain('event=APPROVE');
+    const lastCallArgs = mocked.mock.calls.at(-1)![0] as string[];
+    const lastCallOpts = mocked.mock.calls.at(-1)![1] as { input?: string } | undefined;
+    expect(lastCallArgs).toEqual(['api', 'graphql', '--input', '-']);
+    expect(lastCallOpts?.input).toBeDefined();
+    const body = JSON.parse(lastCallOpts!.input!);
+    expect(body.query).toContain('addPullRequestReview');
+    expect(body.variables.pullRequestId).toBe('PR_abc');
+    expect(body.variables.event).toBe('APPROVE');
+    expect(body.variables.body).toBe('lgtm');
+    expect(body.variables.threads).toEqual([
+      { path: 'file.txt', body: 'nit', line: 2, side: 'RIGHT' },
+      { path: 'file.txt', body: 'these lines look off', line: 8, side: 'RIGHT', startLine: 5, startSide: 'RIGHT' },
+    ]);
     await app.close();
   });
 
