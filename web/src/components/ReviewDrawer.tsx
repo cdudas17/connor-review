@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { PRHeader } from './PRHeader.js';
 import { DiffViewer } from './DiffViewer.js';
 import { ReviewFooter } from './ReviewFooter.js';
@@ -57,8 +57,23 @@ export function ReviewDrawer(props: Props) {
     reload();
   }, [current, reload]);
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (!current) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [current, onClose]);
+
   if (!current) return null;
-  if (loading || !meta || diff == null) return <aside className="drawer"><p>Loading…</p></aside>;
+  if (loading || !meta || diff == null) {
+    return (
+      <>
+        <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
+        <aside className="drawer"><p>Loading…</p></aside>
+      </>
+    );
+  }
 
   const canSubmit = meta.state === 'OPEN' && !submitting;
   const canNext = !submitting;
@@ -91,8 +106,10 @@ export function ReviewDrawer(props: Props) {
   const doNext = () => onAdvance(current, 'reviewed');
 
   return (
-    <aside className="drawer" aria-label="Review drawer">
-      <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
+    <>
+      <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
+      <aside className="drawer" aria-label="Review drawer">
+        <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
       <PRHeader meta={meta} />
       <DiffViewer
         diff={diff}
@@ -113,6 +130,7 @@ export function ReviewDrawer(props: Props) {
       />
       {error && <ErrorToast message={error.message} onDismiss={() => { /* user can reload */ }} />}
       {submitError && <ErrorToast message={submitError} onDismiss={() => setSubmitError(null)} />}
-    </aside>
+      </aside>
+    </>
   );
 }
