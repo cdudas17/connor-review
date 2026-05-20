@@ -19,13 +19,13 @@
     --diff-gutter-background-color: #0f172a;
     --diff-gutter-selected-background-color: #1e293b;
     --diff-code-insert-background-color: #0d3a1d;
-    --diff-code-insert-text-color: #c8f0d6;
+    --diff-code-insert-text-color: #f1f5f9;
     --diff-code-delete-background-color: #4a1015;
-    --diff-code-delete-text-color: #ffd0cb;
+    --diff-code-delete-text-color: #f1f5f9;
     --diff-gutter-insert-background-color: #0e4a26;
-    --diff-gutter-insert-text-color: #c8f0d6;
+    --diff-gutter-insert-text-color: #f1f5f9;
     --diff-gutter-delete-background-color: #5d1620;
-    --diff-gutter-delete-text-color: #ffd0cb;
+    --diff-gutter-delete-text-color: #f1f5f9;
     --diff-code-insert-edit-background-color: #1e6b3a;
     --diff-code-delete-edit-background-color: #8a1d2d;
     --diff-omit-gutter-line-color: #6366f1;
