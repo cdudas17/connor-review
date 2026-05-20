@@ -25,10 +25,6 @@ interface ReviewThread {
   isResolved: boolean;
   path: string;
   line: number | null;
-  originalLine: number | null;
-  startLine: number | null;
-  startSide: 'LEFT' | 'RIGHT' | null;
-  diffSide: 'LEFT' | 'RIGHT' | null;
   comments: Array<{ id: string; authorLogin: string | null; body: string; createdAt: string }>;
 }
 
@@ -73,10 +69,6 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
       isResolved: boolean;
       path: string;
       line: number | null;
-      originalLine: number | null;
-      startLine: number | null;
-      startSide: 'LEFT' | 'RIGHT' | null;
-      diffSide: 'LEFT' | 'RIGHT' | null;
       comments?: {
         nodes?: Array<{
           id: string;
@@ -90,10 +82,6 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
       isResolved: t.isResolved,
       path: t.path,
       line: t.line,
-      originalLine: t.originalLine,
-      startLine: t.startLine,
-      startSide: t.startSide,
-      diffSide: t.diffSide,
       comments: (t.comments?.nodes ?? []).map((c) => ({
         id: c.id,
         authorLogin: c.author?.login ?? null,

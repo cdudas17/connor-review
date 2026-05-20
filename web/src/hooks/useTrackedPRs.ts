@@ -41,5 +41,9 @@ export function useTrackedPRs() {
     setPrs((cur) => cur.map((p) => (same(p, id) ? { ...p, status } : p)));
   }, []);
 
-  return { prs, add, remove, setStatus };
+  const update = useCallback((id: Identity, patch: Partial<Pick<TrackedPR, 'title' | 'authorLogin'>>) => {
+    setPrs((cur) => cur.map((p) => (same(p, id) ? { ...p, ...patch } : p)));
+  }, []);
+
+  return { prs, add, remove, setStatus, update };
 }

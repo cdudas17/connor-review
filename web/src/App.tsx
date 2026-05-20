@@ -15,7 +15,7 @@ interface Identity { owner: string; repo: string; number: number; }
 function same(a: Identity, b: Identity) { return a.owner === b.owner && a.repo === b.repo && a.number === b.number; }
 
 export function App() {
-  const { prs, add, setStatus } = useTrackedPRs();
+  const { prs, add, setStatus, update } = useTrackedPRs();
   const drafts = useDrafts();
   const [mode, setMode] = useState<FilterMode>('untouched-only');
   const [current, setCurrent] = useState<Identity | null>(null);
@@ -23,8 +23,16 @@ export function App() {
   const [authRequired, setAuthRequired] = useState(false);
 
   const handleAdd = useCallback(async (parsed: Identity[]) => {
-    setAddError(null);
     if (parsed.length === 0) return;
+    setAddError(null);
+
+    // 1) Optimistic add — placeholder rows appear immediately so the user sees them
+    //    even if meta fetches are slow or fail. Titles backfill as fetches resolve.
+    for (const p of parsed) {
+      add({ owner: p.owner, repo: p.repo, number: p.number, title: `PR #${p.number}`, authorLogin: null });
+    }
+
+    // 2) Fetch meta in parallel; update rows as each one resolves.
     const results = await Promise.allSettled(
       parsed.map((p) => api.getPullRequest(p.owner, p.repo, p.number).then((meta) => ({ p, meta }))),
     );
@@ -33,9 +41,10 @@ export function App() {
     for (const r of results) {
       if (r.status === 'fulfilled') {
         const { p, meta } = r.value;
-        add({ owner: p.owner, repo: p.repo, number: p.number, title: meta.title, authorLogin: meta.authorLogin });
+        update(p, { title: meta.title, authorLogin: meta.authorLogin });
       } else {
         const err = r.reason as ApiCallError;
+        console.error('Failed to fetch PR meta', err);
         if (err.code === 'AUTH_REQUIRED') sawAuthRequired = true;
         else failures.push(err);
       }
@@ -44,9 +53,9 @@ export function App() {
     if (failures.length > 0) {
       setAddError(failures.length === 1
         ? failures[0].message
-        : `${failures.length} of ${parsed.length} PRs failed to load: ${failures[0].message}`);
+        : `${failures.length} of ${parsed.length} PRs failed to load metadata. See devtools console for details.`);
     }
-  }, [add]);
+  }, [add, update]);
 
   const handleAdvance = useCallback((id: Identity, newStatus: PRStatus) => {
     setStatus(id, newStatus);

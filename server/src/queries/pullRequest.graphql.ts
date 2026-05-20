@@ -18,10 +18,6 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
             isResolved
             path
             line
-            originalLine
-            startLine
-            startSide
-            diffSide
             comments(first: 50) {
               nodes {
                 id

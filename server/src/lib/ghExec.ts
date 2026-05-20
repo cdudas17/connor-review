@@ -22,12 +22,27 @@ function classify(stderr: string): GhErrorCode {
   return 'GH_CLI_FAILED';
 }
 
+function summarizeArgs(args: string[]): string {
+  // Avoid dumping multi-line GraphQL query bodies into error messages — just keep the gh subcommand.
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if ((a === '-f' || a === '-F') && args[i + 1]?.startsWith('query=')) {
+      out.push(a, 'query=<...>');
+      i++;
+      continue;
+    }
+    out.push(a);
+  }
+  return out.join(' ');
+}
+
 export function ghExec(args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile('gh', args, { maxBuffer: 20 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
         const code = classify(stderr || (err as Error).message);
-        reject(new GhCliError(code, `gh ${args.join(' ')} failed: ${stderr.trim()}`, stderr));
+        reject(new GhCliError(code, `gh ${summarizeArgs(args)} failed: ${stderr.trim()}`, stderr));
         return;
       }
       resolve(stdout);
