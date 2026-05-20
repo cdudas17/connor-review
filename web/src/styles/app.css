@@ -1,57 +1,72 @@
 :root {
   color-scheme: light dark;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --fg: #0f172a;
+  /* GitHub Primer light defaults */
+  --fg: #1f2328;
   --bg: #ffffff;
-  --muted: #475569;
-  --border: #e2e8f0;
-  --accent: #2563eb;
-  --danger: #b91c1c;
-  --ok: #15803d;
+  --bg-subtle: #f6f8fa;
+  --muted: #656d76;
+  --border: #d0d7de;
+  --border-muted: #d8dee4;
+  --accent: #0969da;
+  --danger: #cf222e;
+  --ok: #1f883d;
+  --ok-hover: #1a7f37;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --fg: #f1f5f9; --bg: #0f172a; --muted: #94a3b8; --border: #1e293b;
+    /* GitHub Primer dark */
+    --fg: #e6edf3;
+    --bg: #0d1117;
+    --bg-subtle: #161b22;
+    --muted: #7d8590;
+    --border: #30363d;
+    --border-muted: #21262d;
+    --accent: #2f81f7;
+    --danger: #f85149;
+    --ok: #238636;
+    --ok-hover: #2ea043;
 
-    /* react-diff-view dark palette (GitHub-style) — overrides its :root light defaults */
+    /* Diff palette — GitHub uses semi-transparent overlays on the page canvas, so
+       the line bg blends with the surface. We use exact GH Primer RGBA values. */
     --diff-background-color: transparent;
-    --diff-text-color: #e2e8f0;
-    --diff-gutter-background-color: #0f172a;
-    --diff-gutter-selected-background-color: #1e293b;
-    --diff-code-insert-background-color: #0d3a1d;
-    --diff-code-insert-text-color: #f1f5f9;
-    --diff-code-delete-background-color: #4a1015;
-    --diff-code-delete-text-color: #f1f5f9;
-    --diff-gutter-insert-background-color: #0e4a26;
-    --diff-gutter-insert-text-color: #f1f5f9;
-    --diff-gutter-delete-background-color: #5d1620;
-    --diff-gutter-delete-text-color: #f1f5f9;
-    --diff-code-insert-edit-background-color: #1f7a3a;
-    --diff-code-delete-edit-background-color: #a02a37;
-    --diff-omit-gutter-line-color: #6366f1;
-    --diff-selection-background-color: #1e3a8a;
-    --diff-selection-text-color: #f8fafc;
+    --diff-text-color: #e6edf3;
+    --diff-gutter-background-color: transparent;
+    --diff-gutter-selected-background-color: rgba(110, 118, 129, 0.12);
+    --diff-code-insert-background-color: rgba(46, 160, 67, 0.15);
+    --diff-code-insert-text-color: #e6edf3;
+    --diff-code-delete-background-color: rgba(248, 81, 73, 0.15);
+    --diff-code-delete-text-color: #e6edf3;
+    --diff-gutter-insert-background-color: rgba(63, 185, 80, 0.30);
+    --diff-gutter-insert-text-color: #e6edf3;
+    --diff-gutter-delete-background-color: rgba(248, 81, 73, 0.30);
+    --diff-gutter-delete-text-color: #e6edf3;
+    --diff-code-insert-edit-background-color: rgba(46, 160, 67, 0.40);
+    --diff-code-delete-edit-background-color: rgba(248, 81, 73, 0.40);
+    --diff-omit-gutter-line-color: #6e7681;
+    --diff-selection-background-color: rgba(56, 139, 253, 0.25);
+    --diff-selection-text-color: #e6edf3;
   }
-  .change-widget { background: rgba(99, 102, 241, 0.12); }
-  .change-widget-comment { color: #c7d2fe; border-color: #4338ca; }
-  .change-widget-comment:hover { background: rgba(99, 102, 241, 0.2); }
 }
 
 @media (prefers-color-scheme: light) {
-  /* Library's defaults are mostly fine; nudge insert/delete to GitHub-light */
   :root {
-    --diff-text-color: #0f172a;
-    --diff-code-insert-background-color: #e6ffec;
-    --diff-code-insert-text-color: #064d24;
+    /* GitHub Primer light diff palette */
+    --diff-background-color: transparent;
+    --diff-text-color: #1f2328;
+    --diff-gutter-background-color: transparent;
+    --diff-code-insert-background-color: #dafbe1;
+    --diff-code-insert-text-color: #1f2328;
     --diff-code-delete-background-color: #ffebe9;
-    --diff-code-delete-text-color: #82071e;
-    --diff-gutter-insert-background-color: #abf2bc;
-    --diff-gutter-insert-text-color: #064d24;
+    --diff-code-delete-text-color: #1f2328;
+    --diff-gutter-insert-background-color: #aceebb;
+    --diff-gutter-insert-text-color: #1f2328;
     --diff-gutter-delete-background-color: #ffcecb;
-    --diff-gutter-delete-text-color: #82071e;
-    /* Brighter shade for intra-line edits — pops against the row background */
-    --diff-code-insert-edit-background-color: #abf2bc;
+    --diff-gutter-delete-text-color: #1f2328;
+    --diff-code-insert-edit-background-color: #aceebb;
     --diff-code-delete-edit-background-color: #ff9492;
+    --diff-omit-gutter-line-color: #afb8c1;
+    --diff-selection-background-color: #ddf4ff;
   }
 }
 body { margin: 0; color: var(--fg); background: var(--bg); }
@@ -76,10 +91,10 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .drawer-close { position: absolute; top: 12px; right: 16px; font-size: 1.4rem; background: transparent; border: none; cursor: pointer; }
 .pr-header h2 { margin-bottom: 4px; }
 .pr-header-meta { color: var(--muted); font-size: 0.9rem; }
-.diff-viewer .diff-file { border: 1px solid var(--border); border-radius: 8px; margin: 16px 0; overflow: hidden; }
-.diff-file-header { display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(148, 163, 184, 0.12); align-items: center; }
+.diff-viewer .diff-file { border: 1px solid var(--border); border-radius: 6px; margin: 16px 0; overflow: hidden; background: var(--bg); }
+.diff-file-header { display: flex; justify-content: space-between; padding: 8px 12px; background: var(--bg-subtle); border-bottom: 1px solid var(--border); align-items: center; }
 .diff-file-body { user-select: text; }
-.diff-file-body .diff-line { font-size: 12px; line-height: 1.85; }
+.diff-file-body .diff-line { font-size: 13px; line-height: 1.85; }
 .diff-file-body .diff-gutter-col { width: 4ch; }
 .diff-file-body .diff-gutter { padding: 0 0.4ch; text-align: right; }
 .diff-file-body .diff-code { padding: 0 0.6em; }
@@ -90,31 +105,32 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .diff-file-body tr.diff-line[data-cr-selected] td.diff-code { box-shadow: inset 2px 0 0 #6366f1; background-image: linear-gradient(rgba(99, 102, 241, 0.18), rgba(99, 102, 241, 0.18)); }
 .diff-file-body tr.diff-line[data-cr-selected] td.diff-gutter { background-image: linear-gradient(rgba(99, 102, 241, 0.28), rgba(99, 102, 241, 0.28)); }
 /* Inline thread (existing review comments) — GitHub-style card under the diff line */
-.thread-stack { display: flex; flex-direction: column; gap: 12px; padding: 8px 12px 12px; background: rgba(148, 163, 184, 0.06); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.thread-stack { display: flex; flex-direction: column; gap: 12px; padding: 12px; background: var(--bg-subtle); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .thread-card { border: 1px solid var(--border); border-radius: 6px; background: var(--bg); padding: 12px 14px; }
 .thread-card-header { color: var(--muted); font-size: 0.85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-bottom: 6px; }
 .thread-anchor { color: var(--muted); }
-.thread-message { margin: 8px 0; line-height: 1.4; }
+.thread-message { margin: 8px 0; line-height: 1.5; }
 .thread-message strong { display: block; font-size: 0.9rem; margin-bottom: 2px; }
 .thread-message p { margin: 0; white-space: pre-wrap; word-wrap: break-word; }
-.thread-reply { margin-top: 10px; }
-.thread-reply textarea { width: 100%; min-height: 48px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: inherit; font: inherit; box-sizing: border-box; }
-.thread-reply-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
-.thread-reply-actions button { padding: 4px 12px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: inherit; cursor: pointer; font: inherit; }
+.thread-reply { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-muted); }
+.thread-reply textarea { width: 100%; min-height: 48px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); color: inherit; font: inherit; box-sizing: border-box; }
+.thread-reply-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.thread-reply-actions button { padding: 5px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); color: inherit; cursor: pointer; font: inherit; }
+.thread-reply-actions button:hover:not(:disabled) { background: var(--border-muted); }
 
 /* Inline editor for new comments — three buttons: Cancel | Comment | Start a review */
-.inline-editor { padding: 10px 12px 12px; background: rgba(99, 102, 241, 0.10); border-top: 1px solid var(--border); }
+.inline-editor { padding: 12px; background: var(--bg-subtle); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .inline-editor-anchor { margin: 0 0 8px; color: var(--muted); font-size: 0.85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.inline-editor textarea { width: 100%; min-height: 90px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: inherit; font: inherit; box-sizing: border-box; }
+.inline-editor textarea { width: 100%; min-height: 90px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: inherit; font: inherit; box-sizing: border-box; }
+.inline-editor textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .inline-editor-error { margin: 6px 0 0; color: var(--danger); font-size: 0.85rem; }
-.inline-editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
-.inline-editor-actions button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: inherit; cursor: pointer; font: inherit; }
-.inline-editor-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
-.inline-editor-actions .btn-primary { background: #1f883d; border-color: #1f883d; color: #fff; }
-.inline-editor-actions .btn-primary:hover:not(:disabled) { background: #1a7332; }
+.inline-editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.inline-editor-actions button, .review-footer-actions button { padding: 5px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); color: inherit; cursor: pointer; font: inherit; }
+.inline-editor-actions button:hover:not(:disabled), .review-footer-actions button:hover:not(:disabled) { background: var(--border-muted); }
+.inline-editor-actions button:disabled, .review-footer-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.inline-editor-actions .btn-primary, .review-footer-actions .btn-primary { background: var(--ok); border-color: var(--ok); color: #ffffff; }
+.inline-editor-actions .btn-primary:hover:not(:disabled), .review-footer-actions .btn-primary:hover:not(:disabled) { background: var(--ok-hover); border-color: var(--ok-hover); }
 .review-footer-heading { margin: 0 0 8px; font-size: 0.95rem; color: var(--muted); }
-.review-footer-actions .btn-primary { background: #1f883d; border-color: #1f883d; color: #fff; }
-.review-footer-actions .btn-primary:hover:not(:disabled) { background: #1a7332; }
 .review-footer { position: fixed; bottom: 0; right: 0; width: 70vw; min-width: 720px; background: var(--bg); border-top: 1px solid var(--border); padding: 12px 24px; box-shadow: 0 -4px 12px rgba(0,0,0,0.06); }
 .review-footer textarea { width: 100%; min-height: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; }
 .review-footer-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
