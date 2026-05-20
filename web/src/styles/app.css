@@ -72,6 +72,10 @@
 body { margin: 0; color: var(--fg); background: var(--bg); }
 .app { max-width: 1100px; margin: 0 auto; padding: 16px; }
 .app-header { display: flex; justify-content: space-between; align-items: center; }
+.app-header-actions { display: flex; gap: 8px; align-items: center; }
+.refresh-button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); color: inherit; cursor: pointer; font: inherit; }
+.refresh-button:hover:not(:disabled) { background: var(--border-muted); }
+.refresh-button:disabled { opacity: 0.5; cursor: not-allowed; }
 .add-pr-bar { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .add-pr-bar textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; font: inherit; resize: vertical; min-height: 38px; box-sizing: border-box; }
 .add-pr-bar-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }

@@ -22,6 +22,7 @@ export function App() {
   const [addError, setAddError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [pendingReviews, setPendingReviews] = useState<Record<string, string>>({});
+  const [refreshing, setRefreshing] = useState(false);
 
   const handleAdd = useCallback(async (parsed: Identity[]) => {
     if (parsed.length === 0) return;
@@ -73,6 +74,35 @@ export function App() {
     update(id, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta) });
   }, [update]);
 
+  const refreshAll = useCallback(async () => {
+    if (prs.length === 0 || refreshing) return;
+    setRefreshing(true);
+    setAddError(null);
+    const results = await Promise.allSettled(
+      prs.map((p) => api.getPullRequest(p.owner, p.repo, p.number, { fresh: true }).then((meta) => ({ p, meta }))),
+    );
+    let sawAuthRequired = false;
+    const failures: ApiCallError[] = [];
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        const { p, meta } = r.value;
+        update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta) });
+      } else {
+        const err = r.reason as ApiCallError;
+        console.error('Refresh failed for PR', err);
+        if (err.code === 'AUTH_REQUIRED') sawAuthRequired = true;
+        else failures.push(err);
+      }
+    }
+    if (sawAuthRequired) setAuthRequired(true);
+    if (failures.length > 0) {
+      setAddError(failures.length === 1
+        ? failures[0].message
+        : `${failures.length} of ${prs.length} PRs failed to refresh. See devtools console for details.`);
+    }
+    setRefreshing(false);
+  }, [prs, refreshing, update]);
+
   const setPendingReview = useCallback((id: Identity, reviewId: string | null) => {
     setPendingReviews((cur) => {
       const next = { ...cur };
@@ -86,7 +116,18 @@ export function App() {
     <main className="app">
       <header className="app-header">
         <h1>Connor Review</h1>
-        <FilterToggle mode={mode} onChange={setMode} />
+        <div className="app-header-actions">
+          <button
+            type="button"
+            className="refresh-button"
+            onClick={refreshAll}
+            disabled={refreshing || prs.length === 0}
+            title="Refetch PR meta for every tracked PR"
+          >
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+          <FilterToggle mode={mode} onChange={setMode} />
+        </div>
       </header>
       <AddPRBar onAdd={handleAdd} />
       {addError && <ErrorToast message={addError} onDismiss={() => setAddError(null)} />}
