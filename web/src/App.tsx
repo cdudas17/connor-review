@@ -6,33 +6,28 @@ import { ReviewDrawer } from './components/ReviewDrawer.js';
 import { AuthRequiredBanner } from './components/AuthRequiredBanner.js';
 import { ErrorToast } from './components/ErrorToast.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
-import { useDrafts } from './hooks/useDrafts.js';
 import { nextUntouchedAfter } from './hooks/useNextPRPrefetch.js';
 import { api, ApiCallError } from './lib/api.js';
 import type { PRStatus } from './types.js';
 
 interface Identity { owner: string; repo: string; number: number; }
 function same(a: Identity, b: Identity) { return a.owner === b.owner && a.repo === b.repo && a.number === b.number; }
+function prKey(id: Identity) { return `${id.owner}/${id.repo}#${id.number}`; }
 
 export function App() {
   const { prs, add, setStatus, update } = useTrackedPRs();
-  const drafts = useDrafts();
   const [mode, setMode] = useState<FilterMode>('untouched-only');
   const [current, setCurrent] = useState<Identity | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
+  const [pendingReviews, setPendingReviews] = useState<Record<string, string>>({});
 
   const handleAdd = useCallback(async (parsed: Identity[]) => {
     if (parsed.length === 0) return;
     setAddError(null);
-
-    // 1) Optimistic add — placeholder rows appear immediately so the user sees them
-    //    even if meta fetches are slow or fail. Titles backfill as fetches resolve.
     for (const p of parsed) {
       add({ owner: p.owner, repo: p.repo, number: p.number, title: `PR #${p.number}`, authorLogin: null });
     }
-
-    // 2) Fetch meta in parallel; update rows as each one resolves.
     const results = await Promise.allSettled(
       parsed.map((p) => api.getPullRequest(p.owner, p.repo, p.number).then((meta) => ({ p, meta }))),
     );
@@ -59,13 +54,10 @@ export function App() {
 
   const handleAdvance = useCallback((id: Identity, newStatus: PRStatus) => {
     setStatus(id, newStatus);
-    // Project the new status onto the current list so nextUntouchedAfter sees the up-to-date row.
     const projected = prs.map((p) => (same(p, id) ? { ...p, status: newStatus } : p));
     setCurrent(nextUntouchedAfter(id, projected));
   }, [prs, setStatus]);
 
-  // If the drawer's current PR is hidden by the active filter (e.g. status no longer untouched
-  // while mode === 'untouched-only'), jump to the next untouched PR or close.
   useEffect(() => {
     if (!current) return;
     const cur = prs.find((p) => same(p, current));
@@ -74,8 +66,16 @@ export function App() {
     }
   }, [mode, prs, current]);
 
-  const currentDrafts = current ? drafts.getDrafts(current) : { summary: '', inlineComments: [], replies: [] };
-  const currentHasDrafts = current ? drafts.hasAny(current) : false;
+  const currentPendingReviewId = current ? (pendingReviews[prKey(current)] ?? null) : null;
+
+  const setPendingReview = useCallback((id: Identity, reviewId: string | null) => {
+    setPendingReviews((cur) => {
+      const next = { ...cur };
+      if (reviewId == null) delete next[prKey(id)];
+      else next[prKey(id)] = reviewId;
+      return next;
+    });
+  }, []);
 
   return (
     <main className="app">
@@ -91,13 +91,8 @@ export function App() {
         <ReviewDrawer
           current={current}
           prs={prs}
-          drafts={currentDrafts}
-          hasDrafts={currentHasDrafts}
-          onSummaryChange={(id, v) => drafts.setSummary(id, v)}
-          onAddInlineComment={(id, c) => drafts.addInlineComment(id, c)}
-          onRemoveInlineComment={(id, idx) => drafts.removeInlineComment(id, idx)}
-          onAddReply={(id, r) => drafts.addReply(id, r)}
-          onClearDrafts={(id) => drafts.clear(id)}
+          pendingReviewId={currentPendingReviewId}
+          onPendingReviewChange={setPendingReview}
           onAdvance={handleAdvance}
           onClose={() => setCurrent(null)}
         />

@@ -4,7 +4,9 @@ import { LRUCache } from '../lib/lruCache.js';
 import { BadParamsError, parsePullParams } from '../lib/parseRouteParams.js';
 import { PULL_REQUEST_QUERY } from '../queries/pullRequest.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_MUTATION } from '../queries/addPullRequestReview.graphql.js';
+import { ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION } from '../queries/addPullRequestReviewThread.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_THREAD_REPLY_MUTATION } from '../queries/addPullRequestReviewThreadReply.graphql.js';
+import { SUBMIT_PULL_REQUEST_REVIEW_MUTATION } from '../queries/submitPullRequestReview.graphql.js';
 
 interface PullRequestMeta {
   id: string;
@@ -28,10 +30,10 @@ interface ReviewThread {
   comments: Array<{ id: string; authorLogin: string | null; body: string; createdAt: string }>;
 }
 
-interface ReviewSubmission {
-  event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
+interface CreateReviewBody {
+  event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT' | 'PENDING';
   body?: string;
-  comments?: Array<{
+  threads?: Array<{
     path: string;
     line: number;
     side: 'LEFT' | 'RIGHT';
@@ -39,6 +41,37 @@ interface ReviewSubmission {
     startLine?: number;
     startSide?: 'LEFT' | 'RIGHT';
   }>;
+}
+
+interface CreateThreadBody {
+  path: string;
+  body: string;
+  line: number;
+  side: 'LEFT' | 'RIGHT';
+  startLine?: number;
+  startSide?: 'LEFT' | 'RIGHT';
+  pullRequestReviewId?: string;
+}
+
+interface SubmitReviewBody {
+  event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
+  body?: string;
+}
+
+function toThreadVariable(c: {
+  path: string;
+  body: string;
+  line: number;
+  side: 'LEFT' | 'RIGHT';
+  startLine?: number;
+  startSide?: 'LEFT' | 'RIGHT';
+}): Record<string, string | number> {
+  const t: Record<string, string | number> = { path: c.path, body: c.body, line: c.line, side: c.side };
+  if (c.startLine != null && c.startLine !== c.line) {
+    t.startLine = c.startLine;
+    t.startSide = c.startSide ?? c.side;
+  }
+  return t;
 }
 
 function metaKey(p: { owner: string; repo: string; number: number }) {
@@ -155,38 +188,83 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     },
   );
 
+  // Create a review on the PR. event=PENDING creates a draft review (returned id can be
+  // passed to /threads to attach more comments, and later to /reviews/:id/submit).
+  // event=APPROVE/REQUEST_CHANGES/COMMENT immediately publishes the review.
   app.post<{
     Params: { owner: string; repo: string; number: string };
-    Body: ReviewSubmission;
+    Body: CreateReviewBody;
   }>('/api/pulls/:owner/:repo/:number/reviews', async (req) => {
     const params = parsePullParams(req.params);
     const meta = metaCache.get(metaKey(params)) ?? (await fetchMeta(params.owner, params.repo, params.number));
     metaCache.set(metaKey(params), meta);
 
-    // GitHub's addPullRequestReview accepts a `threads` array of DraftPullRequestReviewThread,
-    // which natively supports multi-line (startLine/startSide). We translate from our internal
-    // "comment" shape so the frontend doesn't have to know the GraphQL name.
     const variables: Record<string, unknown> = {
       pullRequestId: meta.id,
       event: req.body.event,
     };
     if (req.body.body) variables.body = req.body.body;
-    if (req.body.comments?.length) {
-      variables.threads = req.body.comments.map((c) => {
-        const t: Record<string, string | number> = { path: c.path, body: c.body, line: c.line, side: c.side };
-        if (c.startLine != null && c.startLine !== c.line) {
-          t.startLine = c.startLine;
-          t.startSide = c.startSide ?? c.side;
-        }
-        return t;
-      });
+    if (req.body.threads?.length) {
+      variables.threads = req.body.threads.map(toThreadVariable);
     }
 
-    // gh's -f/-F flags can't pass typed arrays, so we send the full GraphQL body via stdin.
     const out = await ghExec(['api', 'graphql', '--input', '-'], {
       input: JSON.stringify({ query: ADD_PULL_REQUEST_REVIEW_MUTATION, variables }),
     });
-    return JSON.parse(out);
+    const parsed = JSON.parse(out) as { data?: { addPullRequestReview?: { pullRequestReview?: { id: string; state: string } } } };
+    const review = parsed.data?.addPullRequestReview?.pullRequestReview;
+    if (!review) throw new Error('Review creation returned no review');
+    return review;
+  });
+
+  // Create a single review-thread comment. If pullRequestReviewId is set, the comment is
+  // attached to that pending review; otherwise it posts as a standalone PR review comment.
+  app.post<{
+    Params: { owner: string; repo: string; number: string };
+    Body: CreateThreadBody;
+  }>('/api/pulls/:owner/:repo/:number/threads', async (req) => {
+    const params = parsePullParams(req.params);
+    const meta = metaCache.get(metaKey(params)) ?? (await fetchMeta(params.owner, params.repo, params.number));
+    metaCache.set(metaKey(params), meta);
+
+    const variables: Record<string, unknown> = {
+      pullRequestId: meta.id,
+      path: req.body.path,
+      body: req.body.body,
+      line: req.body.line,
+      side: req.body.side,
+    };
+    if (req.body.startLine != null && req.body.startLine !== req.body.line) {
+      variables.startLine = req.body.startLine;
+      variables.startSide = req.body.startSide ?? req.body.side;
+    }
+    if (req.body.pullRequestReviewId) {
+      variables.pullRequestReviewId = req.body.pullRequestReviewId;
+    }
+
+    const out = await ghExec(['api', 'graphql', '--input', '-'], {
+      input: JSON.stringify({ query: ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION, variables }),
+    });
+    const parsed = JSON.parse(out) as { data?: { addPullRequestReviewThread?: { thread?: { id: string } } } };
+    return parsed.data?.addPullRequestReviewThread?.thread ?? {};
+  });
+
+  // Submit a pending review.
+  app.post<{
+    Params: { owner: string; repo: string; number: string; reviewId: string };
+    Body: SubmitReviewBody;
+  }>('/api/pulls/:owner/:repo/:number/reviews/:reviewId/submit', async (req) => {
+    parsePullParams(req.params);
+    const variables: Record<string, unknown> = {
+      pullRequestReviewId: req.params.reviewId,
+      event: req.body.event,
+    };
+    if (req.body.body) variables.body = req.body.body;
+    const out = await ghExec(['api', 'graphql', '--input', '-'], {
+      input: JSON.stringify({ query: SUBMIT_PULL_REQUEST_REVIEW_MUTATION, variables }),
+    });
+    const parsed = JSON.parse(out) as { data?: { submitPullRequestReview?: { pullRequestReview?: { id: string; state: string } } } };
+    return parsed.data?.submitPullRequestReview?.pullRequestReview ?? {};
   });
 
   app.post<{

@@ -1,41 +1,64 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { PRHeader } from './PRHeader.js';
 import { DiffViewer } from './DiffViewer.js';
 import { ReviewFooter } from './ReviewFooter.js';
-import { DiscardDraftsModal } from './DiscardDraftsModal.js';
 import { ErrorToast } from './ErrorToast.js';
 import { usePRDetails } from '../hooks/usePRDetails.js';
 import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
 import { api } from '../lib/api.js';
-import type { PRStatus, ReviewDrafts, ReviewEvent, StagedInlineComment, StagedThreadReply, TrackedPR } from '../types.js';
+import type { PRStatus, ReviewEvent, StagedInlineComment, TrackedPR } from '../types.js';
 
 interface Identity { owner: string; repo: string; number: number; }
 
 interface Props {
   current: Identity | null;
   prs: TrackedPR[];
-  drafts: ReviewDrafts;
-  hasDrafts: boolean;
-  onSummaryChange: (id: Identity, value: string) => void;
-  onAddInlineComment: (id: Identity, c: StagedInlineComment) => void;
-  onRemoveInlineComment: (id: Identity, idx: number) => void;
-  onAddReply: (id: Identity, r: StagedThreadReply) => void;
-  onClearDrafts: (id: Identity) => void;
+  pendingReviewId: string | null;
+  onPendingReviewChange: (id: Identity, reviewId: string | null) => void;
   onAdvance: (id: Identity, newStatus: PRStatus) => void;
   onClose: () => void;
 }
 
 export function ReviewDrawer(props: Props) {
-  const { current, prs, drafts, hasDrafts, onSummaryChange, onAddInlineComment, onRemoveInlineComment, onAddReply, onClearDrafts, onAdvance, onClose } = props;
-  const { meta, diff, loading, error } = usePRDetails(current);
+  const { current, prs, pendingReviewId, onPendingReviewChange, onAdvance, onClose } = props;
+  const { meta, diff, loading, error, reload } = usePRDetails(current);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [askingDiscard, setAskingDiscard] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [summary, setSummary] = useState('');
 
   useNextPRPrefetch({ current, prs });
 
+  // Reset summary draft when switching PRs.
+  // (Per-PR persistence of summary across drawer close/reopen is intentional and lives in App.)
+
+  const commitStandaloneComment = useCallback(async (c: StagedInlineComment) => {
+    if (!current) return;
+    await api.createThread(current.owner, current.repo, current.number, c);
+    reload();
+  }, [current, reload]);
+
+  const addToReview = useCallback(async (c: StagedInlineComment) => {
+    if (!current) return;
+    if (pendingReviewId) {
+      await api.createThread(current.owner, current.repo, current.number, { ...c, pullRequestReviewId: pendingReviewId });
+    } else {
+      const review = await api.createReview(current.owner, current.repo, current.number, {
+        event: 'PENDING',
+        threads: [c],
+      });
+      onPendingReviewChange(current, review.id);
+    }
+    reload();
+  }, [current, pendingReviewId, onPendingReviewChange, reload]);
+
+  const reply = useCallback(async (threadId: string, body: string) => {
+    if (!current) return;
+    await api.replyToThread(current.owner, current.repo, current.number, threadId, body);
+    reload();
+  }, [current, reload]);
+
   if (!current) return null;
-  if (loading || !meta || diff == null) return <aside className="drawer"><p>Loading...</p></aside>;
+  if (loading || !meta || diff == null) return <aside className="drawer"><p>Loading…</p></aside>;
 
   const canSubmit = meta.state === 'OPEN' && !submitting;
   const canNext = !submitting;
@@ -44,15 +67,19 @@ export function ReviewDrawer(props: Props) {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await api.submitReview(current.owner, current.repo, current.number, {
-        event,
-        body: drafts.summary || undefined,
-        comments: drafts.inlineComments.length ? drafts.inlineComments : undefined,
-      });
-      for (const r of drafts.replies) {
-        await api.replyToThread(current.owner, current.repo, current.number, r.threadId, r.body);
+      if (pendingReviewId) {
+        await api.submitPendingReview(current.owner, current.repo, current.number, pendingReviewId, {
+          event,
+          body: summary || undefined,
+        });
+        onPendingReviewChange(current, null);
+      } else {
+        await api.createReview(current.owner, current.repo, current.number, {
+          event,
+          body: summary || undefined,
+        });
       }
-      onClearDrafts(current);
+      setSummary('');
       onAdvance(current, event === 'APPROVE' ? 'approved' : 'reviewed');
     } catch (e) {
       setSubmitError((e as Error).message);
@@ -61,10 +88,7 @@ export function ReviewDrawer(props: Props) {
     }
   };
 
-  const doNext = () => {
-    if (hasDrafts) { setAskingDiscard(true); return; }
-    onAdvance(current, 'reviewed');
-  };
+  const doNext = () => onAdvance(current, 'reviewed');
 
   return (
     <aside className="drawer" aria-label="Review drawer">
@@ -73,26 +97,22 @@ export function ReviewDrawer(props: Props) {
       <DiffViewer
         diff={diff}
         threads={meta.reviewThreads}
-        stagedComments={drafts.inlineComments}
-        onAddInlineComment={(c) => onAddInlineComment(current, c)}
-        onRemoveStagedComment={(idx) => onRemoveInlineComment(current, idx)}
-        onReplyToThread={(threadId, body) => onAddReply(current, { threadId, body })}
+        hasPendingReview={pendingReviewId != null}
+        onCommitComment={commitStandaloneComment}
+        onAddToReview={addToReview}
+        onReply={reply}
       />
       <ReviewFooter
-        summary={drafts.summary}
-        onSummaryChange={(v) => onSummaryChange(current, v)}
+        summary={summary}
+        onSummaryChange={setSummary}
         onSubmit={submitReview}
         onNext={doNext}
         canSubmit={canSubmit}
         canNext={canNext}
+        finishLabel={pendingReviewId ? 'Finish your review' : null}
       />
       {error && <ErrorToast message={error.message} onDismiss={() => { /* user can reload */ }} />}
       {submitError && <ErrorToast message={submitError} onDismiss={() => setSubmitError(null)} />}
-      <DiscardDraftsModal
-        open={askingDiscard}
-        onCancel={() => setAskingDiscard(false)}
-        onDiscard={() => { setAskingDiscard(false); onClearDrafts(current); onAdvance(current, 'reviewed'); }}
-      />
     </aside>
   );
 }

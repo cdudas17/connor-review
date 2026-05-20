@@ -77,8 +77,8 @@ describe('pulls routes', () => {
     await app.close();
   });
 
-  it('POST /reviews calls addPullRequestReview mutation with the right variables via stdin', async () => {
-    mocked.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE); // meta fetch (route looks up PR id)
+  it('POST /reviews calls addPullRequestReview with threads via stdin', async () => {
+    mocked.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
     mocked.mockResolvedValueOnce(JSON.stringify({ data: { addPullRequestReview: { pullRequestReview: { id: 'R_1', state: 'APPROVED' } } } }));
     const app = await buildServer();
     const res = await app.inject({
@@ -87,19 +87,18 @@ describe('pulls routes', () => {
       payload: {
         event: 'APPROVE',
         body: 'lgtm',
-        comments: [
+        threads: [
           { path: 'file.txt', line: 2, side: 'RIGHT', body: 'nit' },
           { path: 'file.txt', line: 8, side: 'RIGHT', startLine: 5, startSide: 'RIGHT', body: 'these lines look off' },
         ],
       },
     });
     expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ id: 'R_1', state: 'APPROVED' });
     const lastCallArgs = mocked.mock.calls.at(-1)![0] as string[];
     const lastCallOpts = mocked.mock.calls.at(-1)![1] as { input?: string } | undefined;
     expect(lastCallArgs).toEqual(['api', 'graphql', '--input', '-']);
-    expect(lastCallOpts?.input).toBeDefined();
     const body = JSON.parse(lastCallOpts!.input!);
-    expect(body.query).toContain('addPullRequestReview');
     expect(body.variables.pullRequestId).toBe('PR_abc');
     expect(body.variables.event).toBe('APPROVE');
     expect(body.variables.body).toBe('lgtm');
@@ -107,6 +106,74 @@ describe('pulls routes', () => {
       { path: 'file.txt', body: 'nit', line: 2, side: 'RIGHT' },
       { path: 'file.txt', body: 'these lines look off', line: 8, side: 'RIGHT', startLine: 5, startSide: 'RIGHT' },
     ]);
+    await app.close();
+  });
+
+  it('POST /reviews with event=PENDING creates a pending review', async () => {
+    mocked.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
+    mocked.mockResolvedValueOnce(JSON.stringify({ data: { addPullRequestReview: { pullRequestReview: { id: 'R_pending', state: 'PENDING' } } } }));
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/reviews',
+      payload: { event: 'PENDING', threads: [{ path: 'file.txt', line: 2, side: 'RIGHT', body: 'wip' }] },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ id: 'R_pending', state: 'PENDING' });
+    await app.close();
+  });
+
+  it('POST /threads creates a standalone thread when no review id is provided', async () => {
+    mocked.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
+    mocked.mockResolvedValueOnce(JSON.stringify({ data: { addPullRequestReviewThread: { thread: { id: 'TH_1' } } } }));
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/threads',
+      payload: { path: 'file.txt', line: 5, side: 'RIGHT', body: 'looks good' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ id: 'TH_1' });
+    const lastCallOpts = mocked.mock.calls.at(-1)![1] as { input?: string } | undefined;
+    const body = JSON.parse(lastCallOpts!.input!);
+    expect(body.variables.pullRequestId).toBe('PR_abc');
+    expect(body.variables.path).toBe('file.txt');
+    expect(body.variables.line).toBe(5);
+    expect(body.variables.side).toBe('RIGHT');
+    expect(body.variables.pullRequestReviewId).toBeUndefined();
+    await app.close();
+  });
+
+  it('POST /threads attaches to a pending review when reviewId is provided', async () => {
+    mocked.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
+    mocked.mockResolvedValueOnce(JSON.stringify({ data: { addPullRequestReviewThread: { thread: { id: 'TH_2' } } } }));
+    const app = await buildServer();
+    await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/threads',
+      payload: { path: 'file.txt', line: 5, side: 'RIGHT', body: 'looks good', pullRequestReviewId: 'R_pending' },
+    });
+    const lastCallOpts = mocked.mock.calls.at(-1)![1] as { input?: string } | undefined;
+    const body = JSON.parse(lastCallOpts!.input!);
+    expect(body.variables.pullRequestReviewId).toBe('R_pending');
+    await app.close();
+  });
+
+  it('POST /reviews/:reviewId/submit submits the pending review', async () => {
+    mocked.mockResolvedValueOnce(JSON.stringify({ data: { submitPullRequestReview: { pullRequestReview: { id: 'R_pending', state: 'APPROVED' } } } }));
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/reviews/R_pending/submit',
+      payload: { event: 'APPROVE', body: 'done' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ id: 'R_pending', state: 'APPROVED' });
+    const lastCallOpts = mocked.mock.calls.at(-1)![1] as { input?: string } | undefined;
+    const body = JSON.parse(lastCallOpts!.input!);
+    expect(body.variables.pullRequestReviewId).toBe('R_pending');
+    expect(body.variables.event).toBe('APPROVE');
+    expect(body.variables.body).toBe('done');
     await app.close();
   });
 

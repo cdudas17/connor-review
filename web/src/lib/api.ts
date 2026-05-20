@@ -17,6 +17,10 @@ async function call<T>(input: string, init?: RequestInit): Promise<T> {
   return contentType.includes('application/json') ? (res.json() as Promise<T>) : ((await res.text()) as unknown as T);
 }
 
+export type ReviewState = 'PENDING' | 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'DISMISSED';
+
+interface ReviewSummary { id: string; state: ReviewState; }
+
 export const api = {
   getPullRequest(owner: string, repo: string, number: number, opts?: { fresh?: boolean }): Promise<PullRequestMeta> {
     const qs = opts?.fresh ? '?fresh=1' : '';
@@ -26,10 +30,35 @@ export const api = {
     const qs = opts?.fresh ? '?fresh=1' : '';
     return call<string>(`/api/pulls/${owner}/${repo}/${number}/diff${qs}`);
   },
-  submitReview(owner: string, repo: string, number: number, body: {
-    event: ReviewEvent; body?: string; comments?: StagedInlineComment[];
-  }): Promise<{ data: { addPullRequestReview: { pullRequestReview: { id: string; state: string } } } }> {
-    return call(`/api/pulls/${owner}/${repo}/${number}/reviews`, {
+  /** Create a thread (single inline comment). Pass pullRequestReviewId to attach to a pending review. */
+  createThread(owner: string, repo: string, number: number, body: StagedInlineComment & { pullRequestReviewId?: string }) {
+    return call<{ id?: string }>(`/api/pulls/${owner}/${repo}/${number}/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  /**
+   * Create a review. event=PENDING returns the new pending review id (which subsequent
+   * thread creations and the submit endpoint use). The other events publish immediately.
+   */
+  createReview(owner: string, repo: string, number: number, body: {
+    event: ReviewEvent | 'PENDING';
+    body?: string;
+    threads?: StagedInlineComment[];
+  }): Promise<ReviewSummary> {
+    return call<ReviewSummary>(`/api/pulls/${owner}/${repo}/${number}/reviews`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  /** Submit a pending review with a final event + optional summary body. */
+  submitPendingReview(owner: string, repo: string, number: number, reviewId: string, body: {
+    event: ReviewEvent;
+    body?: string;
+  }): Promise<ReviewSummary> {
+    return call<ReviewSummary>(`/api/pulls/${owner}/${repo}/${number}/reviews/${reviewId}/submit`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),

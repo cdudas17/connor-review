@@ -12,13 +12,16 @@ import {
 import 'react-diff-view/style/index.css';
 import type { ReviewThread, StagedInlineComment } from '../types.js';
 
-interface Props {
+export interface DiffViewerProps {
   diff: string;
   threads: ReviewThread[];
-  stagedComments: StagedInlineComment[];
-  onAddInlineComment: (c: StagedInlineComment) => void;
-  onRemoveStagedComment: (idx: number) => void;
-  onReplyToThread: (threadId: string, body: string) => void;
+  hasPendingReview: boolean;
+  /** Post a new thread immediately as a standalone PR comment. */
+  onCommitComment: (c: StagedInlineComment) => Promise<void>;
+  /** Post a new thread as part of a pending review (creates one if needed). */
+  onAddToReview: (c: StagedInlineComment) => Promise<void>;
+  /** Post a reply on an existing thread. */
+  onReply: (threadId: string, body: string) => Promise<void>;
 }
 
 function fileToPath(file: FileData): string {
@@ -53,14 +56,8 @@ function buildAnchors(file: FileData): ChangeAnchor[] {
   return out;
 }
 
-interface ActiveRange {
-  path: string;
-  startIdx: number;
-  endIdx: number;
-}
-
+interface DragRange { startIdx: number; endIdx: number; }
 interface EditorRange {
-  path: string;
   startLine?: number;
   startSide?: 'LEFT' | 'RIGHT';
   line: number;
@@ -71,29 +68,30 @@ interface EditorRange {
 function DiffFile({
   file,
   threads,
-  stagedComments,
-  onAddInlineComment,
-  onRemoveStagedComment,
-  onReplyToThread,
+  hasPendingReview,
+  onCommitComment,
+  onAddToReview,
+  onReply,
 }: {
   file: FileData;
   threads: ReviewThread[];
-  stagedComments: StagedInlineComment[];
-  onAddInlineComment: (c: StagedInlineComment) => void;
-  onRemoveStagedComment: (idx: number) => void;
-  onReplyToThread: (threadId: string, body: string) => void;
+  hasPendingReview: boolean;
+  onCommitComment: (c: StagedInlineComment) => Promise<void>;
+  onAddToReview: (c: StagedInlineComment) => Promise<void>;
+  onReply: (threadId: string, body: string) => Promise<void>;
 }) {
   const path = fileToPath(file);
   const [view, setView] = useState<ViewType>('unified');
   const anchors = useMemo(() => buildAnchors(file), [file]);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [drag, setDrag] = useState<ActiveRange | null>(null);
+  const [drag, setDrag] = useState<DragRange | null>(null);
   const [editor, setEditor] = useState<EditorRange | null>(null);
   const [editorBody, setEditorBody] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [replyState, setReplyState] = useState<{ threadId: string; body: string } | null>(null);
+  const [replyBusy, setReplyBusy] = useState(false);
 
-  // Map each `.diff-line` row (in DOM render order) to its anchor index.
-  // The library renders changes in flattened-hunks order, so DOM row N == anchors[N].
   function rowIndexFromTarget(target: EventTarget | null): number | null {
     if (!(target instanceof HTMLElement) || !containerRef.current) return null;
     const row = target.closest('tr.diff-line') as HTMLTableRowElement | null;
@@ -106,7 +104,7 @@ function DiffFile({
     return target instanceof HTMLElement && target.closest('.diff-gutter') != null;
   }
 
-  function finalizeRange(range: ActiveRange) {
+  function finalizeRange(range: DragRange) {
     const a = Math.min(range.startIdx, range.endIdx);
     const b = Math.max(range.startIdx, range.endIdx);
     const startA = anchors[a];
@@ -114,28 +112,23 @@ function DiffFile({
     if (!startA || !endA || endA.line == null) return;
     const multiLine = a !== b && startA.line != null && startA.side === endA.side;
     setEditor({
-      path,
       line: endA.line,
       side: endA.side,
       ...(multiLine ? { startLine: startA.line!, startSide: startA.side } : {}),
       anchorKey: endA.changeKey,
     });
     setEditorBody('');
+    setError(null);
   }
 
-  // Window-level mouseup so dragging off the table still completes the selection.
   useEffect(() => {
     if (!drag) return;
-    const onUp = () => {
-      finalizeRange(drag);
-      setDrag(null);
-    };
+    const onUp = () => { finalizeRange(drag); setDrag(null); };
     window.addEventListener('mouseup', onUp);
     return () => window.removeEventListener('mouseup', onUp);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drag]);
 
-  // Apply a `data-cr-selected` attribute to rows in the active drag range so CSS can highlight them.
   useEffect(() => {
     if (!containerRef.current) return;
     const rows = containerRef.current.querySelectorAll('tr.diff-line');
@@ -143,19 +136,17 @@ function DiffFile({
     if (drag) {
       const a = Math.min(drag.startIdx, drag.endIdx);
       const b = Math.max(drag.startIdx, drag.endIdx);
-      for (let i = a; i <= b && i < rows.length; i++) {
-        rows[i].setAttribute('data-cr-selected', '');
-      }
+      for (let i = a; i <= b && i < rows.length; i++) rows[i].setAttribute('data-cr-selected', '');
     }
   }, [drag, anchors]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (view !== 'unified') return; // multi-line drag is unified-view only for v1
+    if (view !== 'unified') return;
     if (!isGutter(e.target)) return;
     const idx = rowIndexFromTarget(e.target);
     if (idx == null || idx < 0) return;
     e.preventDefault();
-    setDrag({ path, startIdx: idx, endIdx: idx });
+    setDrag({ startIdx: idx, endIdx: idx });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -166,46 +157,114 @@ function DiffFile({
     if (idx !== drag.endIdx) setDrag({ ...drag, endIdx: idx });
   };
 
-  const fileThreads = threads.filter((t) => t.path === path && t.line != null);
-  const fileStaged = stagedComments
-    .map((c, idx) => ({ c, idx }))
-    .filter(({ c }) => c.path === path);
+  async function postEditor(target: 'standalone' | 'review') {
+    if (!editor || editorBody.trim() === '') return;
+    setBusy(true);
+    setError(null);
+    const comment: StagedInlineComment = {
+      path,
+      line: editor.line,
+      side: editor.side,
+      body: editorBody,
+      ...(editor.startLine != null ? { startLine: editor.startLine, startSide: editor.startSide ?? editor.side } : {}),
+    };
+    try {
+      if (target === 'standalone') await onCommitComment(comment);
+      else await onAddToReview(comment);
+      setEditor(null);
+      setEditorBody('');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
-  // Render the editor as a widget on the end-of-range anchor.
+  // Build a map: changeKey -> array of threads anchored there. Render threads as widgets.
+  const threadsByAnchor = useMemo(() => {
+    const byKey: Record<string, ReviewThread[]> = {};
+    for (const t of threads.filter((th) => th.path === path && th.line != null && !th.isResolved)) {
+      // find the anchor change at (path, line, side). Prefer matching side; fall back to line-only.
+      const anchor = anchors.find((a) => a.line === t.line && a.side === sideOf(makePseudoChangeForSide(t)))
+        ?? anchors.find((a) => a.line === t.line);
+      if (!anchor) continue;
+      (byKey[anchor.changeKey] ||= []).push(t);
+    }
+    return byKey;
+  }, [threads, anchors, path]);
+
+  function rangeLabel(): string {
+    if (!editor) return '';
+    if (editor.startLine != null) return `${path}:${editor.startLine}–${editor.line} (${editor.side})`;
+    return `${path}:${editor.line} (${editor.side})`;
+  }
+
+  // Construct widgets per change: any threads + the editor (if active on this change).
   const widgets: Record<string, React.ReactNode> = {};
-  if (editor && editor.path === path) {
-    const rangeLabel = editor.startLine != null
-      ? `${path}:${editor.startLine}–${editor.line} (${editor.side})`
-      : `${path}:${editor.line} (${editor.side})`;
-    widgets[editor.anchorKey] = (
-      <div className="inline-editor" data-line={editor.line}>
-        <p className="inline-editor-anchor">{rangeLabel}</p>
-        <textarea
-          value={editorBody}
-          onChange={(e) => setEditorBody(e.target.value)}
-          aria-label="Inline comment"
-          autoFocus
-        />
-        <div className="inline-editor-actions">
-          <button
-            type="button"
-            disabled={editorBody.trim() === ''}
-            onClick={() => {
-              const comment: StagedInlineComment = {
-                path: editor.path,
-                line: editor.line,
-                side: editor.side,
-                body: editorBody,
-                ...(editor.startLine != null ? { startLine: editor.startLine, startSide: editor.startSide ?? editor.side } : {}),
-              };
-              onAddInlineComment(comment);
-              setEditor(null);
-              setEditorBody('');
-            }}
-          >Stage comment</button>
-          <button type="button" onClick={() => { setEditor(null); setEditorBody(''); }}>Cancel</button>
-        </div>
+  for (const [key, ts] of Object.entries(threadsByAnchor)) {
+    widgets[key] = (
+      <div className="thread-stack">
+        {ts.map((t) => (
+          <article key={t.id} className="thread-card">
+            <header className="thread-card-header">
+              <span className="thread-anchor">{t.path}:{t.line}</span>
+            </header>
+            {t.comments.map((c) => (
+              <div key={c.id} className="thread-message">
+                <strong>{c.authorLogin ?? '?'}</strong>
+                <p>{c.body}</p>
+              </div>
+            ))}
+            <div className="thread-reply">
+              <textarea
+                placeholder="Write a reply…"
+                value={replyState?.threadId === t.id ? replyState.body : ''}
+                onChange={(e) => setReplyState({ threadId: t.id, body: e.target.value })}
+              />
+              <div className="thread-reply-actions">
+                <button
+                  type="button"
+                  disabled={replyBusy || !replyState || replyState.threadId !== t.id || replyState.body.trim() === ''}
+                  onClick={async () => {
+                    if (!replyState) return;
+                    setReplyBusy(true);
+                    try {
+                      await onReply(replyState.threadId, replyState.body);
+                      setReplyState(null);
+                    } finally { setReplyBusy(false); }
+                  }}
+                >Reply</button>
+              </div>
+            </div>
+          </article>
+        ))}
       </div>
+    );
+  }
+  if (editor) {
+    const existing = widgets[editor.anchorKey];
+    widgets[editor.anchorKey] = (
+      <>
+        {existing}
+        <div className="inline-editor">
+          <p className="inline-editor-anchor">{rangeLabel()}</p>
+          <textarea
+            value={editorBody}
+            onChange={(e) => setEditorBody(e.target.value)}
+            aria-label="Add a comment"
+            placeholder="Leave a comment…"
+            autoFocus
+          />
+          {error && <p className="inline-editor-error">{error}</p>}
+          <div className="inline-editor-actions">
+            <button type="button" className="btn-secondary" disabled={busy} onClick={() => { setEditor(null); setEditorBody(''); setError(null); }}>Cancel</button>
+            <button type="button" className="btn-secondary" disabled={busy || editorBody.trim() === ''} onClick={() => postEditor('standalone')}>Comment</button>
+            <button type="button" className="btn-primary" disabled={busy || editorBody.trim() === ''} onClick={() => postEditor('review')}>
+              {hasPendingReview ? 'Add review comment' : 'Start a review'}
+            </button>
+          </div>
+        </div>
+      </>
     );
   }
 
@@ -235,50 +294,22 @@ function DiffFile({
           {(hunks: HunkData[]) => hunks.map((h: HunkData) => <Hunk key={h.content} hunk={h} />)}
         </Diff>
       </div>
-
-      {fileThreads.map((t) => (
-        <div key={t.id} className="thread" data-line={t.line ?? undefined}>
-          <p className="thread-anchor">{path}:{t.line}</p>
-          {t.comments.map((c) => (
-            <article key={c.id} className="thread-comment">
-              <strong>{c.authorLogin ?? '?'}</strong>
-              <p>{c.body}</p>
-            </article>
-          ))}
-          <div className="thread-reply">
-            <textarea
-              placeholder="Reply..."
-              value={replyState?.threadId === t.id ? replyState.body : ''}
-              onChange={(e) => setReplyState({ threadId: t.id, body: e.target.value })}
-            />
-            <button
-              type="button"
-              disabled={!replyState || replyState.threadId !== t.id || replyState.body.trim() === ''}
-              onClick={() => {
-                if (!replyState) return;
-                onReplyToThread(replyState.threadId, replyState.body);
-                setReplyState(null);
-              }}
-            >Stage reply</button>
-          </div>
-        </div>
-      ))}
-
-      {fileStaged.map(({ c, idx }) => {
-        const label = c.startLine != null ? `${c.path}:${c.startLine}–${c.line} (${c.side})` : `${c.path}:${c.line} (${c.side})`;
-        return (
-          <div key={`${idx}-${c.line}-${c.side}`} className="staged-comment">
-            <p className="staged-anchor">{label}</p>
-            <p>{c.body}</p>
-            <button type="button" onClick={() => onRemoveStagedComment(idx)}>Remove</button>
-          </div>
-        );
-      })}
     </section>
   );
 }
 
-export function DiffViewer({ diff, threads, stagedComments, onAddInlineComment, onRemoveStagedComment, onReplyToThread }: Props) {
+/**
+ * A diff hunk has its own concept of "side". A review thread's `side` comes from
+ * `diffSide` on the GraphQL type, but we trimmed that. As a best-effort, treat
+ * the thread as RIGHT (most reviews comment on additions); fallback finds any
+ * anchor at that line if RIGHT misses.
+ */
+function makePseudoChangeForSide(_t: ReviewThread): ChangeData {
+  // We don't actually have side info on the thread (we trimmed diffSide). Assume RIGHT.
+  return { type: 'insert', content: '', lineNumber: 0, isInsert: true } as unknown as ChangeData;
+}
+
+export function DiffViewer({ diff, threads, hasPendingReview, onCommitComment, onAddToReview, onReply }: DiffViewerProps) {
   const files = useMemo(() => parseDiff(diff), [diff]);
 
   if (files.length === 0) {
@@ -292,10 +323,10 @@ export function DiffViewer({ diff, threads, stagedComments, onAddInlineComment, 
           key={fileToPath(file)}
           file={file}
           threads={threads}
-          stagedComments={stagedComments}
-          onAddInlineComment={onAddInlineComment}
-          onRemoveStagedComment={onRemoveStagedComment}
-          onReplyToThread={onReplyToThread}
+          hasPendingReview={hasPendingReview}
+          onCommitComment={onCommitComment}
+          onAddToReview={onAddToReview}
+          onReply={onReply}
         />
       ))}
     </div>
