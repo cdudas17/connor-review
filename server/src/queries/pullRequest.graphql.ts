@@ -16,6 +16,7 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
         url
         createdAt
         bodyHTML
+        viewerLatestReview { id state }
         commits(last: 1) {
           nodes {
             commit {

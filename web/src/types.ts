@@ -33,6 +33,8 @@ export interface PullRequestMeta {
   createdAt: string | null;
   /** Pre-rendered GitHub-flavored markdown HTML for the PR body. Safe — GitHub sanitizes. */
   bodyHtml: string | null;
+  /** Id of the viewer's existing pending review on this PR, if any. */
+  viewerPendingReviewId: string | null;
   baseRefName: string;
   headRefName: string;
   headSha: string;

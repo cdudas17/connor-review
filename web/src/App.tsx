@@ -182,9 +182,21 @@ export function App() {
 
   const handleMetaLoaded = useCallback((id: Identity, meta: PullRequestMeta) => {
     if (tab === 'my') {
-      myPRs.update(id, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus });
+      myPRs.update(id, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, createdAt: meta.createdAt });
     }
-    // Team list updates only on refresh; we don't bake meta back into it here.
+    // Reflect any server-side pending review state into the client so the UI knows
+    // to show "Add review comment" / "Finish your review" instead of "Start a review".
+    setPendingReviews((cur) => {
+      const k = prKey(id);
+      const existing = cur[k];
+      if (meta.viewerPendingReviewId && existing !== meta.viewerPendingReviewId) {
+        return { ...cur, [k]: meta.viewerPendingReviewId };
+      }
+      if (!meta.viewerPendingReviewId && existing) {
+        const next = { ...cur }; delete next[k]; return next;
+      }
+      return cur;
+    });
   }, [tab, myPRs]);
 
   const setPendingReview = useCallback((id: Identity, reviewId: string | null) => {

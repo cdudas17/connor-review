@@ -31,6 +31,7 @@ const PR_GRAPHQL_RESPONSE = JSON.stringify({
         headRefName: 'feature',
         headRefOid: 'sha-1',
         url: 'https://github.com/Gusto/zenpayroll/pull/1',
+        viewerLatestReview: null,
         commits: { nodes: [{ commit: { statusCheckRollup: { state: 'SUCCESS' } } }] },
         reviewThreads: { nodes: [] },
       },
@@ -109,6 +110,28 @@ describe('pulls routes', () => {
       { path: 'file.txt', body: 'nit', line: 2, side: 'RIGHT' },
       { path: 'file.txt', body: 'these lines look off', line: 8, side: 'RIGHT', startLine: 5, startSide: 'RIGHT' },
     ]);
+    await app.close();
+  });
+
+  it('POST /reviews with event=PENDING reuses an existing pending review (no double-create)', async () => {
+    // Meta lookup says the viewer already has a pending review.
+    const metaWithPending = JSON.parse(PR_GRAPHQL_RESPONSE);
+    metaWithPending.data.repository.pullRequest.viewerLatestReview = { id: 'R_existing', state: 'PENDING' };
+    mocked.mockResolvedValueOnce(JSON.stringify(metaWithPending));
+    // The follow-up addThread mutation succeeds.
+    mocked.mockResolvedValueOnce(JSON.stringify({ data: { addPullRequestReviewThread: { thread: { id: 'TH_x' } } } }));
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/reviews',
+      payload: { event: 'PENDING', threads: [{ path: 'f', line: 1, side: 'RIGHT', body: 'x' }] },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ id: 'R_existing', state: 'PENDING' });
+    // No addPullRequestReview call should have been made — only meta + thread.
+    expect(mocked).toHaveBeenCalledTimes(2);
+    const lastInput = JSON.parse((mocked.mock.calls.at(-1)![1] as { input?: string }).input!);
+    expect(lastInput.variables.pullRequestReviewId).toBe('R_existing');
     await app.close();
   });
 

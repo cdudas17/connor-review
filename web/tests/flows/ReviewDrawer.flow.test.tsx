@@ -27,8 +27,14 @@ describe('ReviewDrawer flow', () => {
     await userEvent.click(screen.getByRole('button', { name: /approve/i }));
     await screen.findByRole('heading', { name: /Second PR/i });
 
-    // Next on PR 2 — status flips to reviewed, queue empties in untouched-only mode
+    // Next on PR 2 — status flips to reviewed, drawer closes (no more untouched in queue).
     await userEvent.click(screen.getByRole('button', { name: /^next$/i }));
+    // Drawer closed → no review summary textarea on screen.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByLabelText(/review summary/i)).not.toBeInTheDocument();
+
+    // Switch filter to Untouched-only and confirm the empty state.
+    await userEvent.click(screen.getByRole('button', { name: /showing all/i }));
     await screen.findByText(/no prs to review/i);
   });
 });

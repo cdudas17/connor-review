@@ -27,6 +27,8 @@ interface PullRequestMeta {
   createdAt: string | null;
   /** Pre-rendered GitHub-flavored markdown HTML for the PR body. */
   bodyHtml: string | null;
+  /** If the viewer has a pending (in-progress) review on this PR, its id. */
+  viewerPendingReviewId: string | null;
   reviewThreads: ReviewThread[];
 }
 
@@ -117,6 +119,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
     url: pr.url,
     createdAt: pr.createdAt ?? null,
     bodyHtml: pr.bodyHTML ?? null,
+    viewerPendingReviewId: pr.viewerLatestReview?.state === 'PENDING' ? (pr.viewerLatestReview?.id ?? null) : null,
     reviewThreads: (pr.reviewThreads?.nodes ?? []).map((t: {
       id: string;
       isResolved: boolean;
@@ -211,8 +214,29 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     Body: CreateReviewBody;
   }>('/api/pulls/:owner/:repo/:number/reviews', async (req) => {
     const params = parsePullParams(req.params);
-    const meta = metaCache.get(metaKey(params)) ?? (await fetchMeta(params.owner, params.repo, params.number));
+    const cached = metaCache.get(metaKey(params));
+    // Always refresh meta when creating a PENDING review — `viewerPendingReviewId` can
+    // shift if the user just submitted/started a review elsewhere.
+    const meta = req.body.event === 'PENDING'
+      ? await fetchMeta(params.owner, params.repo, params.number)
+      : (cached ?? (await fetchMeta(params.owner, params.repo, params.number)));
     metaCache.set(metaKey(params), meta);
+
+    // If the viewer already has a pending review on this PR and we're being asked to
+    // start a new pending review, attach the threads to the existing review instead.
+    if (req.body.event === 'PENDING' && meta.viewerPendingReviewId) {
+      const reviewId = meta.viewerPendingReviewId;
+      for (const t of req.body.threads ?? []) {
+        const tv = toThreadVariable(t);
+        await ghExec(['api', 'graphql', '--input', '-'], {
+          input: JSON.stringify({
+            query: ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION,
+            variables: { ...tv, pullRequestId: meta.id, pullRequestReviewId: reviewId },
+          }),
+        });
+      }
+      return { id: reviewId, state: 'PENDING' };
+    }
 
     const variables: Record<string, unknown> = {
       pullRequestId: meta.id,
@@ -223,13 +247,36 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       variables.threads = req.body.threads.map(toThreadVariable);
     }
 
-    const out = await ghExec(['api', 'graphql', '--input', '-'], {
-      input: JSON.stringify({ query: ADD_PULL_REQUEST_REVIEW_MUTATION, variables }),
-    });
-    const parsed = JSON.parse(out) as { data?: { addPullRequestReview?: { pullRequestReview?: { id: string; state: string } } } };
-    const review = parsed.data?.addPullRequestReview?.pullRequestReview;
-    if (!review) throw new Error('Review creation returned no review');
-    return review;
+    try {
+      const out = await ghExec(['api', 'graphql', '--input', '-'], {
+        input: JSON.stringify({ query: ADD_PULL_REQUEST_REVIEW_MUTATION, variables }),
+      });
+      const parsed = JSON.parse(out) as { data?: { addPullRequestReview?: { pullRequestReview?: { id: string; state: string } } } };
+      const review = parsed.data?.addPullRequestReview?.pullRequestReview;
+      if (!review) throw new Error('Review creation returned no review');
+      return review;
+    } catch (err) {
+      // Race: another process started a pending review between our meta fetch and the
+      // mutation. Re-fetch and attach threads to the now-existing pending review.
+      const isOnePendingErr = err instanceof GhCliError && /one pending review/i.test(err.stderr);
+      if (req.body.event === 'PENDING' && isOnePendingErr) {
+        const fresh = await fetchMeta(params.owner, params.repo, params.number);
+        metaCache.set(metaKey(params), fresh);
+        if (fresh.viewerPendingReviewId) {
+          for (const t of req.body.threads ?? []) {
+            const tv = toThreadVariable(t);
+            await ghExec(['api', 'graphql', '--input', '-'], {
+              input: JSON.stringify({
+                query: ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION,
+                variables: { ...tv, pullRequestId: fresh.id, pullRequestReviewId: fresh.viewerPendingReviewId },
+              }),
+            });
+          }
+          return { id: fresh.viewerPendingReviewId, state: 'PENDING' };
+        }
+      }
+      throw err;
+    }
   });
 
   // Create a single review-thread comment. If pullRequestReviewId is set, the comment is
