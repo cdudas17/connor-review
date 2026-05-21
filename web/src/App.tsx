@@ -21,10 +21,10 @@ function prKey(id: Identity) { return `${id.owner}/${id.repo}#${id.number}`; }
 
 export function App() {
   const myPRs = useTrackedPRs();
-  // Auto-fetch team PRs on app launch and every 5 minutes while the tab is visible.
-  // 2 API calls per refresh × 12 refreshes/hour = ~24 calls/hr, well under GitHub's
-  // 5,000/hour authenticated rate limit.
-  const teamPRs = useTeamPRs({ autoRefreshMs: 5 * 60 * 1000 });
+  // Auto-fetch team PRs on app launch and every 1 minute while the tab is visible.
+  // 2 API calls per refresh × 60 refreshes/hour = ~120 calls/hr, still well under
+  // GitHub's 5,000/hour authenticated rate limit.
+  const teamPRs = useTeamPRs({ autoRefreshMs: 60 * 1000 });
   const [tab, setTab] = useState<TabId>('my');
   const [mode, setMode] = useState<FilterMode>('all');
   const [current, setCurrent] = useState<Identity | null>(null);
@@ -278,7 +278,7 @@ export function App() {
           <p className="tab-context">
             PRs from <code>Gusto/zenpayroll</code>'s <code>config/teams/people_os/talent.yml</code> — open, non-draft, not yet approved.
             {teamPRs.lastFetchedAt && (
-              <span className="tab-context-freshness"> · auto-refreshes every 5 min · last updated {new Date(teamPRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+              <span className="tab-context-freshness"> · auto-refreshes every minute · last updated {new Date(teamPRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</span>
             )}
           </p>
           {teamPRs.loading && <p className="empty">Loading team PRs…</p>}
