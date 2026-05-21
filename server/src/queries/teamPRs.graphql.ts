@@ -18,6 +18,7 @@ export const TEAM_PR_SEARCH_QUERY = /* GraphQL */ `
           headRefOid
           createdAt
           updatedAt
+          labels(first: 50) { nodes { name color } }
           commits(last: 1) {
             nodes {
               commit {

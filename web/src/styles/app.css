@@ -108,6 +108,12 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .pr-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; align-items: center; }
 .pr-row-selectable { grid-template-columns: auto 1fr auto; }
 .pr-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pr-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+
+/* GitHub-style label chips */
+.label-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.label-chip { font-size: 0.72rem; padding: 1px 8px; border-radius: 999px; line-height: 1.4; font-weight: 500; border: 1px solid rgba(0, 0, 0, 0.2); }
+.label-chip-overflow { font-size: 0.72rem; padding: 1px 8px; border-radius: 999px; line-height: 1.4; color: var(--muted); border: 1px solid var(--border); background: var(--bg-subtle); }
 .pr-row:hover { background: rgba(37, 99, 235, 0.06); }
 .pr-row-selected { background: rgba(99, 102, 241, 0.12); }
 .pr-row-selected:hover { background: rgba(99, 102, 241, 0.18); }

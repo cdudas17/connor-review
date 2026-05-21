@@ -32,8 +32,11 @@ interface PullRequestMeta {
   bodyHtml: string | null;
   /** If the viewer has a pending (in-progress) review on this PR, its id. */
   viewerPendingReviewId: string | null;
+  labels: PRLabel[];
   reviewThreads: ReviewThread[];
 }
+
+interface PRLabel { name: string; color: string; }
 
 interface ReviewThread {
   id: string;
@@ -124,6 +127,10 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
     createdAt: pr.createdAt ?? null,
     bodyHtml: pr.bodyHTML ?? null,
     viewerPendingReviewId: pr.viewerLatestReview?.state === 'PENDING' ? (pr.viewerLatestReview?.id ?? null) : null,
+    labels: (pr.labels?.nodes ?? []).map((l: { name?: string; color?: string }) => ({
+      name: l.name ?? '',
+      color: l.color ?? '888888',
+    })).filter((l: PRLabel) => l.name),
     reviewThreads: (pr.reviewThreads?.nodes ?? []).map((t: {
       id: string;
       isResolved: boolean;

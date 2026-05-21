@@ -2,6 +2,7 @@ import type { TrackedPR } from '../types.js';
 import { StatusBadge } from './StatusBadge.js';
 import { GhStatusBadge } from './GhStatusBadge.js';
 import { CiBadge } from './CiBadge.js';
+import { LabelChips } from './LabelChips.js';
 import type { FilterMode } from './FilterToggle.js';
 
 interface Identity { owner: string; repo: string; number: number; }
@@ -57,7 +58,10 @@ export function PRList({ prs, mode, onOpen, selection }: Props) {
               </label>
             )}
             <span className="pr-text">
-              <span className="pr-title">{p.title}</span>
+              <span className="pr-title-row">
+                <span className="pr-title">{p.title}</span>
+                <LabelChips labels={p.labels} max={4} />
+              </span>
               <span className="pr-meta">
                 {p.owner}/{p.repo}#{p.number} · {p.authorLogin ?? 'unknown'}{opened ? ` · ${opened}` : ''}
               </span>

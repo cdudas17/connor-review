@@ -66,6 +66,7 @@ export function useTeamPRs(opts: Options = {}) {
         ghStatus: computeGhStatus(p),
         ciStatus: p.ciStatus,
         ciUrl: p.ciUrl,
+        labels: p.labels ?? [],
         createdAt: p.createdAt,
         addedAt: Date.parse(p.updatedAt) || Date.now(),
       }));

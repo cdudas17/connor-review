@@ -20,6 +20,7 @@ interface TeamPR {
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   ciStatus: CiStatus;
   ciUrl: string | null;
+  labels: Array<{ name: string; color: string }>;
   baseRefName: string;
   headRefName: string;
   headSha: string;
@@ -72,6 +73,7 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
           headRefOid: string;
           createdAt?: string;
           updatedAt: string;
+          labels?: { nodes?: Array<{ name?: string; color?: string }> };
           commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string; contexts?: { nodes?: Array<{ __typename?: string; context?: string; name?: string; targetUrl?: string | null; detailsUrl?: string | null; state?: string; status?: string; conclusion?: string | null }> } } } }> };
         }>;
       };
@@ -94,6 +96,7 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
       reviewDecision: n.reviewDecision,
       ciStatus: (n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
       ciUrl: extractBuildkiteZenpayrollUrl(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+      labels: (n.labels?.nodes ?? []).map((l) => ({ name: l.name ?? '', color: l.color ?? '888888' })).filter((l) => l.name),
       baseRefName: n.baseRefName,
       headRefName: n.headRefName,
       headSha: n.headRefOid,
