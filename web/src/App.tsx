@@ -277,12 +277,11 @@ export function App() {
       )}
       {tab === 'team' && (
         <>
-          <p className="tab-context">
-            PRs from <code>Gusto/zenpayroll</code>'s <code>config/teams/people_os/talent.yml</code> — open, non-draft, not yet approved.
-            {teamPRs.lastFetchedAt && (
-              <span className="tab-context-freshness"> · auto-refreshes every minute · last updated {new Date(teamPRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</span>
-            )}
-          </p>
+          {teamPRs.lastFetchedAt && (
+            <p className="tab-context">
+              <span className="tab-context-freshness">auto-refreshes every minute · last updated {new Date(teamPRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</span>
+            </p>
+          )}
           {teamPRs.loading && <p className="empty">Loading team PRs…</p>}
           {teamPRs.error && (
             <ErrorToast
