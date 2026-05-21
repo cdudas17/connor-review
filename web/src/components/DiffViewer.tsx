@@ -1,23 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Decoration,
   Diff,
   Hunk,
   parseDiff,
   getChangeKey,
   tokenize,
   markEdits,
+  expandFromRawCode,
   type ViewType,
   type ChangeData,
   type FileData,
   type HunkData,
 } from 'react-diff-view';
 import 'react-diff-view/style/index.css';
+import { api } from '../lib/api.js';
 import type { ReviewThread, StagedInlineComment } from '../types.js';
 
 export interface DiffViewerProps {
   diff: string;
   threads: ReviewThread[];
   hasPendingReview: boolean;
+  /** PR identity + base ref needed to fetch file content for hunk expansion. */
+  pr: { owner: string; repo: string; number: number; baseRef: string };
   /** Post a new thread immediately as a standalone PR comment. */
   onCommitComment: (c: StagedInlineComment) => Promise<void>;
   /** Post a new thread as part of a pending review (creates one if needed). */
@@ -71,6 +76,7 @@ function DiffFile({
   file,
   threads,
   hasPendingReview,
+  pr,
   onCommitComment,
   onAddToReview,
   onReply,
@@ -78,27 +84,58 @@ function DiffFile({
   file: FileData;
   threads: ReviewThread[];
   hasPendingReview: boolean;
+  pr: { owner: string; repo: string; number: number; baseRef: string };
   onCommitComment: (c: StagedInlineComment) => Promise<void>;
   onAddToReview: (c: StagedInlineComment) => Promise<void>;
   onReply: (threadId: string, body: string) => Promise<void>;
 }) {
   const path = fileToPath(file);
   const [view, setView] = useState<ViewType>('unified');
-  const anchors = useMemo(() => buildAnchors(file), [file]);
-  // Intra-line edit marks (GitHub-style brighter highlight on the chars that changed).
-  // `markEdits` is a tokenize enhancer that adds .diff-code-edit spans for the changed
-  // ranges. We don't syntax-highlight, so `highlight: false` skips refractor.
+  const [hunks, setHunks] = useState<HunkData[]>(file.hunks);
+  const sourceRef = useRef<string[] | null>(null);
+  const sourceFetching = useRef<Promise<string[]> | null>(null);
+  useEffect(() => { setHunks(file.hunks); sourceRef.current = null; }, [file]);
+  const anchors = useMemo(() => buildAnchors({ ...file, hunks }), [file, hunks]);
   const tokens = useMemo(() => {
     try {
-      return tokenize(file.hunks, {
+      return tokenize(hunks, {
         highlight: false,
-        enhancers: [markEdits(file.hunks, { type: 'block' })],
+        enhancers: [markEdits(hunks, { type: 'block' })],
       });
     } catch (err) {
       console.warn('tokenize failed; rendering diff without intra-line edit marks', err);
       return undefined;
     }
-  }, [file.hunks]);
+  }, [hunks]);
+
+  async function ensureSource(): Promise<string[]> {
+    if (sourceRef.current) return sourceRef.current;
+    if (sourceFetching.current) return sourceFetching.current;
+    const oldPath = file.oldPath && file.oldPath !== '/dev/null' ? file.oldPath : path;
+    sourceFetching.current = api.getFileContent(pr.owner, pr.repo, pr.number, oldPath, pr.baseRef)
+      .then((text) => {
+        const lines = text.split('\n');
+        if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+        sourceRef.current = lines;
+        return lines;
+      })
+      .finally(() => { sourceFetching.current = null; });
+    return sourceFetching.current;
+  }
+
+  async function expandRange(start: number, end: number) {
+    if (start > end) return;
+    try {
+      const source = await ensureSource();
+      const safeEnd = Math.min(end, source.length);
+      if (start > safeEnd) return;
+      setHunks((cur) => expandFromRawCode(cur, source, start, safeEnd));
+    } catch (err) {
+      console.warn('expandFromRawCode failed', err);
+    }
+  }
+
+  const CONTEXT = 20;
   const containerRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<DragRange | null>(null);
   const [editor, setEditor] = useState<EditorRange | null>(null);
@@ -304,11 +341,66 @@ function DiffFile({
         <Diff
           viewType={view}
           diffType={file.type}
-          hunks={file.hunks}
+          hunks={hunks}
           widgets={widgets}
           tokens={tokens}
         >
-          {(hunks: HunkData[]) => hunks.map((h: HunkData) => <Hunk key={h.content} hunk={h} />)}
+          {(renderedHunks: HunkData[]) => renderedHunks.flatMap((h: HunkData, idx: number) => {
+            const prevEnd = idx === 0 ? 1 : renderedHunks[idx - 1].oldStart + renderedHunks[idx - 1].oldLines;
+            const gapTopStart = prevEnd;
+            const gapTopEnd = h.oldStart - 1;
+            const hasGapAbove = gapTopEnd >= gapTopStart;
+            const out: React.ReactElement[] = [];
+            if (hasGapAbove) {
+              const isSmallGap = gapTopEnd - gapTopStart + 1 <= CONTEXT;
+              out.push(
+                <Decoration key={`gap-${idx}`}>
+                  <div className="diff-expand-row">
+                    {!isSmallGap && (
+                      <button
+                        type="button"
+                        className="diff-expand-button diff-expand-up"
+                        title={`Expand ${CONTEXT} lines up`}
+                        onClick={(e) => { e.stopPropagation(); expandRange(Math.max(gapTopStart, h.oldStart - CONTEXT), h.oldStart - 1); }}
+                      >▲</button>
+                    )}
+                    <button
+                      type="button"
+                      className="diff-expand-button diff-expand-all"
+                      title={isSmallGap ? 'Expand gap' : `Expand all ${gapTopEnd - gapTopStart + 1} lines`}
+                      onClick={(e) => { e.stopPropagation(); expandRange(gapTopStart, gapTopEnd); }}
+                    >⇕</button>
+                    {!isSmallGap && idx > 0 && (
+                      <button
+                        type="button"
+                        className="diff-expand-button diff-expand-down"
+                        title={`Expand ${CONTEXT} lines down`}
+                        onClick={(e) => { e.stopPropagation(); const prev = renderedHunks[idx - 1]; const prevEndLine = prev.oldStart + prev.oldLines; expandRange(prevEndLine, Math.min(gapTopEnd, prevEndLine + CONTEXT - 1)); }}
+                      >▼</button>
+                    )}
+                  </div>
+                </Decoration>,
+              );
+            }
+            out.push(<Hunk key={h.content} hunk={h} />);
+            // After the last hunk, offer expand-down past the end.
+            if (idx === renderedHunks.length - 1) {
+              const tailStart = h.oldStart + h.oldLines;
+              out.push(
+                <Decoration key={`gap-tail-${idx}`}>
+                  <div className="diff-expand-row">
+                    <button
+                      type="button"
+                      className="diff-expand-button diff-expand-down"
+                      title={`Expand ${CONTEXT} lines below`}
+                      onClick={(e) => { e.stopPropagation(); expandRange(tailStart, tailStart + CONTEXT - 1); }}
+                    >▼</button>
+                  </div>
+                </Decoration>,
+              );
+            }
+            return out;
+          })}
         </Diff>
       </div>
     </section>
@@ -326,7 +418,7 @@ function makePseudoChangeForSide(_t: ReviewThread): ChangeData {
   return { type: 'insert', content: '', lineNumber: 0, isInsert: true } as unknown as ChangeData;
 }
 
-export function DiffViewer({ diff, threads, hasPendingReview, onCommitComment, onAddToReview, onReply }: DiffViewerProps) {
+export function DiffViewer({ diff, threads, hasPendingReview, pr, onCommitComment, onAddToReview, onReply }: DiffViewerProps) {
   const files = useMemo(() => parseDiff(diff), [diff]);
 
   if (files.length === 0) {
@@ -341,6 +433,7 @@ export function DiffViewer({ diff, threads, hasPendingReview, onCommitComment, o
           file={file}
           threads={threads}
           hasPendingReview={hasPendingReview}
+          pr={pr}
           onCommitComment={onCommitComment}
           onAddToReview={onAddToReview}
           onReply={onReply}

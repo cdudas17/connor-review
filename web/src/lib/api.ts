@@ -71,6 +71,10 @@ export const api = {
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
     return call(`/api/team/prs${suffix}`);
   },
+  getFileContent(owner: string, repo: string, number: number, path: string, ref: string): Promise<string> {
+    const qs = new URLSearchParams({ path, ref });
+    return call(`/api/pulls/${owner}/${repo}/${number}/files/content?${qs.toString()}`);
+  },
   replyToThread(owner: string, repo: string, number: number, threadId: string, body: string) {
     return call(`/api/pulls/${owner}/${repo}/${number}/threads/${threadId}/reply`, {
       method: 'POST',

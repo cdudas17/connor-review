@@ -126,6 +126,7 @@ export function ReviewDrawer(props: Props) {
         diff={diff}
         threads={meta.reviewThreads}
         hasPendingReview={pendingReviewId != null}
+        pr={{ owner: current.owner, repo: current.repo, number: current.number, baseRef: meta.baseRefName }}
         onCommitComment={commitStandaloneComment}
         onAddToReview={addToReview}
         onReply={reply}

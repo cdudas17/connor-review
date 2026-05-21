@@ -282,6 +282,29 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     return parsed.data?.submitPullRequestReview?.pullRequestReview ?? {};
   });
 
+  // Fetch a file's full text at a given ref so the diff viewer can expand unchanged
+  // context above/below a hunk. Cached briefly via the existing diff cache key.
+  app.get<{
+    Params: { owner: string; repo: string; number: string };
+    Querystring: { path: string; ref: string };
+  }>('/api/pulls/:owner/:repo/:number/files/content', async (req, reply) => {
+    parsePullParams(req.params);
+    const { path, ref } = req.query;
+    if (!path || !ref) {
+      reply.code(400).send({ code: 'BAD_PARAMS', message: 'path and ref query params are required' });
+      return;
+    }
+    const out = await ghExec([
+      'api',
+      `repos/${req.params.owner}/${req.params.repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`,
+      '--jq', '.content',
+    ]);
+    const b64 = out.trim().replace(/^"|"$/g, '').replace(/\\n/g, '');
+    const text = Buffer.from(b64, 'base64').toString('utf8');
+    reply.type('text/plain; charset=utf-8');
+    return text;
+  });
+
   app.post<{
     Params: { owner: string; repo: string; number: string; threadId: string };
     Body: { body: string };
