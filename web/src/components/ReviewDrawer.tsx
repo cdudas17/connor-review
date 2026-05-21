@@ -36,7 +36,13 @@ export function ReviewDrawer(props: Props) {
 
   const commitStandaloneComment = useCallback(async (c: StagedInlineComment) => {
     if (!current) return;
-    await api.createThread(current.owner, current.repo, current.number, c);
+    // GitHub's data model attaches every inline comment to a review. To match what the
+    // github.com "Comment" button does, submit a one-shot review with event=COMMENT
+    // containing only this thread — published immediately, no pending review involved.
+    await api.createReview(current.owner, current.repo, current.number, {
+      event: 'COMMENT',
+      threads: [c],
+    });
     reload();
   }, [current, reload]);
 
