@@ -12,6 +12,7 @@ export const META_FIXTURE: PullRequestMeta = {
   reviewDecision: 'REVIEW_REQUIRED',
   ciStatus: 'SUCCESS',
   createdAt: '2026-02-25T00:00:00Z',
+  bodyHtml: '<p>Test PR description</p>',
   baseRefName: 'main',
   headRefName: 'feature',
   headSha: 'sha-1',

@@ -31,6 +31,8 @@ export interface PullRequestMeta {
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   ciStatus: CiStatus;
   createdAt: string | null;
+  /** Pre-rendered GitHub-flavored markdown HTML for the PR body. Safe — GitHub sanitizes. */
+  bodyHtml: string | null;
   baseRefName: string;
   headRefName: string;
   headSha: string;

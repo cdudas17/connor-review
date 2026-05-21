@@ -154,6 +154,50 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .drawer-close { position: absolute; top: 12px; right: 16px; font-size: 1.4rem; background: transparent; border: none; cursor: pointer; }
 .pr-header h2 { margin-bottom: 4px; }
 .pr-header-meta { color: var(--muted); font-size: 0.9rem; }
+
+/* PR description card */
+.pr-description { position: relative; margin: 12px 0 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); padding: 16px 20px; }
+.pr-description .markdown-body { font-size: 14px; line-height: 1.5; word-wrap: break-word; }
+.pr-description .markdown-body-collapsed { overflow: hidden; position: relative; }
+.pr-description .markdown-body-collapsed::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 60px; background: linear-gradient(to bottom, transparent, var(--bg-subtle)); pointer-events: none; }
+.pr-description-toggle { display: inline-block; margin-top: 8px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--accent); cursor: pointer; font: inherit; font-size: 0.85rem; }
+.pr-description-toggle:hover { background: var(--border-muted); }
+
+/* GitHub-flavored markdown styling — kept close to Primer's @primer/css/markdown */
+.markdown-body { color: var(--fg); }
+.markdown-body > *:first-child { margin-top: 0; }
+.markdown-body > *:last-child { margin-bottom: 0; }
+.markdown-body p, .markdown-body ul, .markdown-body ol, .markdown-body dl, .markdown-body table, .markdown-body pre, .markdown-body blockquote { margin: 0 0 12px; }
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 { font-weight: 600; line-height: 1.25; margin: 24px 0 12px; }
+.markdown-body h1 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+.markdown-body h2 { font-size: 1.25em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+.markdown-body h3 { font-size: 1.1em; }
+.markdown-body h4 { font-size: 1em; }
+.markdown-body h5 { font-size: 0.9em; }
+.markdown-body h6 { font-size: 0.85em; color: var(--muted); }
+.markdown-body a { color: var(--accent); text-decoration: none; }
+.markdown-body a:hover { text-decoration: underline; }
+.markdown-body strong { font-weight: 600; }
+.markdown-body em { font-style: italic; }
+.markdown-body ul, .markdown-body ol { padding-left: 2em; }
+.markdown-body li + li { margin-top: 4px; }
+.markdown-body li > p { margin: 4px 0; }
+.markdown-body ul ul, .markdown-body ul ol, .markdown-body ol ol, .markdown-body ol ul { margin: 4px 0; }
+.markdown-body code, .markdown-body tt { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-size: 85%; padding: 0.2em 0.4em; background: rgba(110, 118, 129, 0.4); border-radius: 6px; }
+.markdown-body pre { padding: 16px; overflow: auto; line-height: 1.45; background: rgba(110, 118, 129, 0.15); border-radius: 6px; }
+.markdown-body pre code { padding: 0; background: transparent; font-size: 85%; border-radius: 0; }
+.markdown-body blockquote { padding: 0 1em; color: var(--muted); border-left: 0.25em solid var(--border); }
+.markdown-body hr { height: 1px; border: 0; background: var(--border); margin: 24px 0; }
+.markdown-body table { border-collapse: collapse; display: block; overflow: auto; max-width: 100%; }
+.markdown-body table th, .markdown-body table td { padding: 6px 13px; border: 1px solid var(--border); }
+.markdown-body table th { font-weight: 600; background: var(--bg-subtle); }
+.markdown-body table tr:nth-child(2n) { background: var(--bg-subtle); }
+.markdown-body img { max-width: 100%; height: auto; background-color: var(--bg); }
+.markdown-body .task-list-item { list-style-type: none; }
+.markdown-body .task-list-item input[type="checkbox"] { margin: 0 0.35em 0.25em -1.6em; vertical-align: middle; }
+.markdown-body details { margin-bottom: 12px; }
+.markdown-body details summary { cursor: pointer; padding: 4px 0; }
+.markdown-body kbd { display: inline-block; padding: 3px 5px; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; line-height: 10px; color: var(--fg); vertical-align: middle; background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: 6px; box-shadow: inset 0 -1px 0 var(--border); }
 .diff-viewer .diff-file { border: 1px solid var(--border); border-radius: 6px; margin: 16px 0; overflow: hidden; background: var(--bg); }
 .diff-file-header { display: flex; justify-content: space-between; padding: 8px 12px; background: var(--bg-subtle); border-bottom: 1px solid var(--border); align-items: center; }
 .diff-file-body { user-select: text; }

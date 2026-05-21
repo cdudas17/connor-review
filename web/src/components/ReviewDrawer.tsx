@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PRHeader } from './PRHeader.js';
+import { PRDescription } from './PRDescription.js';
 import { DiffViewer } from './DiffViewer.js';
 import { ReviewFooter } from './ReviewFooter.js';
 import { ErrorToast } from './ErrorToast.js';
@@ -118,6 +119,7 @@ export function ReviewDrawer(props: Props) {
       <aside className="drawer" aria-label="Review drawer">
         <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
       <PRHeader meta={meta} />
+      <PRDescription bodyHtml={meta.bodyHtml} />
       <DiffViewer
         diff={diff}
         threads={meta.reviewThreads}
