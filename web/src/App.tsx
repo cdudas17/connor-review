@@ -64,7 +64,9 @@ export function App() {
   }, []);
 
   const filteredTeamPRs = useMemo(() => {
-    if (!memberFilter || memberFilter.size === 0) return teamPRs.prs;
+    // No member chips selected → empty list. (memberFilter === null happens briefly
+    // before the talent.yml fetch resolves; treat the same as "nothing selected".)
+    if (!memberFilter || memberFilter.size === 0) return [];
     return teamPRs.prs.filter((p) => p.authorLogin != null && memberFilter.has(p.authorLogin));
   }, [teamPRs.prs, memberFilter]);
 
