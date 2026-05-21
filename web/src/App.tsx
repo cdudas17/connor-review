@@ -279,10 +279,17 @@ export function App() {
         <>
           {teamPRs.lastFetchedAt && (
             <p className="tab-context">
-              <span className="tab-context-freshness">auto-refreshes every minute · last updated {new Date(teamPRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</span>
+              <span className="tab-context-freshness">
+                auto-refreshes every minute · last updated {new Date(teamPRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
+                {teamPRs.loading && <span className="loading-spinner" aria-label="Refreshing" />}
+              </span>
             </p>
           )}
-          {teamPRs.loading && <p className="empty">Loading team PRs…</p>}
+          {!teamPRs.lastFetchedAt && teamPRs.loading && (
+            <p className="tab-context">
+              <span className="tab-context-freshness">loading team PRs<span className="loading-spinner" aria-label="Loading" /></span>
+            </p>
+          )}
           {teamPRs.error && (
             <ErrorToast
               message={`Failed to load team PRs: ${teamPRs.error.message}`}
