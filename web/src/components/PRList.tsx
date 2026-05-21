@@ -7,6 +7,16 @@ import type { FilterMode } from './FilterToggle.js';
 interface Identity { owner: string; repo: string; number: number; }
 function prKey(id: Identity) { return `${id.owner}/${id.repo}#${id.number}`; }
 
+function formatOpenedAt(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const y = d.getFullYear();
+  return `${m}/${day}/${y}`;
+}
+
 interface Props {
   prs: TrackedPR[];
   mode: FilterMode;
@@ -29,6 +39,7 @@ export function PRList({ prs, mode, onOpen, selection }: Props) {
         const id = { owner: p.owner, repo: p.repo, number: p.number };
         const key = prKey(id);
         const selected = selection?.selectedKeys.has(key) ?? false;
+        const opened = formatOpenedAt(p.createdAt);
         return (
           <li
             key={key}
@@ -45,8 +56,12 @@ export function PRList({ prs, mode, onOpen, selection }: Props) {
                 />
               </label>
             )}
-            <span className="pr-title">{p.title}</span>
-            <span className="pr-meta">{p.owner}/{p.repo}#{p.number} · {p.authorLogin ?? 'unknown'}</span>
+            <span className="pr-text">
+              <span className="pr-title">{p.title}</span>
+              <span className="pr-meta">
+                {p.owner}/{p.repo}#{p.number} · {p.authorLogin ?? 'unknown'}{opened ? ` · ${opened}` : ''}
+              </span>
+            </span>
             <span className="pr-badges">
               <CiBadge status={p.ciStatus} />
               <GhStatusBadge status={p.ghStatus} />

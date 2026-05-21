@@ -14,6 +14,7 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
         headRefName
         headRefOid
         url
+        createdAt
         commits(last: 1) {
           nodes {
             commit {

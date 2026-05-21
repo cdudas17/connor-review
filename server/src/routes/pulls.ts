@@ -24,6 +24,7 @@ interface PullRequestMeta {
   headRefName: string;
   headSha: string;
   url: string;
+  createdAt: string | null;
   reviewThreads: ReviewThread[];
 }
 
@@ -112,6 +113,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
     headRefName: pr.headRefName,
     headSha: pr.headRefOid,
     url: pr.url,
+    createdAt: pr.createdAt ?? null,
     reviewThreads: (pr.reviewThreads?.nodes ?? []).map((t: {
       id: string;
       isResolved: boolean;

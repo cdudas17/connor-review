@@ -15,6 +15,8 @@ export interface TrackedPR {
   ghStatus: GhStatus | null;
   /** Status check rollup from GitHub (covers Buildkite + any other CI). null when unknown / no checks. */
   ciStatus: CiStatus;
+  /** ISO-8601 timestamp of when the PR was opened on GitHub. null until meta is fetched. */
+  createdAt: string | null;
   addedAt: number;
 }
 
@@ -28,6 +30,7 @@ export interface PullRequestMeta {
   isDraft: boolean;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   ciStatus: CiStatus;
+  createdAt: string | null;
   baseRefName: string;
   headRefName: string;
   headSha: string;
@@ -86,5 +89,6 @@ export interface TeamPR {
   baseRefName: string;
   headRefName: string;
   headSha: string;
+  createdAt: string | null;
   updatedAt: string;
 }

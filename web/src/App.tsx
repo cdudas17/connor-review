@@ -48,7 +48,7 @@ export function App() {
   // Backfill ciStatus / ghStatus for entries that were saved to localStorage before those
   // fields existed. Runs silently — no banner / no spinner.
   useEffect(() => {
-    const stale = myPRs.prs.filter((p) => p.ciStatus === undefined || p.ghStatus == null);
+    const stale = myPRs.prs.filter((p) => p.ciStatus === undefined || p.ghStatus == null || p.createdAt === undefined || p.createdAt == null);
     if (stale.length === 0) return;
     let cancelled = false;
     Promise.allSettled(
@@ -58,7 +58,7 @@ export function App() {
       for (const r of results) {
         if (r.status === 'fulfilled') {
           const { p, meta } = r.value;
-          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus });
+          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, createdAt: meta.createdAt });
         }
       }
     });
@@ -148,7 +148,7 @@ export function App() {
     for (const r of results) {
       if (r.status === 'fulfilled') {
         const { p, meta } = r.value;
-        myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus });
+        myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, createdAt: meta.createdAt });
       } else {
         const err = r.reason as ApiCallError;
         console.error('Failed to fetch PR meta', err);
@@ -210,7 +210,7 @@ export function App() {
       for (const r of results) {
         if (r.status === 'fulfilled') {
           const { p, meta } = r.value;
-          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus });
+          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, createdAt: meta.createdAt });
         } else {
           const err = r.reason as ApiCallError;
           console.error('Refresh failed for PR', err);

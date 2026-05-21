@@ -21,6 +21,7 @@ interface TeamPR {
   baseRefName: string;
   headRefName: string;
   headSha: string;
+  createdAt: string | null;
   updatedAt: string;
 }
 
@@ -67,6 +68,7 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
           baseRefName: string;
           headRefName: string;
           headRefOid: string;
+          createdAt?: string;
           updatedAt: string;
           commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string } } }> };
         }>;
@@ -92,6 +94,7 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
       baseRefName: n.baseRefName,
       headRefName: n.headRefName,
       headSha: n.headRefOid,
+      createdAt: n.createdAt ?? null,
       updatedAt: n.updatedAt,
     }))
     .filter((p) => p.owner && p.repo);

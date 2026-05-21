@@ -11,6 +11,7 @@ export const META_FIXTURE: PullRequestMeta = {
   isDraft: false,
   reviewDecision: 'REVIEW_REQUIRED',
   ciStatus: 'SUCCESS',
+  createdAt: '2026-02-25T00:00:00Z',
   baseRefName: 'main',
   headRefName: 'feature',
   headSha: 'sha-1',

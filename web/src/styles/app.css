@@ -92,8 +92,9 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .add-pr-bar button, .filter-toggle, .drawer button { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; cursor: pointer; font: inherit; }
 .add-pr-bar .error { color: var(--danger); }
 .pr-list { list-style: none; padding: 0; }
-.pr-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; align-items: center; }
-.pr-row-selectable { grid-template-columns: auto 1fr auto auto; }
+.pr-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; align-items: center; }
+.pr-row-selectable { grid-template-columns: auto 1fr auto; }
+.pr-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .pr-row:hover { background: rgba(37, 99, 235, 0.06); }
 .pr-row-selected { background: rgba(99, 102, 241, 0.12); }
 .pr-row-selected:hover { background: rgba(99, 102, 241, 0.18); }
