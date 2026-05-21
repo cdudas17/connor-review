@@ -52,7 +52,7 @@ function ConversationCard({ thread, onReply }: CardProps) {
     <article className={`conversation-card${open ? '' : ' conversation-card-collapsed'}`}>
       <button type="button" className="conversation-card-toggle" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
         <span className="caret" aria-hidden="true">{open ? '▾' : '▸'}</span>
-        <code className="conversation-card-path">{thread.path}:{thread.line}</code>
+        {!open && <code className="conversation-card-path">{thread.path}:{thread.line}</code>}
         <span className="conversation-card-summary">
           {first?.authorLogin ?? '?'} · {thread.comments.length} comment{thread.comments.length === 1 ? '' : 's'}
           {first ? ` · ${formatTimeAgo(first.createdAt)}` : ''}
