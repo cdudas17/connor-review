@@ -35,6 +35,7 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
                 author { login }
                 body
                 createdAt
+                diffHunk
               }
             }
           }

@@ -35,7 +35,7 @@ interface ReviewThread {
   isResolved: boolean;
   path: string;
   line: number | null;
-  comments: Array<{ id: string; authorLogin: string | null; body: string; createdAt: string }>;
+  comments: Array<{ id: string; authorLogin: string | null; body: string; createdAt: string; diffHunk: string | null }>;
 }
 
 interface CreateReviewBody {
@@ -128,6 +128,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
           author?: { login?: string };
           body: string;
           createdAt: string;
+          diffHunk?: string;
         }>;
       };
     }) => ({
@@ -140,6 +141,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
         authorLogin: c.author?.login ?? null,
         body: c.body,
         createdAt: c.createdAt,
+        diffHunk: c.diffHunk ?? null,
       })),
     })),
   };

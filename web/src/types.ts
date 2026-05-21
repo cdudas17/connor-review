@@ -49,7 +49,7 @@ export interface ReviewThread {
   startLine: number | null;
   startSide: 'LEFT' | 'RIGHT' | null;
   diffSide: 'LEFT' | 'RIGHT' | null;
-  comments: Array<{ id: string; authorLogin: string | null; body: string; createdAt: string }>;
+  comments: Array<{ id: string; authorLogin: string | null; body: string; createdAt: string; diffHunk?: string | null }>;
 }
 
 export type ReviewEvent = 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';

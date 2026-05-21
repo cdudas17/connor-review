@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ReviewThread } from '../types.js';
+import { DiffHunkSnippet } from './DiffHunkSnippet.js';
 
 interface Props {
   threads: ReviewThread[];
@@ -59,6 +60,7 @@ function ConversationCard({ thread, onReply }: CardProps) {
       </button>
       {open && (
         <div className="conversation-card-body">
+          <DiffHunkSnippet hunk={first?.diffHunk ?? null} path={thread.path} />
           {thread.comments.map((c) => (
             <div key={c.id} className="conversation-message">
               <header className="conversation-message-header">
