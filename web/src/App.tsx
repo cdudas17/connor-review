@@ -23,7 +23,7 @@ export function App() {
   const myPRs = useTrackedPRs();
   const teamPRs = useTeamPRs();
   const [tab, setTab] = useState<TabId>('my');
-  const [mode, setMode] = useState<FilterMode>('untouched-only');
+  const [mode, setMode] = useState<FilterMode>('all');
   const [current, setCurrent] = useState<Identity | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
