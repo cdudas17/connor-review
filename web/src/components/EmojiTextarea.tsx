@@ -57,7 +57,7 @@ export const EmojiTextarea = forwardRef<HTMLTextAreaElement, Props>(function Emo
   useImperativeHandle(forwardedRef, () => ref.current!, []);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [active, setActive] = useState(0);
-  const [caret, setCaret] = useState<{ top: number; left: number; lineHeight: number } | null>(null);
+  const [caret, setCaret] = useState<{ top: number; left: number; lineHeight: number; flipUp: boolean } | null>(null);
 
   const getCurrentToken = useCallback((): { start: number; query: string } | null => {
     const el = ref.current; if (!el) return null;
@@ -79,7 +79,16 @@ export const EmojiTextarea = forwardRef<HTMLTextAreaElement, Props>(function Emo
     const matches = (searchEmoji(tok.query) ?? []).slice(0, 7);
     setSuggestions(matches);
     setActive(0);
-    setCaret(getCaretPixelOffset(el, el.selectionStart ?? 0));
+    const c = getCaretPixelOffset(el, el.selectionStart ?? 0);
+    // Estimate dropdown size (7 rows × ~34px + 8px padding) and flip above the caret
+    // if it would otherwise clip the viewport bottom.
+    const DROPDOWN_HEIGHT = matches.length * 34 + 12;
+    const elRect = el.getBoundingClientRect();
+    const caretBottomInViewport = elRect.top + c.top + c.lineHeight;
+    const spaceBelow = window.innerHeight - caretBottomInViewport;
+    const spaceAbove = elRect.top + c.top;
+    const flipUp = spaceBelow < DROPDOWN_HEIGHT && spaceAbove > spaceBelow;
+    setCaret({ ...c, flipUp });
   }, [getCurrentToken]);
 
   const insert = useCallback((emoji: string) => {
@@ -127,7 +136,9 @@ export const EmojiTextarea = forwardRef<HTMLTextAreaElement, Props>(function Emo
         <ul
           className="emoji-suggestions"
           role="listbox"
-          style={{ top: caret.top + caret.lineHeight + 2, left: caret.left }}
+          style={caret.flipUp
+            ? { bottom: `calc(100% - ${caret.top}px + 2px)`, left: caret.left }
+            : { top: caret.top + caret.lineHeight + 2, left: caret.left }}
         >
           {suggestions.map((s, i) => (
             <li key={s.name}>
