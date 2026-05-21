@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AddPRBar } from './components/AddPRBar.js';
 import { PRList } from './components/PRList.js';
 import { FilterToggle, type FilterMode } from './components/FilterToggle.js';
@@ -6,6 +6,7 @@ import { ReviewDrawer } from './components/ReviewDrawer.js';
 import { AuthRequiredBanner } from './components/AuthRequiredBanner.js';
 import { ErrorToast } from './components/ErrorToast.js';
 import { Tabs, type TabId } from './components/Tabs.js';
+import { BulkActionsBar } from './components/BulkActionsBar.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
 import { nextUntouchedAfter } from './hooks/useNextPRPrefetch.js';
@@ -27,6 +28,7 @@ export function App() {
   const [authRequired, setAuthRequired] = useState(false);
   const [pendingReviews, setPendingReviews] = useState<Record<string, string>>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
   // Lazy-load team PRs the first time the Team tab is opened.
   useEffect(() => {
@@ -60,8 +62,43 @@ export function App() {
   const activePRs: TrackedPR[] = tab === 'my' ? myPRs.prs : teamPRs.prs;
   const activeSetStatus = tab === 'my' ? myPRs.setStatus : teamPRs.setStatus;
 
-  // Close the drawer when switching tabs so we don't show a PR from the other list.
-  useEffect(() => { setCurrent(null); }, [tab]);
+  // Close the drawer + clear any selection when switching tabs.
+  useEffect(() => { setCurrent(null); setSelectedKeys(new Set()); }, [tab]);
+
+  // Visible PRs after the untouched-only filter (matches what PRList renders).
+  const visiblePRs = useMemo(
+    () => (mode === 'untouched-only' ? activePRs.filter((p) => p.status === 'untouched') : activePRs),
+    [activePRs, mode],
+  );
+
+  const toggleSelect = useCallback((id: Identity) => {
+    setSelectedKeys((cur) => {
+      const next = new Set(cur);
+      const k = prKey(id);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  }, []);
+
+  const selectAllVisible = useCallback(() => {
+    setSelectedKeys(new Set(visiblePRs.map(prKey)));
+  }, [visiblePRs]);
+
+  const clearSelection = useCallback(() => setSelectedKeys(new Set()), []);
+
+  const deleteSelected = useCallback(() => {
+    if (selectedKeys.size === 0) return;
+    const ok = window.confirm(`Delete ${selectedKeys.size} PR${selectedKeys.size === 1 ? '' : 's'} from the list? (This only removes them from this app — it doesn't affect the PR on GitHub.)`);
+    if (!ok) return;
+    for (const p of activePRs) {
+      if (selectedKeys.has(prKey(p))) {
+        myPRs.remove({ owner: p.owner, repo: p.repo, number: p.number });
+      }
+    }
+    setSelectedKeys(new Set());
+    if (current && selectedKeys.has(prKey(current))) setCurrent(null);
+  }, [selectedKeys, activePRs, myPRs, current]);
 
   const handleAdd = useCallback(async (parsed: Identity[]) => {
     if (parsed.length === 0) return;
@@ -209,7 +246,23 @@ export function App() {
 
       {authRequired && <AuthRequiredBanner onDismiss={() => setAuthRequired(false)} />}
 
-      <PRList prs={activePRs} mode={mode} onOpen={setCurrent} />
+      {tab === 'my' && (
+        <BulkActionsBar
+          selectedCount={selectedKeys.size}
+          totalVisible={visiblePRs.length}
+          allSelected={visiblePRs.length > 0 && visiblePRs.every((p) => selectedKeys.has(prKey(p)))}
+          onSelectAll={selectAllVisible}
+          onClear={clearSelection}
+          onDelete={deleteSelected}
+        />
+      )}
+
+      <PRList
+        prs={activePRs}
+        mode={mode}
+        onOpen={setCurrent}
+        {...(tab === 'my' ? { selection: { selectedKeys, onToggle: toggleSelect } } : {})}
+      />
 
       {current && (
         <ReviewDrawer
