@@ -26,6 +26,7 @@ export const META_FIXTURE_2: PullRequestMeta = { ...META_FIXTURE, id: 'PR_def', 
 export const DIFF_FIXTURE = `diff --git a/file.txt b/file.txt\nindex 0..1 100644\n--- a/file.txt\n+++ b/file.txt\n@@ -1,1 +1,1 @@\n-old\n+new\n`;
 
 export const handlers = [
+  http.get('/api/team/prs', () => HttpResponse.json({ members: [], prs: [] })),
   http.get('/api/pulls/:owner/:repo/:number', ({ params }) => {
     const n = Number(params.number);
     if (n === 2) return HttpResponse.json(META_FIXTURE_2);

@@ -81,6 +81,7 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .tab-active .tab-badge { color: var(--fg); }
 .tab-context { color: var(--muted); font-size: 0.9rem; margin: 8px 0 12px; }
 .tab-context code { background: var(--bg-subtle); padding: 1px 4px; border-radius: 3px; }
+.tab-context-freshness { color: var(--muted); font-size: 0.85rem; }
 .refresh-button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); color: inherit; cursor: pointer; font: inherit; }
 .refresh-button:hover:not(:disabled) { background: var(--border-muted); }
 .refresh-button:disabled { opacity: 0.5; cursor: not-allowed; }

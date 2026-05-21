@@ -21,7 +21,10 @@ function prKey(id: Identity) { return `${id.owner}/${id.repo}#${id.number}`; }
 
 export function App() {
   const myPRs = useTrackedPRs();
-  const teamPRs = useTeamPRs();
+  // Auto-fetch team PRs on app launch and every 5 minutes while the tab is visible.
+  // 2 API calls per refresh × 12 refreshes/hour = ~24 calls/hr, well under GitHub's
+  // 5,000/hour authenticated rate limit.
+  const teamPRs = useTeamPRs({ autoRefreshMs: 5 * 60 * 1000 });
   const [tab, setTab] = useState<TabId>('my');
   const [mode, setMode] = useState<FilterMode>('all');
   const [current, setCurrent] = useState<Identity | null>(null);
@@ -37,13 +40,6 @@ export function App() {
     if (teamPRs.members.length === 0) return;
     setMemberFilter((cur) => cur ?? new Set(teamPRs.members));
   }, [teamPRs.members]);
-
-  // Lazy-load team PRs the first time the Team tab is opened.
-  useEffect(() => {
-    if (tab === 'team' && !teamPRs.hasLoaded && !teamPRs.loading) {
-      teamPRs.fetch();
-    }
-  }, [tab, teamPRs]);
 
   // Backfill ciStatus / ghStatus for entries that were saved to localStorage before those
   // fields existed. Runs silently — no banner / no spinner.
@@ -279,7 +275,12 @@ export function App() {
       )}
       {tab === 'team' && (
         <>
-          <p className="tab-context">PRs from <code>Gusto/zenpayroll</code>'s <code>config/teams/people_os/talent.yml</code> — open, non-draft, not yet approved.</p>
+          <p className="tab-context">
+            PRs from <code>Gusto/zenpayroll</code>'s <code>config/teams/people_os/talent.yml</code> — open, non-draft, not yet approved.
+            {teamPRs.lastFetchedAt && (
+              <span className="tab-context-freshness"> · auto-refreshes every 5 min · last updated {new Date(teamPRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+            )}
+          </p>
           {teamPRs.loading && <p className="empty">Loading team PRs…</p>}
           {teamPRs.error && (
             <ErrorToast
