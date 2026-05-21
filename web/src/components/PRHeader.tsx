@@ -1,16 +1,25 @@
-import type { PullRequestMeta } from '../types.js';
+import type { CiStatus, GhStatus, PullRequestMeta } from '../types.js';
 import { GhStatusBadge } from './GhStatusBadge.js';
 import { CiBadge } from './CiBadge.js';
 import { computeGhStatus } from '../lib/ghStatus.js';
 
-export function PRHeader({ meta }: { meta: PullRequestMeta }) {
-  const status = computeGhStatus(meta);
+interface Props {
+  meta: PullRequestMeta;
+  /** Latest values from the auto-refreshing list. Override the (potentially stale)
+   *  values derived from the drawer's own meta fetch. */
+  latestGhStatus?: GhStatus | null;
+  latestCiStatus?: CiStatus;
+}
+
+export function PRHeader({ meta, latestGhStatus, latestCiStatus }: Props) {
+  const status = latestGhStatus ?? computeGhStatus(meta);
+  const ci = latestCiStatus !== undefined ? latestCiStatus : meta.ciStatus;
   return (
     <header className="pr-header">
       <div className="pr-header-title">
         <h2>{meta.title}</h2>
         <GhStatusBadge status={status} />
-        <CiBadge status={meta.ciStatus} />
+        <CiBadge status={ci} />
       </div>
       <p className="pr-header-meta">
         <a href={meta.url} target="_blank" rel="noopener noreferrer">#{meta.number}</a>

@@ -8,7 +8,7 @@ import { ErrorToast } from './ErrorToast.js';
 import { usePRDetails } from '../hooks/usePRDetails.js';
 import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
 import { api } from '../lib/api.js';
-import type { PRStatus, PullRequestMeta, ReviewEvent, StagedInlineComment, TrackedPR } from '../types.js';
+import type { CiStatus, GhStatus, PRStatus, PullRequestMeta, ReviewEvent, StagedInlineComment, TrackedPR } from '../types.js';
 
 interface Identity { owner: string; repo: string; number: number; }
 
@@ -16,6 +16,9 @@ interface Props {
   current: Identity | null;
   prs: TrackedPR[];
   pendingReviewId: string | null;
+  /** Latest CI / GH status from the auto-refreshing list — overrides drawer-fetched meta. */
+  latestGhStatus?: GhStatus | null;
+  latestCiStatus?: CiStatus;
   onPendingReviewChange: (id: Identity, reviewId: string | null) => void;
   onMetaLoaded?: (id: Identity, meta: PullRequestMeta) => void;
   onAdvance: (id: Identity, newStatus: PRStatus) => void;
@@ -23,7 +26,7 @@ interface Props {
 }
 
 export function ReviewDrawer(props: Props) {
-  const { current, prs, pendingReviewId, onPendingReviewChange, onMetaLoaded, onAdvance, onClose } = props;
+  const { current, prs, pendingReviewId, latestGhStatus, latestCiStatus, onPendingReviewChange, onMetaLoaded, onAdvance, onClose } = props;
   const { meta, diff, loading, error, reload } = usePRDetails(current);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -125,7 +128,7 @@ export function ReviewDrawer(props: Props) {
       <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
       <aside className="drawer" aria-label="Review drawer">
         <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
-      <PRHeader meta={meta} />
+      <PRHeader meta={meta} latestGhStatus={latestGhStatus} latestCiStatus={latestCiStatus} />
       <PRDescription bodyHtml={meta.bodyHtml} />
       <ConversationsList threads={meta.reviewThreads} onReply={reply} />
       <DiffViewer

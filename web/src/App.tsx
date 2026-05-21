@@ -329,17 +329,22 @@ export function App() {
         {...(tab === 'my' ? { selection: { selectedKeys, onToggle: toggleSelect } } : {})}
       />
 
-      {current && (
-        <ReviewDrawer
-          current={current}
-          prs={activePRs}
-          pendingReviewId={currentPendingReviewId}
-          onPendingReviewChange={setPendingReview}
-          onMetaLoaded={handleMetaLoaded}
-          onAdvance={handleAdvance}
-          onClose={() => setCurrent(null)}
-        />
-      )}
+      {current && (() => {
+        const tracked = activePRs.find((p) => same(p, current));
+        return (
+          <ReviewDrawer
+            current={current}
+            prs={activePRs}
+            pendingReviewId={currentPendingReviewId}
+            latestGhStatus={tracked?.ghStatus}
+            latestCiStatus={tracked?.ciStatus}
+            onPendingReviewChange={setPendingReview}
+            onMetaLoaded={handleMetaLoaded}
+            onAdvance={handleAdvance}
+            onClose={() => setCurrent(null)}
+          />
+        );
+      })()}
     </main>
   );
 }
