@@ -107,6 +107,19 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .bulk-actions-buttons button:hover { background: var(--border-muted); }
 .bulk-actions-buttons .btn-danger { border-color: var(--danger); color: var(--danger); }
 .bulk-actions-buttons .btn-danger:hover { background: rgba(248, 81, 73, 0.12); }
+
+/* Team-tab member filter chips */
+.member-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; margin: 0 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); }
+.member-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+.member-filter-bulk { display: flex; gap: 8px; }
+.member-filter-bulk button { padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: inherit; cursor: pointer; font: inherit; font-size: 0.85rem; }
+.member-filter-bulk button:hover { background: var(--border-muted); }
+.member-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: 0.8rem; transition: background-color 80ms, color 80ms, border-color 80ms; }
+.member-chip:hover { background: var(--border-muted); color: var(--fg); }
+.member-chip-on { background: rgba(99, 102, 241, 0.18); border-color: var(--accent); color: var(--fg); }
+.member-chip-on:hover { background: rgba(99, 102, 241, 0.28); }
+.member-chip-count { font-size: 0.72rem; padding: 0 6px; min-width: 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
+.member-chip-on .member-chip-count { background: var(--accent); color: #fff; border-color: var(--accent); }
 .pr-title { font-weight: 600; }
 .pr-meta { color: var(--muted); font-size: 0.9rem; }
 .pr-badges { display: inline-flex; gap: 6px; align-items: center; }

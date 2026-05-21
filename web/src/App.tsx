@@ -7,6 +7,7 @@ import { AuthRequiredBanner } from './components/AuthRequiredBanner.js';
 import { ErrorToast } from './components/ErrorToast.js';
 import { Tabs, type TabId } from './components/Tabs.js';
 import { BulkActionsBar } from './components/BulkActionsBar.js';
+import { MemberFilter } from './components/MemberFilter.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
 import { nextUntouchedAfter } from './hooks/useNextPRPrefetch.js';
@@ -29,6 +30,13 @@ export function App() {
   const [pendingReviews, setPendingReviews] = useState<Record<string, string>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [memberFilter, setMemberFilter] = useState<Set<string> | null>(null);
+
+  // First time members load (or when they change), default to "show all".
+  useEffect(() => {
+    if (teamPRs.members.length === 0) return;
+    setMemberFilter((cur) => cur ?? new Set(teamPRs.members));
+  }, [teamPRs.members]);
 
   // Lazy-load team PRs the first time the Team tab is opened.
   useEffect(() => {
@@ -59,8 +67,34 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const activePRs: TrackedPR[] = tab === 'my' ? myPRs.prs : teamPRs.prs;
+  const filteredTeamPRs = useMemo(() => {
+    if (!memberFilter || memberFilter.size === 0) return teamPRs.prs;
+    return teamPRs.prs.filter((p) => p.authorLogin != null && memberFilter.has(p.authorLogin));
+  }, [teamPRs.prs, memberFilter]);
+
+  const activePRs: TrackedPR[] = tab === 'my' ? myPRs.prs : filteredTeamPRs;
   const activeSetStatus = tab === 'my' ? myPRs.setStatus : teamPRs.setStatus;
+
+  const teamPRCountByMember = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of teamPRs.prs) {
+      if (p.authorLogin) counts[p.authorLogin] = (counts[p.authorLogin] ?? 0) + 1;
+    }
+    return counts;
+  }, [teamPRs.prs]);
+
+  const toggleMember = useCallback((login: string) => {
+    setMemberFilter((cur) => {
+      const base = cur ?? new Set(teamPRs.members);
+      const next = new Set(base);
+      if (next.has(login)) next.delete(login);
+      else next.add(login);
+      return next;
+    });
+  }, [teamPRs.members]);
+
+  const selectAllMembers = useCallback(() => setMemberFilter(new Set(teamPRs.members)), [teamPRs.members]);
+  const clearAllMembers = useCallback(() => setMemberFilter(new Set()), []);
 
   // Close the drawer + clear any selection when switching tabs.
   useEffect(() => { setCurrent(null); setSelectedKeys(new Set()); }, [tab]);
@@ -239,6 +273,16 @@ export function App() {
             <ErrorToast
               message={`Failed to load team PRs: ${teamPRs.error.message}`}
               onDismiss={() => { /* user can click Refresh */ }}
+            />
+          )}
+          {teamPRs.members.length > 0 && (
+            <MemberFilter
+              members={teamPRs.members}
+              selected={memberFilter ?? new Set(teamPRs.members)}
+              countsByMember={teamPRCountByMember}
+              onToggle={toggleMember}
+              onSelectAll={selectAllMembers}
+              onClearAll={clearAllMembers}
             />
           )}
         </>

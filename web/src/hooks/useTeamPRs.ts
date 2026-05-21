@@ -23,6 +23,7 @@ function saveStatuses(statuses: Record<string, PRStatus>) {
 
 interface State {
   prs: TrackedPR[];
+  members: string[];
   loading: boolean;
   error: ApiCallError | null;
   hasLoaded: boolean;
@@ -36,7 +37,7 @@ interface State {
  * Drafts/merged/already-approved PRs are filtered out server-side.
  */
 export function useTeamPRs() {
-  const [state, setState] = useState<State>({ prs: [], loading: false, error: null, hasLoaded: false });
+  const [state, setState] = useState<State>({ prs: [], members: [], loading: false, error: null, hasLoaded: false });
   const [statuses, setStatuses] = useState<Record<string, PRStatus>>(() => loadStatuses());
 
   useEffect(() => { saveStatuses(statuses); }, [statuses]);
@@ -44,7 +45,7 @@ export function useTeamPRs() {
   const fetch = useCallback(async () => {
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const { prs } = await api.getTeamPRs();
+      const { prs, members } = await api.getTeamPRs();
       const tracked: TrackedPR[] = prs.map((p: TeamPR) => ({
         owner: p.owner,
         repo: p.repo,
@@ -58,7 +59,7 @@ export function useTeamPRs() {
       }));
       // Newest PRs first.
       tracked.sort((a, b) => b.addedAt - a.addedAt);
-      setState({ prs: tracked, loading: false, error: null, hasLoaded: true });
+      setState({ prs: tracked, members, loading: false, error: null, hasLoaded: true });
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e as ApiCallError, hasLoaded: true }));
     }
