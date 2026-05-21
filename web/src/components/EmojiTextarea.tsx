@@ -6,6 +6,47 @@ interface Suggestion { name: string; emoji: string; }
 type Props = TextareaHTMLAttributes<HTMLTextAreaElement>;
 
 /**
+ * Mirror-div technique: build a hidden block element matching the textarea's text
+ * layout, fill it with text up to the caret + a marker, measure the marker's
+ * position relative to the textarea. Works in every modern browser.
+ */
+function getCaretPixelOffset(el: HTMLTextAreaElement, position: number): { top: number; left: number; lineHeight: number } {
+  const style = window.getComputedStyle(el);
+  const mirror = document.createElement('div');
+  const props = [
+    'boxSizing', 'width',
+    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+    'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+    'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariant', 'fontStretch',
+    'letterSpacing', 'wordSpacing', 'textIndent', 'textAlign', 'textTransform',
+    'lineHeight', 'tabSize', 'MozTabSize',
+    'whiteSpace', 'wordWrap', 'wordBreak', 'overflowWrap', 'direction',
+  ] as const;
+  for (const p of props) {
+    // @ts-expect-error – dynamic style copy
+    mirror.style[p] = style[p];
+  }
+  mirror.style.position = 'absolute';
+  mirror.style.visibility = 'hidden';
+  mirror.style.overflow = 'hidden';
+  mirror.style.top = '0';
+  mirror.style.left = '-9999px';
+  mirror.style.whiteSpace = 'pre-wrap';
+  mirror.style.wordWrap = 'break-word';
+  mirror.style.width = `${el.clientWidth}px`;
+  mirror.textContent = el.value.substring(0, position);
+  const marker = document.createElement('span');
+  marker.textContent = el.value.substring(position) || '.';
+  mirror.appendChild(marker);
+  document.body.appendChild(mirror);
+  const lineHeight = parseFloat(style.lineHeight) || (parseFloat(style.fontSize) * 1.4);
+  const top = marker.offsetTop - el.scrollTop;
+  const left = marker.offsetLeft - el.scrollLeft;
+  document.body.removeChild(mirror);
+  return { top, left, lineHeight };
+}
+
+/**
  * Textarea drop-in that opens a `:shortcode:` emoji autocomplete dropdown
  * (matches GitHub's behaviour). Typing `:fire` brings up a list; ArrowUp /
  * ArrowDown navigates, Enter or Tab inserts the selected emoji, Escape closes.
@@ -16,6 +57,7 @@ export const EmojiTextarea = forwardRef<HTMLTextAreaElement, Props>(function Emo
   useImperativeHandle(forwardedRef, () => ref.current!, []);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [active, setActive] = useState(0);
+  const [caret, setCaret] = useState<{ top: number; left: number; lineHeight: number } | null>(null);
 
   const getCurrentToken = useCallback((): { start: number; query: string } | null => {
     const el = ref.current; if (!el) return null;
@@ -31,11 +73,13 @@ export const EmojiTextarea = forwardRef<HTMLTextAreaElement, Props>(function Emo
   }, []);
 
   const updateSuggestions = useCallback(() => {
+    const el = ref.current;
     const tok = getCurrentToken();
-    if (!tok || tok.query.length < 1) { setSuggestions([]); return; }
+    if (!el || !tok || tok.query.length < 1) { setSuggestions([]); setCaret(null); return; }
     const matches = (searchEmoji(tok.query) ?? []).slice(0, 7);
     setSuggestions(matches);
     setActive(0);
+    setCaret(getCaretPixelOffset(el, el.selectionStart ?? 0));
   }, [getCurrentToken]);
 
   const insert = useCallback((emoji: string) => {
@@ -79,8 +123,12 @@ export const EmojiTextarea = forwardRef<HTMLTextAreaElement, Props>(function Emo
   return (
     <div className="emoji-textarea">
       <textarea {...props} ref={ref} onChange={handleChange} onKeyDown={handleKeyDown} onBlur={handleBlur} />
-      {suggestions.length > 0 && (
-        <ul className="emoji-suggestions" role="listbox">
+      {suggestions.length > 0 && caret && (
+        <ul
+          className="emoji-suggestions"
+          role="listbox"
+          style={{ top: caret.top + caret.lineHeight + 2, left: caret.left }}
+        >
           {suggestions.map((s, i) => (
             <li key={s.name}>
               <button
