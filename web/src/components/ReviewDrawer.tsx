@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PRHeader } from './PRHeader.js';
 import { PRDescription } from './PRDescription.js';
+import { ConversationsList } from './ConversationsList.js';
 import { DiffViewer } from './DiffViewer.js';
 import { ReviewFooter } from './ReviewFooter.js';
 import { ErrorToast } from './ErrorToast.js';
@@ -120,6 +121,7 @@ export function ReviewDrawer(props: Props) {
         <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
       <PRHeader meta={meta} />
       <PRDescription bodyHtml={meta.bodyHtml} />
+      <ConversationsList threads={meta.reviewThreads} onReply={reply} />
       <DiffViewer
         diff={diff}
         threads={meta.reviewThreads}

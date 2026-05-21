@@ -198,6 +198,38 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .markdown-body details { margin-bottom: 12px; }
 .markdown-body details summary { cursor: pointer; padding: 4px 0; }
 .markdown-body kbd { display: inline-block; padding: 3px 5px; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; line-height: 10px; color: var(--fg); vertical-align: middle; background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: 6px; box-shadow: inset 0 -1px 0 var(--border); }
+
+/* Conversations section (top-of-drawer mirror of inline review threads) */
+.conversations { margin: 12px 0 16px; }
+.conversations-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.conversations-toggle { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: none; background: transparent; cursor: pointer; color: var(--fg); font: inherit; }
+.conversations-toggle h3 { margin: 0; font-size: 1.05rem; display: inline-flex; align-items: center; gap: 8px; }
+.conversations-count { font-size: 0.75rem; padding: 1px 8px; border-radius: 999px; background: var(--bg-subtle); border: 1px solid var(--border); color: var(--muted); font-weight: 500; }
+.conversations-list { display: flex; flex-direction: column; gap: 8px; }
+.caret { display: inline-block; width: 14px; text-align: center; color: var(--muted); }
+
+.conversation-card { border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); overflow: hidden; }
+.conversation-card-toggle { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 12px; background: var(--bg-subtle); border: none; color: var(--fg); cursor: pointer; font: inherit; text-align: left; }
+.conversation-card-toggle:hover { background: var(--border-muted); }
+.conversation-card-path { font-size: 0.85rem; color: var(--muted); }
+.conversation-card-summary { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+.conversation-card-collapsed .conversation-card-toggle { border-radius: 6px; }
+.conversation-card-body { background: var(--bg); padding: 12px 14px; border-top: 1px solid var(--border); }
+.conversation-message { margin: 0 0 12px; padding: 0 0 12px; border-bottom: 1px solid var(--border-muted); }
+.conversation-message:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.conversation-message-header { display: flex; gap: 10px; align-items: baseline; margin-bottom: 4px; }
+.conversation-message-header strong { font-size: 0.9rem; }
+.conversation-message-header time { color: var(--muted); font-size: 0.8rem; }
+.conversation-message p { margin: 0; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+.conversation-reply { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-muted); }
+.conversation-reply textarea { width: 100%; min-height: 56px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); color: inherit; font: inherit; box-sizing: border-box; }
+.conversation-reply textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.conversation-reply-error { color: var(--danger); font-size: 0.85rem; margin: 6px 0 0; }
+.conversation-reply-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.conversation-reply-actions button { padding: 5px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: inherit; cursor: pointer; font: inherit; }
+.conversation-reply-actions button:hover:not(:disabled) { background: var(--border-muted); }
+.conversation-reply-actions .btn-primary { background: var(--ok); border-color: var(--ok); color: #ffffff; }
+.conversation-reply-actions .btn-primary:hover:not(:disabled) { background: var(--ok-hover); border-color: var(--ok-hover); }
 .diff-viewer .diff-file { border: 1px solid var(--border); border-radius: 6px; margin: 16px 0; overflow: hidden; background: var(--bg); }
 .diff-file-header { display: flex; justify-content: space-between; padding: 8px 12px; background: var(--bg-subtle); border-bottom: 1px solid var(--border); align-items: center; }
 .diff-file-body { user-select: text; }
