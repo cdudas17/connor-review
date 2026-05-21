@@ -15,6 +15,7 @@ import {
 } from 'react-diff-view';
 import 'react-diff-view/style/index.css';
 import { api } from '../lib/api.js';
+import { EmojiTextarea } from './EmojiTextarea.js';
 import type { ReviewThread, StagedInlineComment } from '../types.js';
 
 export interface DiffViewerProps {
@@ -293,7 +294,7 @@ function DiffFile({
               </div>
             ))}
             <div className="thread-reply">
-              <textarea
+              <EmojiTextarea
                 placeholder="Write a reply…"
                 value={replyState?.threadId === t.id ? replyState.body : ''}
                 onChange={(e) => setReplyState({ threadId: t.id, body: e.target.value })}
@@ -325,7 +326,7 @@ function DiffFile({
         {existing}
         <div className="inline-editor">
           <p className="inline-editor-anchor">{rangeLabel()}</p>
-          <textarea
+          <EmojiTextarea
             value={editorBody}
             onChange={(e) => setEditorBody(e.target.value)}
             aria-label="Add a comment"

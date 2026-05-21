@@ -1,4 +1,5 @@
 import type { ReviewEvent } from '../types.js';
+import { EmojiTextarea } from './EmojiTextarea.js';
 
 interface Props {
   summary: string;
@@ -15,7 +16,7 @@ export function ReviewFooter({ summary, onSummaryChange, onSubmit, onNext, canSu
   return (
     <footer className="review-footer">
       {finishLabel && <h4 className="review-footer-heading">{finishLabel}</h4>}
-      <textarea
+      <EmojiTextarea
         aria-label="Review summary"
         placeholder="Leave a summary (optional)"
         value={summary}

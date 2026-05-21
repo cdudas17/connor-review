@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ReviewThread } from '../types.js';
 import { DiffHunkSnippet } from './DiffHunkSnippet.js';
+import { EmojiTextarea } from './EmojiTextarea.js';
 
 interface Props {
   threads: ReviewThread[];
@@ -71,7 +72,7 @@ function ConversationCard({ thread, onReply }: CardProps) {
             </div>
           ))}
           <div className="conversation-reply">
-            <textarea
+            <EmojiTextarea
               placeholder="Reply…"
               value={reply}
               onChange={(e) => setReply(e.target.value)}

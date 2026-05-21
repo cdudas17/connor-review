@@ -84,6 +84,16 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .tab-context-freshness { color: var(--muted); font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; }
 .loading-spinner { display: inline-block; width: 10px; height: 10px; border: 1.5px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: cr-spin 700ms linear infinite; margin-left: 6px; vertical-align: -1px; }
 @keyframes cr-spin { to { transform: rotate(360deg); } }
+
+/* :shortcode: emoji autocomplete dropdown */
+.emoji-textarea { position: relative; }
+.emoji-suggestions { position: absolute; top: 100%; left: 0; z-index: 70; margin: 4px 0 0; padding: 4px; list-style: none; min-width: 240px; max-width: 320px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
+.emoji-suggestions li { margin: 0; }
+.emoji-suggestion { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 10px; border: none; border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; font: inherit; font-size: 0.9rem; text-align: left; }
+.emoji-suggestion-active, .emoji-suggestion:hover { background: var(--accent); color: #fff; }
+.emoji-suggestion-emoji { font-size: 1.1rem; line-height: 1; flex-shrink: 0; }
+.emoji-suggestion-name { color: var(--muted); }
+.emoji-suggestion-active .emoji-suggestion-name, .emoji-suggestion:hover .emoji-suggestion-name { color: rgba(255, 255, 255, 0.85); }
 .refresh-button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); color: inherit; cursor: pointer; font: inherit; }
 .refresh-button:hover:not(:disabled) { background: var(--border-muted); }
 .refresh-button:disabled { opacity: 0.5; cursor: not-allowed; }
