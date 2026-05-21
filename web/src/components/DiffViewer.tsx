@@ -145,13 +145,15 @@ function DiffFile({
     return sourceFetching.current;
   }
 
-  async function expandRange(start: number, end: number) {
-    if (start > end) return;
+  async function expandRange(start: number, endInclusive: number) {
+    if (start > endInclusive) return;
     try {
       const source = await ensureSource();
-      const safeEnd = Math.min(end, source.length);
+      const safeEnd = Math.min(endInclusive, source.length);
       if (start > safeEnd) return;
-      setHunks((cur) => expandFromRawCode(cur, source, start, safeEnd));
+      // expandFromRawCode treats `end` as EXCLUSIVE (slice(start-1, end-1)). To include
+      // safeEnd, we pass safeEnd + 1.
+      setHunks((cur) => expandFromRawCode(cur, source, start, safeEnd + 1));
     } catch (err) {
       console.warn('expandFromRawCode failed', err);
     }
