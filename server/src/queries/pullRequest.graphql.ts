@@ -20,7 +20,16 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
         commits(last: 1) {
           nodes {
             commit {
-              statusCheckRollup { state }
+              statusCheckRollup {
+                state
+                contexts(first: 100) {
+                  nodes {
+                    __typename
+                    ... on StatusContext { context state targetUrl }
+                    ... on CheckRun { name status conclusion detailsUrl }
+                  }
+                }
+              }
             }
           }
         }

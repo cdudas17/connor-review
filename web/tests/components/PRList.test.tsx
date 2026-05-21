@@ -5,9 +5,9 @@ import { PRList } from '../../src/components/PRList.js';
 import type { TrackedPR } from '../../src/types.js';
 
 const PRS: TrackedPR[] = [
-  { owner: 'a', repo: 'b', number: 1, title: 'First', authorLogin: 'alice', status: 'untouched', ghStatus: 'open', ciStatus: 'SUCCESS', createdAt: '2026-02-25T00:00:00Z', addedAt: 1 },
-  { owner: 'a', repo: 'b', number: 2, title: 'Second', authorLogin: 'bob', status: 'reviewed', ghStatus: 'open', ciStatus: 'PENDING', createdAt: null, addedAt: 2 },
-  { owner: 'a', repo: 'b', number: 3, title: 'Third', authorLogin: 'carol', status: 'approved', ghStatus: 'merged', ciStatus: 'SUCCESS', createdAt: null, addedAt: 3 },
+  { owner: 'a', repo: 'b', number: 1, title: 'First', authorLogin: 'alice', status: 'untouched', ghStatus: 'open', ciStatus: 'SUCCESS', ciUrl: null, createdAt: '2026-02-25T00:00:00Z', addedAt: 1 },
+  { owner: 'a', repo: 'b', number: 2, title: 'Second', authorLogin: 'bob', status: 'reviewed', ghStatus: 'open', ciStatus: 'PENDING', ciUrl: 'https://buildkite.com/gusto/zenpayroll/builds/1', createdAt: null, addedAt: 2 },
+  { owner: 'a', repo: 'b', number: 3, title: 'Third', authorLogin: 'carol', status: 'approved', ghStatus: 'merged', ciStatus: 'SUCCESS', ciUrl: null, createdAt: null, addedAt: 3 },
 ];
 
 describe('PRList', () => {

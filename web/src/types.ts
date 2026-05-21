@@ -15,6 +15,8 @@ export interface TrackedPR {
   ghStatus: GhStatus | null;
   /** Status check rollup from GitHub (covers Buildkite + any other CI). null when unknown / no checks. */
   ciStatus: CiStatus;
+  /** URL of the buildkite/zenpayroll check, when present. */
+  ciUrl: string | null;
   /** ISO-8601 timestamp of when the PR was opened on GitHub. null until meta is fetched. */
   createdAt: string | null;
   addedAt: number;
@@ -30,6 +32,7 @@ export interface PullRequestMeta {
   isDraft: boolean;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   ciStatus: CiStatus;
+  ciUrl: string | null;
   createdAt: string | null;
   /** Pre-rendered GitHub-flavored markdown HTML for the PR body. Safe — GitHub sanitizes. */
   bodyHtml: string | null;
@@ -90,6 +93,7 @@ export interface TeamPR {
   merged: boolean;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   ciStatus: CiStatus;
+  ciUrl: string | null;
   baseRefName: string;
   headRefName: string;
   headSha: string;

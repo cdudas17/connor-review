@@ -63,7 +63,7 @@ export function PRList({ prs, mode, onOpen, selection }: Props) {
               </span>
             </span>
             <span className="pr-badges">
-              <CiBadge status={p.ciStatus} />
+              <CiBadge status={p.ciStatus} url={p.ciUrl} />
               <GhStatusBadge status={p.ghStatus} />
               <StatusBadge status={p.status} />
             </span>

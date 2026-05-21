@@ -54,7 +54,7 @@ export function App() {
       for (const r of results) {
         if (r.status === 'fulfilled') {
           const { p, meta } = r.value;
-          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, createdAt: meta.createdAt });
+          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, createdAt: meta.createdAt });
         }
       }
     });
@@ -146,7 +146,7 @@ export function App() {
     for (const r of results) {
       if (r.status === 'fulfilled') {
         const { p, meta } = r.value;
-        myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, createdAt: meta.createdAt });
+        myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, createdAt: meta.createdAt });
       } else {
         const err = r.reason as ApiCallError;
         console.error('Failed to fetch PR meta', err);
@@ -220,7 +220,7 @@ export function App() {
       for (const r of results) {
         if (r.status === 'fulfilled') {
           const { p, meta } = r.value;
-          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, createdAt: meta.createdAt });
+          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, createdAt: meta.createdAt });
         } else {
           const err = r.reason as ApiCallError;
           console.error('Refresh failed for PR', err);
@@ -338,6 +338,7 @@ export function App() {
             pendingReviewId={currentPendingReviewId}
             latestGhStatus={tracked?.ghStatus}
             latestCiStatus={tracked?.ciStatus}
+            latestCiUrl={tracked?.ciUrl}
             onPendingReviewChange={setPendingReview}
             onMetaLoaded={handleMetaLoaded}
             onAdvance={handleAdvance}

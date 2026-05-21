@@ -11,6 +11,7 @@ export const META_FIXTURE: PullRequestMeta = {
   isDraft: false,
   reviewDecision: 'REVIEW_REQUIRED',
   ciStatus: 'SUCCESS',
+  ciUrl: null,
   createdAt: '2026-02-25T00:00:00Z',
   bodyHtml: '<p>Test PR description</p>',
   viewerPendingReviewId: null,

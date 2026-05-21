@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import yaml from 'js-yaml';
 import { ghExec } from '../lib/ghExec.js';
 import { TEAM_PR_SEARCH_QUERY } from '../queries/teamPRs.graphql.js';
+import { extractBuildkiteZenpayrollUrl } from '../lib/ciUrl.js';
 
 type CiStatus = 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' | null;
 
@@ -18,6 +19,7 @@ interface TeamPR {
   merged: boolean;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   ciStatus: CiStatus;
+  ciUrl: string | null;
   baseRefName: string;
   headRefName: string;
   headSha: string;
@@ -70,7 +72,7 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
           headRefOid: string;
           createdAt?: string;
           updatedAt: string;
-          commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string } } }> };
+          commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string; contexts?: { nodes?: Array<{ __typename?: string; context?: string; name?: string; targetUrl?: string | null; detailsUrl?: string | null; state?: string; status?: string; conclusion?: string | null }> } } } }> };
         }>;
       };
     };
@@ -91,6 +93,7 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
       merged: n.merged,
       reviewDecision: n.reviewDecision,
       ciStatus: (n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
+      ciUrl: extractBuildkiteZenpayrollUrl(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
       baseRefName: n.baseRefName,
       headRefName: n.headRefName,
       headSha: n.headRefOid,

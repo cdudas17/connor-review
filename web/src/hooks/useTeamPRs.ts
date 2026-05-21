@@ -65,6 +65,7 @@ export function useTeamPRs(opts: Options = {}) {
         status: statuses[key(p)] ?? 'untouched',
         ghStatus: computeGhStatus(p),
         ciStatus: p.ciStatus,
+        ciUrl: p.ciUrl,
         createdAt: p.createdAt,
         addedAt: Date.parse(p.updatedAt) || Date.now(),
       }));

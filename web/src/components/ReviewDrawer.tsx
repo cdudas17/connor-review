@@ -19,6 +19,7 @@ interface Props {
   /** Latest CI / GH status from the auto-refreshing list — overrides drawer-fetched meta. */
   latestGhStatus?: GhStatus | null;
   latestCiStatus?: CiStatus;
+  latestCiUrl?: string | null;
   onPendingReviewChange: (id: Identity, reviewId: string | null) => void;
   onMetaLoaded?: (id: Identity, meta: PullRequestMeta) => void;
   onAdvance: (id: Identity, newStatus: PRStatus) => void;
@@ -26,7 +27,7 @@ interface Props {
 }
 
 export function ReviewDrawer(props: Props) {
-  const { current, prs, pendingReviewId, latestGhStatus, latestCiStatus, onPendingReviewChange, onMetaLoaded, onAdvance, onClose } = props;
+  const { current, prs, pendingReviewId, latestGhStatus, latestCiStatus, latestCiUrl, onPendingReviewChange, onMetaLoaded, onAdvance, onClose } = props;
   const { meta, diff, loading, error, reload } = usePRDetails(current);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -128,7 +129,7 @@ export function ReviewDrawer(props: Props) {
       <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
       <aside className="drawer" aria-label="Review drawer">
         <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
-      <PRHeader meta={meta} latestGhStatus={latestGhStatus} latestCiStatus={latestCiStatus} />
+      <PRHeader meta={meta} latestGhStatus={latestGhStatus} latestCiStatus={latestCiStatus} latestCiUrl={latestCiUrl} />
       <PRDescription bodyHtml={meta.bodyHtml} />
       <ConversationsList threads={meta.reviewThreads} onReply={reply} />
       <DiffViewer

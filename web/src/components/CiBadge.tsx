@@ -8,13 +8,39 @@ const CONFIG: Record<NonNullable<CiStatus>, { label: string; icon: string; cls: 
   EXPECTED: { label: 'CI', icon: '○', cls: 'ci-expected' },
 };
 
-export function CiBadge({ status }: { status: CiStatus }) {
+interface Props {
+  status: CiStatus;
+  /** Optional URL to the underlying build (e.g. buildkite). Linkified when CI isn't green. */
+  url?: string | null;
+}
+
+export function CiBadge({ status, url }: Props) {
   if (status == null) return null;
   const c = CONFIG[status];
-  return (
-    <span className={`ci-badge ${c.cls}`} title={`CI: ${status.toLowerCase()}`}>
+  const showLink = url && status !== 'SUCCESS';
+  const content = (
+    <>
       <span className="ci-icon" aria-hidden="true">{c.icon}</span>
       {c.label}
+    </>
+  );
+  if (showLink) {
+    return (
+      <a
+        className={`ci-badge ci-badge-link ${c.cls}`}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={`CI: ${status.toLowerCase()} — open build`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {content}
+      </a>
+    );
+  }
+  return (
+    <span className={`ci-badge ${c.cls}`} title={`CI: ${status.toLowerCase()}`}>
+      {content}
     </span>
   );
 }

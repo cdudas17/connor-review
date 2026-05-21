@@ -152,7 +152,9 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .gh-status-closed { color: #f85149; }
 
 /* CI / status-check rollup badge */
-.ci-badge { font-size: 0.75rem; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; background: transparent; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.ci-badge { font-size: 0.75rem; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; background: transparent; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; text-decoration: none; }
+.ci-badge-link { cursor: pointer; }
+.ci-badge-link:hover { background: rgba(255, 255, 255, 0.05); text-decoration: underline; }
 .ci-icon { font-size: 0.85em; line-height: 1; }
 .ci-success { color: #3fb950; }
 .ci-failure { color: #f85149; }
