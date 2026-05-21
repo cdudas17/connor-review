@@ -31,6 +31,28 @@ export interface DiffViewerProps {
   onReply: (threadId: string, body: string) => Promise<void>;
 }
 
+function ChevronUpIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M3.22 9.78a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 1 1-1.06 1.06L8 6.06 4.28 9.78a.75.75 0 0 1-1.06 0z"/>
+    </svg>
+  );
+}
+function ChevronDownIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M12.78 6.22a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L3.22 7.28a.75.75 0 0 1 1.06-1.06L8 9.94l3.72-3.72a.75.75 0 0 1 1.06 0z"/>
+    </svg>
+  );
+}
+function UnfoldIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M8.177.677 10.5 3l-1.06 1.06L8 2.621 6.56 4.06 5.5 3 7.823.677a.25.25 0 0 1 .354 0zM5.5 13l1.06-1.06L8 13.378 9.44 11.94 10.5 13l-2.323 2.323a.25.25 0 0 1-.354 0L5.5 13zM0 7.75A.75.75 0 0 1 .75 7h14.5a.75.75 0 0 1 0 1.5H.75A.75.75 0 0 1 0 7.75z"/>
+    </svg>
+  );
+}
+
 function fileToPath(file: FileData): string {
   return (file.newPath && file.newPath !== '/dev/null') ? file.newPath : (file.oldPath ?? '');
 }
@@ -359,31 +381,30 @@ function DiffFile({
                     {!isSmallGap && (
                       <button
                         type="button"
-                        className="diff-expand-button diff-expand-up"
+                        className="diff-expand-button"
                         title={`Expand ${CONTEXT} lines up`}
                         onClick={(e) => { e.stopPropagation(); expandRange(Math.max(gapTopStart, h.oldStart - CONTEXT), h.oldStart - 1); }}
-                      >▲</button>
+                      ><ChevronUpIcon /></button>
                     )}
                     <button
                       type="button"
-                      className="diff-expand-button diff-expand-all"
-                      title={isSmallGap ? 'Expand gap' : `Expand all ${gapTopEnd - gapTopStart + 1} lines`}
+                      className="diff-expand-button"
+                      title={isSmallGap ? `Expand ${gapTopEnd - gapTopStart + 1} hidden lines` : `Expand all ${gapTopEnd - gapTopStart + 1} hidden lines`}
                       onClick={(e) => { e.stopPropagation(); expandRange(gapTopStart, gapTopEnd); }}
-                    >⇕</button>
+                    ><UnfoldIcon /></button>
                     {!isSmallGap && idx > 0 && (
                       <button
                         type="button"
-                        className="diff-expand-button diff-expand-down"
+                        className="diff-expand-button"
                         title={`Expand ${CONTEXT} lines down`}
                         onClick={(e) => { e.stopPropagation(); const prev = renderedHunks[idx - 1]; const prevEndLine = prev.oldStart + prev.oldLines; expandRange(prevEndLine, Math.min(gapTopEnd, prevEndLine + CONTEXT - 1)); }}
-                      >▼</button>
+                      ><ChevronDownIcon /></button>
                     )}
                   </div>
                 </Decoration>,
               );
             }
             out.push(<Hunk key={h.content} hunk={h} />);
-            // After the last hunk, offer expand-down past the end.
             if (idx === renderedHunks.length - 1) {
               const tailStart = h.oldStart + h.oldLines;
               out.push(
@@ -391,10 +412,10 @@ function DiffFile({
                   <div className="diff-expand-row">
                     <button
                       type="button"
-                      className="diff-expand-button diff-expand-down"
+                      className="diff-expand-button"
                       title={`Expand ${CONTEXT} lines below`}
                       onClick={(e) => { e.stopPropagation(); expandRange(tailStart, tailStart + CONTEXT - 1); }}
-                    >▼</button>
+                    ><ChevronDownIcon /></button>
                   </div>
                 </Decoration>,
               );

@@ -255,10 +255,11 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .diff-file-body tr.diff-line[data-cr-selected] td.diff-gutter { background-image: linear-gradient(rgba(99, 102, 241, 0.28), rgba(99, 102, 241, 0.28)); }
 
 /* GitHub-style expand-context buttons rendered as <Decoration> rows between hunks */
-.diff-expand-row { display: flex; gap: 0; align-items: stretch; background: rgba(56, 139, 253, 0.10); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.diff-expand-button { flex: 1; padding: 4px 0; background: transparent; border: none; color: var(--accent); cursor: pointer; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; line-height: 1; transition: background-color 80ms; }
+.diff-expand-row { display: flex; gap: 0; align-items: stretch; background: rgba(56, 139, 253, 0.10); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); min-height: 22px; }
+.diff-expand-button { flex: 1; display: flex; align-items: center; justify-content: center; padding: 4px 0; background: transparent; border: none; color: var(--accent); cursor: pointer; transition: background-color 80ms, color 80ms; }
 .diff-expand-button + .diff-expand-button { border-left: 1px solid var(--border); }
-.diff-expand-button:hover { background: rgba(56, 139, 253, 0.20); }
+.diff-expand-button:hover { background: rgba(56, 139, 253, 0.25); color: #58a6ff; }
+.diff-expand-button svg { display: block; }
 /* Inline thread (existing review comments) — GitHub-style card under the diff line */
 .thread-stack { display: flex; flex-direction: column; gap: 12px; padding: 12px; background: var(--bg-subtle); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .thread-card { border: 1px solid var(--border); border-radius: 6px; background: var(--bg); padding: 12px 14px; }
