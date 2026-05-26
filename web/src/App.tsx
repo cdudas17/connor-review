@@ -334,6 +334,13 @@ export function App() {
             >
               📥 Incoming TPOs (Jira)
             </a>
+            <a
+              href="https://app.gusto.com/panda/sidekiq/morgue?substr=%22team%3Atalent%22"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ⚰️ Sidekiq Morgue (team:talent)
+            </a>
           </p>
           {!oncallPRs.hasLoaded ? (
             <div className="oncall-empty">
