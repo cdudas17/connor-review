@@ -341,6 +341,13 @@ export function App() {
             >
               ⚰️ Sidekiq Morgue (team:talent)
             </a>
+            <a
+              href="https://app.datadoghq.com/dashboard/j8a-aq4-54t?fromUser=false&refresh_mode=sliding&tpl_var_env%5B0%5D=production&tpl_var_team%5B0%5D=team-member-lifecycle&from_ts=1779726797061&to_ts=1779813197061&live=true"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              🚨 Alert frequency (Datadog)
+            </a>
           </p>
           {!oncallPRs.hasLoaded ? (
             <div className="oncall-empty">
