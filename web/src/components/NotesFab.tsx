@@ -21,7 +21,7 @@ function CloseIcon({ size = 16 }: { size?: number }) {
 
 const FAB_SIZE = 44;
 const DRAG_THRESHOLD_PX = 4;
-const PANEL_W = 360;
+const PANEL_W = 440;
 const PANEL_GAP = 12;
 
 /**
