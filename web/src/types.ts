@@ -57,6 +57,8 @@ export interface PullRequestMeta {
 export interface ReviewThread {
   id: string;
   isResolved: boolean;
+  /** True when the line this comment was made on has changed in a later commit. */
+  isOutdated: boolean;
   path: string;
   line: number | null;
   originalLine: number | null;

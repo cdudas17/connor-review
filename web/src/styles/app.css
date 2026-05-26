@@ -352,6 +352,7 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .thread-card-body { padding: 12px 14px; border-top: 1px solid var(--border); }
 .thread-card-header { color: var(--muted); font-size: 0.85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-bottom: 6px; }
 .thread-anchor { color: var(--muted); }
+.thread-outdated-badge { font-size: 0.72rem; padding: 1px 8px; border-radius: 999px; border: 1px solid #d29922; color: #d29922; background: rgba(210, 153, 34, 0.08); margin-left: auto; white-space: nowrap; }
 .thread-message { margin: 8px 0; line-height: 1.5; }
 .thread-message-author { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
 .thread-message-author strong { font-size: 0.9rem; }

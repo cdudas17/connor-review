@@ -59,6 +59,7 @@ function ConversationCard({ thread, onReply }: CardProps) {
           {first?.authorLogin ?? '?'} · {thread.comments.length} comment{thread.comments.length === 1 ? '' : 's'}
           {first ? ` · ${formatTimeAgo(first.createdAt)}` : ''}
         </span>
+        {thread.isOutdated && <span className="thread-outdated-badge" title="The line this comment was made on has changed in a later commit">Outdated</span>}
       </button>
       {open && (
         <div className="conversation-card-body">

@@ -43,6 +43,7 @@ interface PRAssignee { login: string; avatarUrl: string | null; url: string | nu
 interface ReviewThread {
   id: string;
   isResolved: boolean;
+  isOutdated: boolean;
   path: string;
   line: number | null;
   comments: Array<{ id: string; authorLogin: string | null; authorAvatarUrl: string | null; body: string; createdAt: string; diffHunk: string | null }>;
@@ -141,6 +142,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
     reviewThreads: (pr.reviewThreads?.nodes ?? []).map((t: {
       id: string;
       isResolved: boolean;
+      isOutdated?: boolean;
       path: string;
       line: number | null;
       comments?: {
@@ -155,6 +157,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
     }) => ({
       id: t.id,
       isResolved: t.isResolved,
+      isOutdated: !!t.isOutdated,
       path: t.path,
       line: t.line,
       comments: (t.comments?.nodes ?? []).map((c) => ({

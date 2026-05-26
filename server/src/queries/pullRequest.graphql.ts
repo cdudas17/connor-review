@@ -39,6 +39,7 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
           nodes {
             id
             isResolved
+            isOutdated
             path
             line
             comments(first: 50) {

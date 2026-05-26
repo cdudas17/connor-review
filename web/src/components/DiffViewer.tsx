@@ -80,6 +80,7 @@ function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, 
         <span className="thread-card-toggle-label">
           {open ? 'Comment' : `${summaryAuthor} · ${count} comment${count === 1 ? '' : 's'}`} on line {t.line}
         </span>
+        {t.isOutdated && <span className="thread-outdated-badge" title="The line this comment was made on has changed in a later commit">Outdated</span>}
       </button>
       {open && (
         <div className="thread-card-body">
