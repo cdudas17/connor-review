@@ -22,7 +22,6 @@ function CloseIcon({ size = 16 }: { size?: number }) {
 const FAB_SIZE = 44;
 const DRAG_THRESHOLD_PX = 4;
 const PANEL_W = 360;
-const PANEL_H = 420;
 const PANEL_GAP = 12;
 
 /**
@@ -93,16 +92,19 @@ export function NotesFab() {
     setIsDragging(true);
   };
 
-  // Position the panel relative to the FAB: pick the side with more room so it
-  // stays on-screen no matter where the user dragged the button.
+  // Position the panel relative to the FAB. Anchor by *bottom* when placing above
+  // so the PANEL_GAP is enforced regardless of the panel's actual rendered height
+  // (which can be less than PANEL_H when max-height clips it). Anchor by top when
+  // placing below.
   const w = typeof window === 'undefined' ? 1024 : window.innerWidth;
   const h = typeof window === 'undefined' ? 768 : window.innerHeight;
+  const placeAbove = pos.y > h / 2;
   const panelLeft = (pos.x + FAB_SIZE / 2 < w / 2)
     ? Math.max(12, pos.x)
     : Math.max(12, pos.x + FAB_SIZE - PANEL_W);
-  const panelTop = (pos.y - PANEL_GAP - PANEL_H >= 12)
-    ? pos.y - PANEL_GAP - PANEL_H
-    : Math.min(pos.y + FAB_SIZE + PANEL_GAP, h - PANEL_H - 12);
+  const panelStyle: React.CSSProperties = placeAbove
+    ? { left: panelLeft, bottom: h - pos.y + PANEL_GAP, right: 'auto', top: 'auto' }
+    : { left: panelLeft, top: pos.y + FAB_SIZE + PANEL_GAP, right: 'auto', bottom: 'auto' };
 
   return (
     <>
@@ -121,7 +123,7 @@ export function NotesFab() {
           className="notes-panel"
           role="dialog"
           aria-label="Notes"
-          style={{ left: panelLeft, top: panelTop, right: 'auto', bottom: 'auto' }}
+          style={panelStyle}
         >
           <header className="notes-panel-header">
             <h3>Notes</h3>
