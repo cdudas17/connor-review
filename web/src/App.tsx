@@ -9,6 +9,7 @@ import { Tabs, type TabId } from './components/Tabs.js';
 import { BulkActionsBar } from './components/BulkActionsBar.js';
 import { MemberFilter } from './components/MemberFilter.js';
 import { OncallStateFilter, type OncallState } from './components/OncallStateFilter.js';
+import { NotesFab } from './components/NotesFab.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
 import { useLabeledPRs } from './hooks/useLabeledPRs.js';
@@ -455,6 +456,7 @@ export function App() {
           />
         );
       })()}
+      <NotesFab />
     </main>
   );
 }

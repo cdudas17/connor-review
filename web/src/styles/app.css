@@ -195,6 +195,23 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .pr-header-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pr-header-title h2 { margin: 0; }
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(13, 17, 23, 0.35); z-index: 10; cursor: pointer; }
+
+/* Floating notes pencil — always on screen, above the drawer. */
+.notes-fab { position: fixed; bottom: 20px; right: 20px; z-index: 70; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--border); background: var(--bg); color: var(--accent); cursor: pointer; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); display: inline-flex; align-items: center; justify-content: center; transition: transform 80ms, background 80ms; }
+.notes-fab:hover { background: var(--bg-subtle); transform: translateY(-1px); }
+.notes-fab svg { display: block; }
+
+.notes-panel { position: fixed; bottom: 76px; right: 20px; z-index: 71; width: 360px; max-width: calc(100vw - 40px); height: 420px; max-height: calc(100vh - 120px); display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); padding: 12px; }
+.notes-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.notes-panel-header h3 { margin: 0; font-size: 1rem; }
+.notes-panel-actions { display: inline-flex; align-items: center; gap: 6px; }
+.notes-panel-actions button { padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); color: inherit; cursor: pointer; font: inherit; font-size: 0.85rem; }
+.notes-panel-actions button:hover:not(:disabled) { background: var(--border-muted); }
+.notes-panel-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.notes-panel-close { padding: 4px 6px !important; display: inline-flex; align-items: center; justify-content: center; }
+.notes-textarea { flex: 1; resize: none; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); color: inherit; font: inherit; font-size: 0.9rem; box-sizing: border-box; }
+.notes-textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.notes-panel-hint { color: var(--muted); font-size: 0.75rem; margin: 6px 0 0; text-align: right; }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 70vw; min-width: 720px; background: var(--bg); border-left: 1px solid var(--border); box-shadow: -8px 0 32px rgba(0,0,0,0.18); overflow: auto; padding: 16px 24px 120px; z-index: 11; }
 .drawer-close { position: absolute; top: 12px; right: 16px; font-size: 1.4rem; background: transparent; border: none; cursor: pointer; }
 .pr-header h2 { margin-bottom: 4px; }
