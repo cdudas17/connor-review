@@ -1,5 +1,28 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState, type TextareaHTMLAttributes, type KeyboardEvent } from 'react';
-import { search as searchEmoji } from 'node-emoji';
+import { search as searchEmoji, get as getEmoji } from 'node-emoji';
+
+const REGEX_SPECIAL = /[.*+?^${}()|[\]\\]/g;
+function escapeRegex(s: string): string { return s.replace(REGEX_SPECIAL, '\\$&'); }
+
+/**
+ * `node-emoji`'s `search()` treats the query as a regex pattern, which crashes on
+ * inputs like `:+1`. Wrap it: escape regex specials, and merge in an exact-key
+ * lookup so canonical names like "+1" or "-1" still surface as the top hit.
+ */
+function safeSearchEmoji(query: string): Array<{ name: string; emoji: string }> {
+  const exact = getEmoji(query);
+  let matches: Array<{ name: string; emoji: string }> = [];
+  try {
+    matches = searchEmoji(escapeRegex(query)) ?? [];
+  } catch {
+    matches = [];
+  }
+  if (exact) {
+    const filtered = matches.filter((m) => m.name !== query);
+    return [{ name: query, emoji: exact }, ...filtered];
+  }
+  return matches;
+}
 
 interface Suggestion { name: string; emoji: string; }
 
@@ -76,7 +99,7 @@ export const EmojiTextarea = forwardRef<HTMLTextAreaElement, Props>(function Emo
     const el = ref.current;
     const tok = getCurrentToken();
     if (!el || !tok || tok.query.length < 1) { setSuggestions([]); setCaret(null); return; }
-    const matches = (searchEmoji(tok.query) ?? []).slice(0, 7);
+    const matches = safeSearchEmoji(tok.query).slice(0, 7);
     setSuggestions(matches);
     setActive(0);
     const c = getCaretPixelOffset(el, el.selectionStart ?? 0);
