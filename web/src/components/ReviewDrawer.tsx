@@ -25,11 +25,17 @@ interface Props {
   onPendingReviewChange: (id: Identity, reviewId: string | null) => void;
   onMetaLoaded?: (id: Identity, meta: PullRequestMeta) => void;
   onAdvance: (id: Identity, newStatus: PRStatus) => void;
+  /** Move drawer to the previous PR in the list without changing status. */
+  onNavigatePrev: () => void;
+  /** Move drawer to the next PR in the list without changing status. */
+  onNavigateNext: () => void;
+  canNavigatePrev: boolean;
+  canNavigateNext: boolean;
   onClose: () => void;
 }
 
 export function ReviewDrawer(props: Props) {
-  const { current, prs, pendingReviewId, latestGhStatus, latestCiStatus, latestCiUrl, viewedPaths, onViewedChange, onPendingReviewChange, onMetaLoaded, onAdvance, onClose } = props;
+  const { current, prs, pendingReviewId, latestGhStatus, latestCiStatus, latestCiUrl, viewedPaths, onViewedChange, onPendingReviewChange, onMetaLoaded, onAdvance, onNavigatePrev, onNavigateNext, canNavigatePrev, canNavigateNext, onClose } = props;
   const { meta, diff, loading, error, reload } = usePRDetails(current);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -149,9 +155,13 @@ export function ReviewDrawer(props: Props) {
         summary={summary}
         onSummaryChange={setSummary}
         onSubmit={submitReview}
-        onNext={doNext}
+        onReviewed={doNext}
+        onPrev={onNavigatePrev}
+        onNextPR={onNavigateNext}
         canSubmit={canSubmit}
-        canNext={canNext}
+        canReviewed={canNext}
+        canPrev={canNavigatePrev && canNext}
+        canNextPR={canNavigateNext && canNext}
         finishLabel={pendingReviewId ? 'Finish your review' : null}
       />
       {error && <ErrorToast message={error.message} onDismiss={() => { /* user can reload */ }} />}

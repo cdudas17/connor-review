@@ -414,6 +414,10 @@ export function App() {
 
       {current && (() => {
         const tracked = activePRs.find((p) => same(p, current));
+        const idx = activePRs.findIndex((p) => same(p, current));
+        const prevPr = idx > 0 ? activePRs[idx - 1] : null;
+        const nextPr = idx >= 0 && idx < activePRs.length - 1 ? activePRs[idx + 1] : null;
+        const toIdentity = (p: TrackedPR): Identity => ({ owner: p.owner, repo: p.repo, number: p.number });
         return (
           <ReviewDrawer
             current={current}
@@ -427,6 +431,10 @@ export function App() {
             onPendingReviewChange={setPendingReview}
             onMetaLoaded={handleMetaLoaded}
             onAdvance={handleAdvance}
+            onNavigatePrev={() => prevPr && setCurrent(toIdentity(prevPr))}
+            onNavigateNext={() => nextPr && setCurrent(toIdentity(nextPr))}
+            canNavigatePrev={!!prevPr}
+            canNavigateNext={!!nextPr}
             onClose={() => setCurrent(null)}
           />
         );
