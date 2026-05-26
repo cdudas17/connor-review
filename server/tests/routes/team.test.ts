@@ -106,4 +106,73 @@ describe('team routes', () => {
     expect(firstCall).toContain('repos/foo/bar/contents/teams/x.yml');
     await app.close();
   });
+
+  describe('GET /api/labeled-prs', () => {
+    it('uses label:"talent-alerts" by default and does NOT filter drafts in the query', async () => {
+      mocked.mockResolvedValueOnce(JSON.stringify({ data: { search: { nodes: [] } } }));
+      const app = await buildServer();
+      const res = await app.inject({ url: '/api/labeled-prs' });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ label: 'talent-alerts', prs: [] });
+
+      const callInput = mocked.mock.calls[0][1] as { input?: string };
+      const body = JSON.parse(callInput.input!);
+      expect(body.variables.q).toContain('is:pr');
+      expect(body.variables.q).toContain('is:open');
+      expect(body.variables.q).toContain('label:"talent-alerts"');
+      // Critically: no draft filter (oncall workflow needs to see drafts).
+      expect(body.variables.q).not.toContain('draft:false');
+      await app.close();
+    });
+
+    it('honors a custom ?label= query param', async () => {
+      mocked.mockResolvedValueOnce(JSON.stringify({ data: { search: { nodes: [] } } }));
+      const app = await buildServer();
+      const res = await app.inject({ url: '/api/labeled-prs?label=urgent' });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().label).toBe('urgent');
+      const callInput = mocked.mock.calls[0][1] as { input?: string };
+      const body = JSON.parse(callInput.input!);
+      expect(body.variables.q).toContain('label:"urgent"');
+      await app.close();
+    });
+
+    it('keeps draft PRs (unlike /api/team/prs) and filters merged/approved', async () => {
+      mocked.mockResolvedValueOnce(JSON.stringify({
+        data: {
+          search: {
+            nodes: [
+              // open draft → KEEP
+              { id: 'p1', number: 1, title: 'draft', url: 'u', author: { login: 'a' },
+                repository: { owner: { login: 'Gusto' }, name: 'zenpayroll' },
+                isDraft: true, state: 'OPEN', merged: false, reviewDecision: 'REVIEW_REQUIRED',
+                baseRefName: 'main', headRefName: 'b', headRefOid: 's1', createdAt: 'x', updatedAt: 'y' },
+              // open ready → KEEP
+              { id: 'p2', number: 2, title: 'ready', url: 'u', author: { login: 'a' },
+                repository: { owner: { login: 'Gusto' }, name: 'zenpayroll' },
+                isDraft: false, state: 'OPEN', merged: false, reviewDecision: 'REVIEW_REQUIRED',
+                baseRefName: 'main', headRefName: 'b', headRefOid: 's2', createdAt: 'x', updatedAt: 'y' },
+              // approved → DROP
+              { id: 'p3', number: 3, title: 'approved', url: 'u', author: { login: 'a' },
+                repository: { owner: { login: 'Gusto' }, name: 'zenpayroll' },
+                isDraft: false, state: 'OPEN', merged: false, reviewDecision: 'APPROVED',
+                baseRefName: 'main', headRefName: 'b', headRefOid: 's3', createdAt: 'x', updatedAt: 'y' },
+              // merged → DROP
+              { id: 'p4', number: 4, title: 'merged', url: 'u', author: { login: 'a' },
+                repository: { owner: { login: 'Gusto' }, name: 'zenpayroll' },
+                isDraft: false, state: 'MERGED', merged: true, reviewDecision: 'APPROVED',
+                baseRefName: 'main', headRefName: 'b', headRefOid: 's4', createdAt: 'x', updatedAt: 'y' },
+            ],
+          },
+        },
+      }));
+      const app = await buildServer();
+      const res = await app.inject({ url: '/api/labeled-prs' });
+      const body = res.json();
+      expect(body.prs.map((p: { number: number }) => p.number).sort()).toEqual([1, 2]);
+      expect(body.prs.find((p: { number: number }) => p.number === 1).isDraft).toBe(true);
+      expect(body.prs.find((p: { number: number }) => p.number === 2).isDraft).toBe(false);
+      await app.close();
+    });
+  });
 });

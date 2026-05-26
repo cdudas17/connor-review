@@ -233,4 +233,41 @@ describe('pulls routes', () => {
     expect(res.json().code).toBe('AUTH_REQUIRED');
     await app.close();
   });
+
+  describe('GET /api/pulls/:o/:r/:n/files/content', () => {
+    it('400 when path or ref is missing', async () => {
+      const app = await buildServer();
+      const r1 = await app.inject({ url: '/api/pulls/Gusto/zenpayroll/1/files/content?ref=main' });
+      expect(r1.statusCode).toBe(400);
+      const r2 = await app.inject({ url: '/api/pulls/Gusto/zenpayroll/1/files/content?path=a.rb' });
+      expect(r2.statusCode).toBe(400);
+      await app.close();
+    });
+
+    it('shells out to gh api contents and base64-decodes the response', async () => {
+      const source = "def hello\n  'world'\nend\n";
+      mocked.mockResolvedValueOnce(Buffer.from(source).toString('base64') + '\n');
+      const app = await buildServer();
+      const res = await app.inject({ url: '/api/pulls/Gusto/zenpayroll/1/files/content?path=lib/x.rb&ref=main' });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toContain('text/plain');
+      expect(res.body).toBe(source);
+      const args = mocked.mock.calls[0][0] as string[];
+      expect(args[0]).toBe('api');
+      expect(args[1]).toContain('repos/Gusto/zenpayroll/contents/');
+      expect(args[1]).toContain('lib%2Fx.rb');
+      expect(args[1]).toContain('ref=main');
+      await app.close();
+    });
+
+    it('URL-encodes path segments containing special chars', async () => {
+      mocked.mockResolvedValueOnce(Buffer.from('').toString('base64'));
+      const app = await buildServer();
+      await app.inject({ url: '/api/pulls/Gusto/zenpayroll/1/files/content?path=path%20with%20space.rb&ref=feature%2Fx' });
+      const args = mocked.mock.calls[0][0] as string[];
+      expect(args[1]).toContain('path%20with%20space.rb');
+      expect(args[1]).toContain('ref=feature%2Fx');
+      await app.close();
+    });
+  });
 });
