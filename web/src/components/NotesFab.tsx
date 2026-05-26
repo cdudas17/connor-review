@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNotes } from '../hooks/useNotes.js';
+import { handlePasteLinkify } from '../lib/pasteLinkify.js';
 
 function PencilIcon({ size = 18 }: { size?: number }) {
   return (
@@ -66,7 +67,8 @@ export function NotesFab() {
             className="notes-textarea"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Jot anything down — auto-saved to this browser."
+            onPaste={handlePasteLinkify}
+            placeholder="Jot anything down — auto-saved to this browser. Select text + paste a URL to linkify."
             autoFocus
           />
           <p className="notes-panel-hint">Saved automatically · ⌘⇧N to toggle</p>

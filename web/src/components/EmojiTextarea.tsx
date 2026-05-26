@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState, type TextareaHTMLAttributes, type KeyboardEvent } from 'react';
 import { search as searchEmoji, get as getEmoji } from 'node-emoji';
+import { handlePasteLinkify } from '../lib/pasteLinkify.js';
 
 const REGEX_SPECIAL = /[.*+?^${}()|[\]\\]/g;
 function escapeRegex(s: string): string { return s.replace(REGEX_SPECIAL, '\\$&'); }
@@ -146,6 +147,11 @@ export const EmojiTextarea = forwardRef<HTMLTextAreaElement, Props>(function Emo
     queueMicrotask(updateSuggestions);
   };
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const handled = handlePasteLinkify(e);
+    if (!handled) props.onPaste?.(e);
+  };
+
   const handleBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
     // Delay so a click on a suggestion can register before we hide.
     setTimeout(() => setSuggestions([]), 120);
@@ -154,7 +160,7 @@ export const EmojiTextarea = forwardRef<HTMLTextAreaElement, Props>(function Emo
 
   return (
     <div className="emoji-textarea">
-      <textarea {...props} ref={ref} onChange={handleChange} onKeyDown={handleKeyDown} onBlur={handleBlur} />
+      <textarea {...props} ref={ref} onChange={handleChange} onKeyDown={handleKeyDown} onBlur={handleBlur} onPaste={handlePaste} />
       {suggestions.length > 0 && caret && (
         <ul
           className="emoji-suggestions"
