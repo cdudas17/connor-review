@@ -292,10 +292,10 @@ export function App() {
               <span className="tab-context-freshness">loading team PRs<span className="loading-spinner" aria-label="Loading" /></span>
             </p>
           )}
-          {teamPRs.error && (
+          {teamPRs.error && !teamPRs.errorDismissed && (
             <ErrorToast
               message={`Failed to load team PRs: ${teamPRs.error.message}`}
-              onDismiss={() => { /* user can click Refresh */ }}
+              onDismiss={teamPRs.dismissError}
             />
           )}
           {teamPRs.members.length > 0 && (

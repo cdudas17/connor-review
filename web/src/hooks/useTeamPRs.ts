@@ -26,6 +26,8 @@ interface State {
   members: string[];
   loading: boolean;
   error: ApiCallError | null;
+  /** Whether the error toast has been dismissed by the user. Re-armed on every new error. */
+  errorDismissed: boolean;
   hasLoaded: boolean;
   lastFetchedAt: number | null;
 }
@@ -44,7 +46,7 @@ interface Options {
  */
 export function useTeamPRs(opts: Options = {}) {
   const { autoRefreshMs } = opts;
-  const [state, setState] = useState<State>({ prs: [], members: [], loading: false, error: null, hasLoaded: false, lastFetchedAt: null });
+  const [state, setState] = useState<State>({ prs: [], members: [], loading: false, error: null, errorDismissed: false, hasLoaded: false, lastFetchedAt: null });
   const [statuses, setStatuses] = useState<Record<string, PRStatus>>(() => loadStatuses());
   const loadingRef = useRef(false);
 
@@ -72,9 +74,9 @@ export function useTeamPRs(opts: Options = {}) {
       }));
       // Newest PRs first.
       tracked.sort((a, b) => b.addedAt - a.addedAt);
-      setState({ prs: tracked, members, loading: false, error: null, hasLoaded: true, lastFetchedAt: Date.now() });
+      setState({ prs: tracked, members, loading: false, error: null, errorDismissed: false, hasLoaded: true, lastFetchedAt: Date.now() });
     } catch (e) {
-      setState((s) => ({ ...s, loading: false, error: e as ApiCallError, hasLoaded: true, lastFetchedAt: Date.now() }));
+      setState((s) => ({ ...s, loading: false, error: e as ApiCallError, errorDismissed: false, hasLoaded: true, lastFetchedAt: Date.now() }));
     } finally {
       loadingRef.current = false;
     }
@@ -107,6 +109,10 @@ export function useTeamPRs(opts: Options = {}) {
     };
   }, [autoRefreshMs]);
 
+  const dismissError = useCallback(() => {
+    setState((s) => ({ ...s, errorDismissed: true }));
+  }, []);
+
   const setStatus = useCallback((id: Identity, status: PRStatus) => {
     setStatuses((cur) => ({ ...cur, [key(id)]: status }));
     setState((s) => ({
@@ -115,5 +121,5 @@ export function useTeamPRs(opts: Options = {}) {
     }));
   }, []);
 
-  return { ...state, fetch, setStatus };
+  return { ...state, fetch, setStatus, dismissError };
 }
