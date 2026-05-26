@@ -318,6 +318,15 @@ export function App() {
       )}
       {tab === 'oncall' && (
         <>
+          <p className="oncall-external-links">
+            <a
+              href="https://app.datadoghq.com/dashboard/twu-4eu-hgm?fromUser=false&refresh_mode=sliding&tpl_var_team%5B0%5D=team-member-lifecycle&view=spans&from_ts=1779802221972&to_ts=1779805821972&live=true"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              📊 Team SLOs (Datadog)
+            </a>
+          </p>
           {!oncallPRs.hasLoaded ? (
             <div className="oncall-empty">
               <p>Pull all open, non-draft, non-approved PRs labeled <code>talent-alerts</code>.</p>
