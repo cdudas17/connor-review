@@ -326,6 +326,13 @@ export function App() {
             >
               📊 Team SLOs (Datadog)
             </a>
+            <a
+              href="https://gustohq.atlassian.net/jira/people/712020%3A2b9e829a-ea58-4cb9-be41-514738b76be8/boards/66"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              📥 Incoming TPOs (Jira)
+            </a>
           </p>
           {!oncallPRs.hasLoaded ? (
             <div className="oncall-empty">
