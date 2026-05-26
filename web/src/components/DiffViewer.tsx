@@ -16,6 +16,7 @@ import {
 import 'react-diff-view/style/index.css';
 import { api } from '../lib/api.js';
 import { EmojiTextarea } from './EmojiTextarea.js';
+import { PersonIcon } from './PersonIcon.js';
 import type { ReviewThread, StagedInlineComment } from '../types.js';
 
 export interface DiffViewerProps {
@@ -289,7 +290,7 @@ function DiffFile({
             </header>
             {t.comments.map((c) => (
               <div key={c.id} className="thread-message">
-                <strong>{c.authorLogin ?? '?'}</strong>
+                <div className="thread-message-author"><PersonIcon /><strong>{c.authorLogin ?? '?'}</strong></div>
                 <p>{c.body}</p>
               </div>
             ))}

@@ -239,8 +239,9 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .conversation-card-body { background: var(--bg); padding: 12px 14px; border-top: 1px solid var(--border); }
 .conversation-message { margin: 0 0 12px; padding: 0 0 12px; border-bottom: 1px solid var(--border-muted); }
 .conversation-message:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-.conversation-message-header { display: flex; gap: 10px; align-items: baseline; margin-bottom: 4px; }
+.conversation-message-header { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
 .conversation-message-header strong { font-size: 0.9rem; }
+.conversation-message-header .person-icon { color: var(--muted); flex-shrink: 0; }
 .conversation-message-header time { color: var(--muted); font-size: 0.8rem; }
 .conversation-message p { margin: 0; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
 .conversation-reply { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-muted); }
@@ -289,7 +290,9 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .thread-card-header { color: var(--muted); font-size: 0.85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-bottom: 6px; }
 .thread-anchor { color: var(--muted); }
 .thread-message { margin: 8px 0; line-height: 1.5; }
-.thread-message strong { display: block; font-size: 0.9rem; margin-bottom: 2px; }
+.thread-message-author { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.thread-message-author strong { font-size: 0.9rem; }
+.thread-message-author .person-icon { color: var(--muted); flex-shrink: 0; }
 .thread-message p { margin: 0; white-space: pre-wrap; word-wrap: break-word; }
 .thread-reply { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-muted); }
 .thread-reply textarea { width: 100%; min-height: 48px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); color: inherit; font: inherit; box-sizing: border-box; }
