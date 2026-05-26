@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNotes } from '../hooks/useNotes.js';
-import { handlePasteLinkify } from '../lib/pasteLinkify.js';
-import { renderNotesToHtml } from '../lib/renderNotes.js';
+import { NotesEditor } from './NotesEditor.js';
 
 function PencilIcon({ size = 18 }: { size?: number }) {
   return (
@@ -20,17 +19,13 @@ function CloseIcon({ size = 16 }: { size?: number }) {
 }
 
 /**
- * Floating "notes" pencil button + slide-in panel. Persists to localStorage
- * via useNotes, so the notes survive reloads and follow the user across the
- * entire app (every tab, the drawer, etc.).
+ * Floating "notes" pencil button + slide-in panel. Always-rendered editable
+ * surface (contenteditable): you can type, paste, click links — all in one
+ * view, no Write/Preview toggle. Persists HTML to localStorage via useNotes.
  */
-type Mode = 'write' | 'preview';
-
 export function NotesFab() {
   const { notes, setNotes, clear } = useNotes();
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>('write');
-  const previewHtml = useMemo(() => renderNotesToHtml(notes), [notes]);
 
   // Toggle with Cmd/Ctrl + Shift + N for keyboard access.
   useEffect(() => {
@@ -62,44 +57,18 @@ export function NotesFab() {
           <header className="notes-panel-header">
             <h3>Notes</h3>
             <div className="notes-panel-actions">
-              <div className="notes-mode-toggle" role="tablist">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === 'write'}
-                  className={mode === 'write' ? 'notes-mode-active' : ''}
-                  onClick={() => setMode('write')}
-                >Write</button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === 'preview'}
-                  className={mode === 'preview' ? 'notes-mode-active' : ''}
-                  onClick={() => setMode('preview')}
-                >Preview</button>
-              </div>
               <button type="button" onClick={clear} disabled={!notes} title="Clear notes">Clear</button>
               <button type="button" className="notes-panel-close" onClick={() => setOpen(false)} aria-label="Close notes">
                 <CloseIcon />
               </button>
             </div>
           </header>
-          {mode === 'write' ? (
-            <textarea
-              className="notes-textarea"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              onPaste={handlePasteLinkify}
-              placeholder="Jot anything down — auto-saved to this browser. Select text + paste a URL to linkify."
-              autoFocus
-            />
-          ) : (
-            <div
-              className="notes-preview"
-              dangerouslySetInnerHTML={{ __html: previewHtml || '<p class="notes-preview-empty">Nothing to preview yet.</p>' }}
-            />
-          )}
-          <p className="notes-panel-hint">Saved automatically · ⌘⇧N to toggle</p>
+          <NotesEditor
+            initialHtml={notes}
+            onChange={setNotes}
+            placeholder="Jot anything down — auto-saved. Select text + paste a URL to linkify."
+          />
+          <p className="notes-panel-hint">Saved automatically · ⌘⇧N to toggle · click a link to open</p>
         </aside>
       )}
     </>

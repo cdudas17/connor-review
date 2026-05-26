@@ -209,16 +209,11 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .notes-panel-actions button:hover:not(:disabled) { background: var(--border-muted); }
 .notes-panel-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
 .notes-panel-close { padding: 4px 6px !important; display: inline-flex; align-items: center; justify-content: center; }
-.notes-mode-toggle { display: inline-flex; gap: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-.notes-mode-toggle button { padding: 4px 10px !important; border: none !important; border-radius: 0 !important; background: var(--bg) !important; color: var(--muted) !important; font-size: 0.8rem !important; }
-.notes-mode-toggle button + button { border-left: 1px solid var(--border) !important; }
-.notes-mode-toggle .notes-mode-active { background: var(--accent) !important; color: #fff !important; }
-.notes-textarea { flex: 1; resize: none; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); color: inherit; font: inherit; font-size: 0.9rem; box-sizing: border-box; }
-.notes-textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
-.notes-preview { flex: 1; overflow-y: auto; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); font-size: 0.9rem; line-height: 1.5; word-wrap: break-word; }
-.notes-preview a { color: var(--accent); }
-.notes-preview a:hover { text-decoration: underline; }
-.notes-preview-empty { color: var(--muted); margin: 0; }
+.notes-editor { flex: 1; overflow-y: auto; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); color: inherit; font: inherit; font-size: 0.9rem; line-height: 1.5; word-wrap: break-word; white-space: pre-wrap; cursor: text; }
+.notes-editor:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.notes-editor a { color: var(--accent); cursor: pointer; }
+.notes-editor a:hover { text-decoration: underline; }
+.notes-editor:empty::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
 .notes-panel-hint { color: var(--muted); font-size: 0.75rem; margin: 6px 0 0; text-align: right; }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 70vw; min-width: 720px; background: var(--bg); border-left: 1px solid var(--border); box-shadow: -8px 0 32px rgba(0,0,0,0.18); overflow: auto; padding: 16px 24px 120px; z-index: 11; }
 .drawer-close { position: absolute; top: 12px; right: 16px; font-size: 1.4rem; background: transparent; border: none; cursor: pointer; }
