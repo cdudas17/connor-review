@@ -21,6 +21,8 @@ export interface TrackedPR {
   ciUrl: string | null;
   /** PR labels (name + GitHub hex color, no leading #). */
   labels: PRLabel[];
+  /** Whether this PR is currently in draft state. Used by the Oncall tab. Optional/false for older entries. */
+  isDraft?: boolean;
   /** ISO-8601 timestamp of when the PR was opened on GitHub. null until meta is fetched. */
   createdAt: string | null;
   addedAt: number;

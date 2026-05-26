@@ -127,7 +127,8 @@ export async function registerTeamRoutes(app: FastifyInstance) {
     '/api/labeled-prs',
     async (req) => {
       const label = req.query.label ?? 'talent-alerts';
-      const q = ['is:pr', 'is:open', 'draft:false', `label:"${label}"`].join(' ');
+      // No draft filter — caller filters drafts vs ready-for-review client-side.
+      const q = ['is:pr', 'is:open', `label:"${label}"`].join(' ');
       const out = await ghExec(['api', 'graphql', '--input', '-'], {
         input: JSON.stringify({ query: TEAM_PR_SEARCH_QUERY, variables: { q } }),
       });
@@ -153,7 +154,8 @@ export async function registerTeamRoutes(app: FastifyInstance) {
       const parsed = JSON.parse(out) as { data?: { search?: { nodes?: LabelSearchNode[] } } };
       const nodes = (parsed.data?.search?.nodes ?? []) as LabelSearchNode[];
       const prs: TeamPR[] = nodes
-        .filter((n) => n && n.id && !n.merged && n.state === 'OPEN' && !n.isDraft && n.reviewDecision !== 'APPROVED')
+        // Keep drafts for the oncall workflow — they are the ones that need triaging.
+        .filter((n) => n && n.id && !n.merged && n.state === 'OPEN' && n.reviewDecision !== 'APPROVED')
         .map((n) => ({
           id: n.id!,
           number: n.number!,

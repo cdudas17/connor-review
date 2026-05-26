@@ -8,6 +8,7 @@ import { ErrorToast } from './components/ErrorToast.js';
 import { Tabs, type TabId } from './components/Tabs.js';
 import { BulkActionsBar } from './components/BulkActionsBar.js';
 import { MemberFilter } from './components/MemberFilter.js';
+import { OncallStateFilter, type OncallState } from './components/OncallStateFilter.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
 import { useLabeledPRs } from './hooks/useLabeledPRs.js';
@@ -38,6 +39,9 @@ export function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [memberFilter, setMemberFilter] = useState<Set<string> | null>(null);
+  // Oncall tab state-filter (Draft vs Ready for review). Defaults to Draft only — that's
+  // what the on-call person actually needs to triage.
+  const [oncallStates, setOncallStates] = useState<Set<OncallState>>(() => new Set<OncallState>(['draft']));
 
   // First time members load (or when they change), default to "show all".
   useEffect(() => {
@@ -74,10 +78,34 @@ export function App() {
     return teamPRs.prs.filter((p) => p.authorLogin != null && memberFilter.has(p.authorLogin));
   }, [teamPRs.prs, memberFilter]);
 
+  const filteredOncallPRs = useMemo(() => {
+    if (oncallStates.size === 0) return [];
+    return oncallPRs.prs.filter((p) => {
+      const state: OncallState = p.isDraft ? 'draft' : 'ready';
+      return oncallStates.has(state);
+    });
+  }, [oncallPRs.prs, oncallStates]);
+
+  const oncallCountsByState: Record<OncallState, number> = useMemo(() => {
+    const c: Record<OncallState, number> = { draft: 0, ready: 0 };
+    for (const p of oncallPRs.prs) c[p.isDraft ? 'draft' : 'ready']++;
+    return c;
+  }, [oncallPRs.prs]);
+
+  const toggleOncallState = useCallback((s: OncallState) => {
+    setOncallStates((cur) => {
+      const next = new Set(cur);
+      if (next.has(s)) next.delete(s); else next.add(s);
+      return next;
+    });
+  }, []);
+  const selectAllOncallStates = useCallback(() => setOncallStates(new Set<OncallState>(['draft', 'ready'])), []);
+  const clearAllOncallStates = useCallback(() => setOncallStates(new Set<OncallState>()), []);
+
   const activePRs: TrackedPR[] =
     tab === 'my' ? myPRs.prs
     : tab === 'team' ? filteredTeamPRs
-    : oncallPRs.prs;
+    : filteredOncallPRs;
   const activeSetStatus =
     tab === 'my' ? myPRs.setStatus
     : tab === 'team' ? teamPRs.setStatus
@@ -304,14 +332,23 @@ export function App() {
               </button>
             </div>
           ) : (
-            <p className="tab-context">
-              <span className="tab-context-freshness">
-                {oncallPRs.prs.length} PRs · last loaded {oncallPRs.lastFetchedAt ? new Date(oncallPRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '—'}
-                {oncallPRs.loading && <span className="loading-spinner" aria-label="Refreshing" />}
-                {' · '}
-                <button type="button" className="link-button" onClick={oncallPRs.fetch} disabled={oncallPRs.loading}>Refresh now</button>
-              </span>
-            </p>
+            <>
+              <p className="tab-context">
+                <span className="tab-context-freshness">
+                  {oncallPRs.prs.length} PRs · last loaded {oncallPRs.lastFetchedAt ? new Date(oncallPRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '—'}
+                  {oncallPRs.loading && <span className="loading-spinner" aria-label="Refreshing" />}
+                  {' · '}
+                  <button type="button" className="link-button" onClick={oncallPRs.fetch} disabled={oncallPRs.loading}>Refresh now</button>
+                </span>
+              </p>
+              <OncallStateFilter
+                selected={oncallStates}
+                countsByState={oncallCountsByState}
+                onToggle={toggleOncallState}
+                onSelectAll={selectAllOncallStates}
+                onClearAll={clearAllOncallStates}
+              />
+            </>
           )}
           {oncallPRs.error && !oncallPRs.errorDismissed && (
             <ErrorToast

@@ -59,6 +59,7 @@ export function useLabeledPRs(label = 'talent-alerts') {
         ciStatus: p.ciStatus,
         ciUrl: p.ciUrl,
         labels: p.labels ?? [],
+        isDraft: p.isDraft,
         createdAt: p.createdAt,
         addedAt: Date.parse(p.updatedAt) || Date.now(),
       }));
