@@ -25,6 +25,9 @@ export interface DiffViewerProps {
   hasPendingReview: boolean;
   /** PR identity + base ref needed to fetch file content for hunk expansion. */
   pr: { owner: string; repo: string; number: number; baseRef: string };
+  /** Per-path "Viewed" state from App-level storage. */
+  viewedPaths: Set<string>;
+  onViewedChange: (path: string, viewed: boolean) => void;
   /** Post a new thread immediately as a standalone PR comment. */
   onCommitComment: (c: StagedInlineComment) => Promise<void>;
   /** Post a new thread as part of a pending review (creates one if needed). */
@@ -181,6 +184,8 @@ function DiffFile({
   threads,
   hasPendingReview,
   pr,
+  viewed,
+  onViewedChange,
   onCommitComment,
   onAddToReview,
   onReply,
@@ -189,6 +194,8 @@ function DiffFile({
   threads: ReviewThread[];
   hasPendingReview: boolean;
   pr: { owner: string; repo: string; number: number; baseRef: string };
+  viewed: boolean;
+  onViewedChange: (path: string, viewed: boolean) => void;
   onCommitComment: (c: StagedInlineComment) => Promise<void>;
   onAddToReview: (c: StagedInlineComment) => Promise<void>;
   onReply: (threadId: string, body: string) => Promise<void>;
@@ -417,16 +424,29 @@ function DiffFile({
   }
 
   return (
-    <section className="diff-file">
+    <section className={`diff-file${viewed ? ' diff-file-viewed' : ''}`}>
       <header className="diff-file-header">
         <code>{path}</code>
-        <button
-          type="button"
-          onClick={() => setView((v) => (v === 'unified' ? 'split' : 'unified'))}
-        >
-          {view === 'unified' ? 'Split view' : 'Unified view'}
-        </button>
+        <div className="diff-file-header-actions">
+          <label className="diff-file-viewed-toggle" title="Mark this file as viewed">
+            <input
+              type="checkbox"
+              checked={viewed}
+              onChange={(e) => onViewedChange(path, e.target.checked)}
+            />
+            Viewed
+          </label>
+          {!viewed && (
+            <button
+              type="button"
+              onClick={() => setView((v) => (v === 'unified' ? 'split' : 'unified'))}
+            >
+              {view === 'unified' ? 'Split view' : 'Unified view'}
+            </button>
+          )}
+        </div>
       </header>
+      {!viewed && (
       <div
         className={`diff-file-body${drag ? ' cr-dragging' : ''}`}
         ref={containerRef}
@@ -497,6 +517,7 @@ function DiffFile({
           })}
         </Diff>
       </div>
+      )}
     </section>
   );
 }
@@ -512,7 +533,7 @@ function makePseudoChangeForSide(_t: ReviewThread): ChangeData {
   return { type: 'insert', content: '', lineNumber: 0, isInsert: true } as unknown as ChangeData;
 }
 
-export function DiffViewer({ diff, threads, hasPendingReview, pr, onCommitComment, onAddToReview, onReply }: DiffViewerProps) {
+export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, onViewedChange, onCommitComment, onAddToReview, onReply }: DiffViewerProps) {
   const files = useMemo(() => parseDiff(diff), [diff]);
 
   if (files.length === 0) {
@@ -521,18 +542,23 @@ export function DiffViewer({ diff, threads, hasPendingReview, pr, onCommitCommen
 
   return (
     <div className="diff-viewer">
-      {files.map((file) => (
-        <DiffFile
-          key={fileToPath(file)}
-          file={file}
-          threads={threads}
-          hasPendingReview={hasPendingReview}
-          pr={pr}
-          onCommitComment={onCommitComment}
-          onAddToReview={onAddToReview}
-          onReply={onReply}
-        />
-      ))}
+      {files.map((file) => {
+        const path = fileToPath(file);
+        return (
+          <DiffFile
+            key={path}
+            file={file}
+            threads={threads}
+            hasPendingReview={hasPendingReview}
+            pr={pr}
+            viewed={viewedPaths.has(path)}
+            onViewedChange={onViewedChange}
+            onCommitComment={onCommitComment}
+            onAddToReview={onAddToReview}
+            onReply={onReply}
+          />
+        );
+      })}
     </div>
   );
 }

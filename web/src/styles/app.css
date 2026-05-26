@@ -266,6 +266,12 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .diff-file-header { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; background: var(--bg-subtle); border-bottom: 1px solid var(--border); align-items: center; }
 .diff-file-header > code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; word-break: break-all; font-size: 0.85rem; }
 .diff-file-header > button { flex: 0 0 auto; }
+.diff-file-header-actions { display: inline-flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+.diff-file-viewed-toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--fg); cursor: pointer; font-size: 0.85rem; user-select: none; padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+.diff-file-viewed-toggle:hover { background: var(--border-muted); }
+.diff-file-viewed-toggle input { cursor: pointer; width: 14px; height: 14px; accent-color: var(--accent); margin: 0; }
+.diff-file-viewed .diff-file-header { background: rgba(46, 160, 67, 0.10); }
+.diff-file-viewed .diff-file-viewed-toggle { color: var(--ok); border-color: var(--ok); }
 .diff-file-body { user-select: text; }
 .diff-file-body .diff-line { font-size: 13px; line-height: 1.85; }
 .diff-file-body .diff-gutter-col { width: 4ch; }

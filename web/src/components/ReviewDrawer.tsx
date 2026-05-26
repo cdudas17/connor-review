@@ -20,6 +20,8 @@ interface Props {
   latestGhStatus?: GhStatus | null;
   latestCiStatus?: CiStatus;
   latestCiUrl?: string | null;
+  viewedPaths: Set<string>;
+  onViewedChange: (path: string, viewed: boolean) => void;
   onPendingReviewChange: (id: Identity, reviewId: string | null) => void;
   onMetaLoaded?: (id: Identity, meta: PullRequestMeta) => void;
   onAdvance: (id: Identity, newStatus: PRStatus) => void;
@@ -27,7 +29,7 @@ interface Props {
 }
 
 export function ReviewDrawer(props: Props) {
-  const { current, prs, pendingReviewId, latestGhStatus, latestCiStatus, latestCiUrl, onPendingReviewChange, onMetaLoaded, onAdvance, onClose } = props;
+  const { current, prs, pendingReviewId, latestGhStatus, latestCiStatus, latestCiUrl, viewedPaths, onViewedChange, onPendingReviewChange, onMetaLoaded, onAdvance, onClose } = props;
   const { meta, diff, loading, error, reload } = usePRDetails(current);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -137,6 +139,8 @@ export function ReviewDrawer(props: Props) {
         threads={meta.reviewThreads}
         hasPendingReview={pendingReviewId != null}
         pr={{ owner: current.owner, repo: current.repo, number: current.number, baseRef: meta.baseRefName }}
+        viewedPaths={viewedPaths}
+        onViewedChange={onViewedChange}
         onCommitComment={commitStandaloneComment}
         onAddToReview={addToReview}
         onReply={reply}

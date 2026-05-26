@@ -10,6 +10,7 @@ import { BulkActionsBar } from './components/BulkActionsBar.js';
 import { MemberFilter } from './components/MemberFilter.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
+import { useViewedPaths } from './hooks/useViewedPaths.js';
 import { nextUntouchedAfter } from './hooks/useNextPRPrefetch.js';
 import { api, ApiCallError } from './lib/api.js';
 import { computeGhStatus } from './lib/ghStatus.js';
@@ -31,6 +32,7 @@ export function App() {
   const [addError, setAddError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [pendingReviews, setPendingReviews] = useState<Record<string, string>>({});
+  const viewedPaths = useViewedPaths();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [memberFilter, setMemberFilter] = useState<Set<string> | null>(null);
@@ -339,6 +341,8 @@ export function App() {
             latestGhStatus={tracked?.ghStatus}
             latestCiStatus={tracked?.ciStatus}
             latestCiUrl={tracked?.ciUrl}
+            viewedPaths={viewedPaths.getViewedFor(current)}
+            onViewedChange={(p, v) => viewedPaths.setViewed(current, p, v)}
             onPendingReviewChange={setPendingReview}
             onMetaLoaded={handleMetaLoaded}
             onAdvance={handleAdvance}
