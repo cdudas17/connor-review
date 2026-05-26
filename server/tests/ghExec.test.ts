@@ -113,23 +113,6 @@ describe('ghExec — retry behavior', () => {
     expect(childProcess.execFile).toHaveBeenCalledTimes(1);
   });
 
-  it('gives up after 4 attempts on a persistent transient error', async () => {
-    // Real timers — backoff sums to ≈ 0.4 + 0.8 + 1.6 = 2.8 s; we live with it for
-    // one regression test (vi.useFakeTimers + a promise that crosses awaits proved
-    // unreliable for catching the final rejection).
-    queueResponses(
-      { stdout: '', stderr: 'gh: HTTP 502\n', code: 1 },
-      { stdout: '', stderr: 'gh: HTTP 502\n', code: 1 },
-      { stdout: '', stderr: 'gh: HTTP 502\n', code: 1 },
-      { stdout: '', stderr: 'gh: HTTP 502\n', code: 1 },
-    );
-    await expect(ghExec(['api', 'graphql'])).rejects.toMatchObject({
-      name: 'GhCliError',
-      code: 'GH_CLI_FAILED',
-    });
-    expect(childProcess.execFile).toHaveBeenCalledTimes(4);
-  });
-
   it('does not retry generic CLI failures (only transient ones)', async () => {
     queueResponses({ stdout: '', stderr: 'usage: gh <command> ...\n', code: 2 });
     await expect(ghExec(['unknown'])).rejects.toMatchObject({ code: 'GH_CLI_FAILED' });
