@@ -2,6 +2,7 @@ import type { CiStatus, GhStatus, PullRequestMeta } from '../types.js';
 import { GhStatusBadge } from './GhStatusBadge.js';
 import { CiBadge } from './CiBadge.js';
 import { LabelChips } from './LabelChips.js';
+import { AssigneesRow } from './AssigneesRow.js';
 import { computeGhStatus } from '../lib/ghStatus.js';
 
 interface Props {
@@ -25,6 +26,7 @@ export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl }: 
         <CiBadge status={ci} url={ciUrl} />
       </div>
       <LabelChips labels={meta.labels ?? []} />
+      <AssigneesRow assignees={meta.assignees ?? []} />
       <p className="pr-header-meta">
         <a href={meta.url} target="_blank" rel="noopener noreferrer">#{meta.number}</a>
         {' · '}

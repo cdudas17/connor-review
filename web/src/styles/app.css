@@ -126,6 +126,15 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .label-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .label-chip { font-size: 0.72rem; padding: 1px 8px; border-radius: 999px; line-height: 1.4; font-weight: 500; border: 1px solid rgba(0, 0, 0, 0.2); }
 .label-chip-overflow { font-size: 0.72rem; padding: 1px 8px; border-radius: 999px; line-height: 1.4; color: var(--muted); border: 1px solid var(--border); background: var(--bg-subtle); }
+
+/* Assignees row (drawer header) */
+.pr-assignees { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.pr-assignees-label { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 0.85rem; }
+.pr-assignees-label .person-icon { color: var(--muted); }
+.pr-assignees ul { list-style: none; padding: 0; margin: 0; display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.pr-assignee { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px 2px 4px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-subtle); color: var(--fg); text-decoration: none; font-size: 0.85rem; }
+.pr-assignee:hover { background: var(--border-muted); }
+.pr-assignee img { border-radius: 50%; flex-shrink: 0; }
 .pr-row:hover { background: rgba(37, 99, 235, 0.06); }
 .pr-row-selected { background: rgba(99, 102, 241, 0.12); }
 .pr-row-selected:hover { background: rgba(99, 102, 241, 0.18); }

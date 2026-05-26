@@ -5,6 +5,7 @@ export type GhStatus = 'draft' | 'open' | 'changes-requested' | 'approved' | 'me
 export type CiStatus = 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' | null;
 
 export interface PRLabel { name: string; color: string; }
+export interface PRAssignee { login: string; avatarUrl: string | null; url: string | null; }
 
 export interface TrackedPR {
   owner: string;
@@ -40,6 +41,7 @@ export interface PullRequestMeta {
   ciStatus: CiStatus;
   ciUrl: string | null;
   labels: PRLabel[];
+  assignees: PRAssignee[];
   createdAt: string | null;
   /** Pre-rendered GitHub-flavored markdown HTML for the PR body. Safe — GitHub sanitizes. */
   bodyHtml: string | null;
