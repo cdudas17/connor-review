@@ -42,7 +42,29 @@ export interface GhExecOptions {
   input?: string;
 }
 
-export function ghExec(args: string[], opts: GhExecOptions = {}): Promise<string> {
+// Retry settings for transient upstream errors. Backoff is exponential with jitter.
+const MAX_ATTEMPTS = 4;
+const BASE_DELAY_MS = 400;
+const TRANSIENT_PATTERNS = [
+  /\bHTTP 5\d\d\b/i,           // 500, 502, 503, 504
+  /HTTP\/2 stream\b/i,         // "HTTP/2 stream 1 was not closed cleanly"
+  /stream error/i,             // "stream error: stream ID 1; CANCEL; received from peer"
+  /connection reset/i,
+  /ECONNRESET|EAI_AGAIN|ETIMEDOUT|ECONNREFUSED/,
+  /TLS connection/i,
+  /timed? out/i,
+  /timeout exceeded/i,
+];
+
+function isTransient(stderr: string): boolean {
+  return TRANSIENT_PATTERNS.some((re) => re.test(stderr));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function execOnce(args: string[], opts: GhExecOptions): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = execFile('gh', args, { maxBuffer: 20 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
@@ -56,4 +78,26 @@ export function ghExec(args: string[], opts: GhExecOptions = {}): Promise<string
       child.stdin?.end(opts.input);
     }
   });
+}
+
+export async function ghExec(args: string[], opts: GhExecOptions = {}): Promise<string> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await execOnce(args, opts);
+    } catch (err) {
+      lastErr = err;
+      // Only retry GH_CLI_FAILED with transient upstream errors. Auth and GraphQL semantic
+      // errors should NOT be retried — they'll always fail.
+      const retryable = err instanceof GhCliError
+        && (err.code === 'GH_CLI_FAILED' || err.code === 'GH_API_ERROR')
+        && isTransient(err.stderr);
+      if (!retryable || attempt === MAX_ATTEMPTS) break;
+      // Exponential backoff with +/- 20% jitter: 400, 800, 1600 ms.
+      const delay = BASE_DELAY_MS * 2 ** (attempt - 1);
+      const jittered = delay * (0.8 + Math.random() * 0.4);
+      await sleep(jittered);
+    }
+  }
+  throw lastErr;
 }
