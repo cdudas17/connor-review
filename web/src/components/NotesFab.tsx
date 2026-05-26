@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNotes } from '../hooks/useNotes.js';
+import { useFabPosition } from '../hooks/useFabPosition.js';
 import { NotesEditor } from './NotesEditor.js';
 
 function PencilIcon({ size = 18 }: { size?: number }) {
@@ -18,16 +19,28 @@ function CloseIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+const FAB_SIZE = 44;
+const DRAG_THRESHOLD_PX = 4;
+const PANEL_W = 360;
+const PANEL_H = 420;
+const PANEL_GAP = 12;
+
 /**
- * Floating "notes" pencil button + slide-in panel. Always-rendered editable
- * surface (contenteditable): you can type, paste, click links — all in one
- * view, no Write/Preview toggle. Persists HTML to localStorage via useNotes.
+ * Floating draggable notes pencil + slide-in panel. Defaults to bottom-left.
+ * Click to toggle the panel; press-and-drag to reposition the button anywhere
+ * on screen. Position is persisted to localStorage and clamped to the viewport.
  */
 export function NotesFab() {
   const { notes, setNotes, clear } = useNotes();
+  const { pos, setPos } = useFabPosition();
   const [open, setOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef<{
+    startX: number; startY: number;
+    originX: number; originY: number;
+    moved: boolean;
+  } | null>(null);
 
-  // Toggle with Cmd/Ctrl + Shift + N for keyboard access.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
@@ -41,19 +54,75 @@ export function NotesFab() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  // Window-level move/up listeners while a drag is in flight — the drag must
+  // survive the pointer leaving the FAB.
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: MouseEvent) => {
+      const d = dragRef.current; if (!d) return;
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      if (Math.abs(dx) > DRAG_THRESHOLD_PX || Math.abs(dy) > DRAG_THRESHOLD_PX) d.moved = true;
+      setPos({ x: d.originX + dx, y: d.originY + dy });
+    };
+    const onUp = () => {
+      const d = dragRef.current;
+      setIsDragging(false);
+      if (d && !d.moved) {
+        // Treat as a click — toggle the panel.
+        setOpen((o) => !o);
+      }
+      dragRef.current = null;
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [isDragging, setPos]);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return; // primary button only
+    e.preventDefault();
+    dragRef.current = {
+      startX: e.clientX, startY: e.clientY,
+      originX: pos.x, originY: pos.y,
+      moved: false,
+    };
+    setIsDragging(true);
+  };
+
+  // Position the panel relative to the FAB: pick the side with more room so it
+  // stays on-screen no matter where the user dragged the button.
+  const w = typeof window === 'undefined' ? 1024 : window.innerWidth;
+  const h = typeof window === 'undefined' ? 768 : window.innerHeight;
+  const panelLeft = (pos.x + FAB_SIZE / 2 < w / 2)
+    ? Math.max(12, pos.x)
+    : Math.max(12, pos.x + FAB_SIZE - PANEL_W);
+  const panelTop = (pos.y - PANEL_GAP - PANEL_H >= 12)
+    ? pos.y - PANEL_GAP - PANEL_H
+    : Math.min(pos.y + FAB_SIZE + PANEL_GAP, h - PANEL_H - 12);
+
   return (
     <>
       <button
         type="button"
-        className="notes-fab"
-        onClick={() => setOpen((o) => !o)}
-        aria-label="Open notes"
-        title="Notes (⌘⇧N)"
+        className={`notes-fab${isDragging ? ' notes-fab-dragging' : ''}`}
+        onMouseDown={handleMouseDown}
+        aria-label="Notes (drag to reposition)"
+        title="Notes (⌘⇧N) — drag to move"
+        style={{ left: pos.x, top: pos.y, right: 'auto', bottom: 'auto' }}
       >
         <PencilIcon />
       </button>
       {open && (
-        <aside className="notes-panel" role="dialog" aria-label="Notes">
+        <aside
+          className="notes-panel"
+          role="dialog"
+          aria-label="Notes"
+          style={{ left: panelLeft, top: panelTop, right: 'auto', bottom: 'auto' }}
+        >
           <header className="notes-panel-header">
             <h3>Notes</h3>
             <div className="notes-panel-actions">
@@ -68,7 +137,7 @@ export function NotesFab() {
             onChange={setNotes}
             placeholder="Jot anything down — auto-saved. Select text + paste a URL to linkify."
           />
-          <p className="notes-panel-hint">Saved automatically · ⌘⇧N to toggle · click a link to open</p>
+          <p className="notes-panel-hint">Saved automatically · ⌘⇧N to toggle · drag the pencil to move</p>
         </aside>
       )}
     </>
