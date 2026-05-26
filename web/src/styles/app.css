@@ -263,6 +263,7 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .conversation-message-header { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
 .conversation-message-header strong { font-size: 0.9rem; }
 .conversation-message-header .person-icon { color: var(--muted); flex-shrink: 0; }
+.avatar { border-radius: 50%; flex-shrink: 0; display: inline-block; vertical-align: middle; background: var(--bg-subtle); }
 .conversation-message-header time { color: var(--muted); font-size: 0.8rem; }
 .conversation-message p { margin: 0; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
 .conversation-reply { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-muted); }

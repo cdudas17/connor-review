@@ -44,7 +44,7 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
             comments(first: 50) {
               nodes {
                 id
-                author { login }
+                author { login avatarUrl }
                 body
                 createdAt
                 diffHunk

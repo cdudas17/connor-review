@@ -16,7 +16,7 @@ import {
 import 'react-diff-view/style/index.css';
 import { api } from '../lib/api.js';
 import { EmojiTextarea } from './EmojiTextarea.js';
-import { PersonIcon } from './PersonIcon.js';
+import { Avatar } from './Avatar.js';
 import type { ReviewThread, StagedInlineComment } from '../types.js';
 
 export interface DiffViewerProps {
@@ -85,7 +85,7 @@ function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, 
         <div className="thread-card-body">
           {t.comments.map((c) => (
             <div key={c.id} className="thread-message">
-              <div className="thread-message-author"><PersonIcon /><strong>{c.authorLogin ?? '?'}</strong></div>
+              <div className="thread-message-author"><Avatar url={c.authorAvatarUrl} login={c.authorLogin} /><strong>{c.authorLogin ?? '?'}</strong></div>
               <p>{c.body}</p>
             </div>
           ))}

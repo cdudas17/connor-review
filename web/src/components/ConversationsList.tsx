@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ReviewThread } from '../types.js';
 import { DiffHunkSnippet } from './DiffHunkSnippet.js';
 import { EmojiTextarea } from './EmojiTextarea.js';
-import { PersonIcon } from './PersonIcon.js';
+import { Avatar } from './Avatar.js';
 
 interface Props {
   threads: ReviewThread[];
@@ -66,7 +66,7 @@ function ConversationCard({ thread, onReply }: CardProps) {
           {thread.comments.map((c) => (
             <div key={c.id} className="conversation-message">
               <header className="conversation-message-header">
-                <PersonIcon />
+                <Avatar url={c.authorAvatarUrl} login={c.authorLogin} />
                 <strong>{c.authorLogin ?? '?'}</strong>
                 <time>{formatTimeAgo(c.createdAt)}</time>
               </header>
