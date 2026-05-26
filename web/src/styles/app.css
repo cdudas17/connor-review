@@ -82,6 +82,18 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .tab-context { color: var(--muted); font-size: 0.9rem; margin: 8px 0 12px; }
 .tab-context code { background: var(--bg-subtle); padding: 1px 4px; border-radius: 3px; }
 .tab-context-freshness { color: var(--muted); font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; }
+
+/* Manual-fetch Oncall tab empty state */
+.oncall-empty { padding: 32px 24px; text-align: center; border: 1px dashed var(--border); border-radius: 8px; background: var(--bg-subtle); margin: 12px 0; }
+.oncall-empty p { margin: 0 0 12px; color: var(--fg); }
+.oncall-empty .oncall-note { color: var(--muted); font-size: 0.9rem; }
+.oncall-empty code { background: var(--bg); padding: 1px 6px; border-radius: 3px; border: 1px solid var(--border); }
+.oncall-fetch-button { padding: 8px 18px; border: 1px solid var(--ok); border-radius: 6px; background: var(--ok); color: #fff; cursor: pointer; font: inherit; font-weight: 500; }
+.oncall-fetch-button:hover:not(:disabled) { background: var(--ok-hover); border-color: var(--ok-hover); }
+.oncall-fetch-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.link-button { padding: 0; border: none; background: transparent; color: var(--accent); cursor: pointer; font: inherit; font-size: inherit; }
+.link-button:hover:not(:disabled) { text-decoration: underline; }
+.link-button:disabled { opacity: 0.5; cursor: not-allowed; }
 .loading-spinner { display: inline-block; width: 10px; height: 10px; border: 1.5px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: cr-spin 700ms linear infinite; margin-left: 6px; vertical-align: -1px; }
 @keyframes cr-spin { to { transform: rotate(360deg); } }
 

@@ -10,6 +10,7 @@ import { BulkActionsBar } from './components/BulkActionsBar.js';
 import { MemberFilter } from './components/MemberFilter.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
+import { useLabeledPRs } from './hooks/useLabeledPRs.js';
 import { useViewedPaths } from './hooks/useViewedPaths.js';
 import { nextUntouchedAfter } from './hooks/useNextPRPrefetch.js';
 import { api, ApiCallError } from './lib/api.js';
@@ -26,6 +27,7 @@ export function App() {
   // 2 API calls per refresh × 60 refreshes/hour = ~120 calls/hr, still well under
   // GitHub's 5,000/hour authenticated rate limit.
   const teamPRs = useTeamPRs({ autoRefreshMs: 60 * 1000 });
+  const oncallPRs = useLabeledPRs('talent-alerts');
   const [tab, setTab] = useState<TabId>('my');
   const [mode, setMode] = useState<FilterMode>('all');
   const [current, setCurrent] = useState<Identity | null>(null);
@@ -72,8 +74,14 @@ export function App() {
     return teamPRs.prs.filter((p) => p.authorLogin != null && memberFilter.has(p.authorLogin));
   }, [teamPRs.prs, memberFilter]);
 
-  const activePRs: TrackedPR[] = tab === 'my' ? myPRs.prs : filteredTeamPRs;
-  const activeSetStatus = tab === 'my' ? myPRs.setStatus : teamPRs.setStatus;
+  const activePRs: TrackedPR[] =
+    tab === 'my' ? myPRs.prs
+    : tab === 'team' ? filteredTeamPRs
+    : oncallPRs.prs;
+  const activeSetStatus =
+    tab === 'my' ? myPRs.setStatus
+    : tab === 'team' ? teamPRs.setStatus
+    : oncallPRs.setStatus;
 
   const teamPRCountByMember = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -236,11 +244,13 @@ export function App() {
           ? failures[0].message
           : `${failures.length} of ${myPRs.prs.length} PRs failed to refresh.`);
       }
-    } else {
+    } else if (tab === 'team') {
       await teamPRs.fetch();
+    } else {
+      await oncallPRs.fetch();
     }
     setRefreshing(false);
-  }, [tab, myPRs, teamPRs, refreshing]);
+  }, [tab, myPRs, teamPRs, oncallPRs, refreshing]);
 
   const untouchedCount = (list: TrackedPR[]) => list.filter((p) => p.status === 'untouched').length;
 
@@ -266,6 +276,7 @@ export function App() {
         tabs={[
           { id: 'my', label: 'My PRs', badge: untouchedCount(myPRs.prs) || null },
           { id: 'team', label: 'Team PRs', badge: teamPRs.hasLoaded ? (untouchedCount(teamPRs.prs) || null) : null },
+          { id: 'oncall', label: 'Oncall (talent-alerts)', badge: oncallPRs.hasLoaded ? (untouchedCount(oncallPRs.prs) || null) : null },
         ]}
         active={tab}
         onChange={setTab}
@@ -275,6 +286,39 @@ export function App() {
         <>
           <AddPRBar onAdd={handleAdd} />
           {addError && <ErrorToast message={addError} onDismiss={() => setAddError(null)} />}
+        </>
+      )}
+      {tab === 'oncall' && (
+        <>
+          {!oncallPRs.hasLoaded ? (
+            <div className="oncall-empty">
+              <p>Pull all open, non-draft, non-approved PRs labeled <code>talent-alerts</code>.</p>
+              <p className="oncall-note">Manual fetch — this can be a large list, so it isn't auto-refreshed.</p>
+              <button
+                type="button"
+                className="btn-primary oncall-fetch-button"
+                onClick={oncallPRs.fetch}
+                disabled={oncallPRs.loading}
+              >
+                {oncallPRs.loading ? 'Loading…' : 'Load talent-alerts PRs'}
+              </button>
+            </div>
+          ) : (
+            <p className="tab-context">
+              <span className="tab-context-freshness">
+                {oncallPRs.prs.length} PRs · last loaded {oncallPRs.lastFetchedAt ? new Date(oncallPRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '—'}
+                {oncallPRs.loading && <span className="loading-spinner" aria-label="Refreshing" />}
+                {' · '}
+                <button type="button" className="link-button" onClick={oncallPRs.fetch} disabled={oncallPRs.loading}>Refresh now</button>
+              </span>
+            </p>
+          )}
+          {oncallPRs.error && !oncallPRs.errorDismissed && (
+            <ErrorToast
+              message={`Failed to load talent-alerts PRs: ${oncallPRs.error.message}`}
+              onDismiss={oncallPRs.dismissError}
+            />
+          )}
         </>
       )}
       {tab === 'team' && (

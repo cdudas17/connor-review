@@ -71,6 +71,9 @@ export const api = {
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
     return call(`/api/team/prs${suffix}`);
   },
+  getLabeledPRs(label = 'talent-alerts'): Promise<{ label: string; prs: TeamPR[] }> {
+    return call(`/api/labeled-prs?label=${encodeURIComponent(label)}`);
+  },
   getFileContent(owner: string, repo: string, number: number, path: string, ref: string): Promise<string> {
     const qs = new URLSearchParams({ path, ref });
     return call(`/api/pulls/${owner}/${repo}/${number}/files/content?${qs.toString()}`);
