@@ -33,6 +33,86 @@ export interface DiffViewerProps {
   onReply: (threadId: string, body: string) => Promise<void>;
 }
 
+type ChangeTone = 'add' | 'del' | 'normal';
+
+function ChevronRightIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 16 16" width={size} height={size} aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 1 1-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06z"/>
+    </svg>
+  );
+}
+function ChevronDownIconSmall({ size = 14 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 16 16" width={size} height={size} aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M12.78 6.22a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L3.22 7.28a.75.75 0 0 1 1.06-1.06L8 9.94l3.72-3.72a.75.75 0 0 1 1.06 0z"/>
+    </svg>
+  );
+}
+
+interface InlineThreadCardProps {
+  thread: ReviewThread;
+  tone: ChangeTone;
+  replyState: { threadId: string; body: string } | null;
+  setReplyState: (s: { threadId: string; body: string } | null) => void;
+  replyBusy: boolean;
+  onReply: (threadId: string, body: string) => Promise<void>;
+  setReplyBusy: (b: boolean) => void;
+}
+
+function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, setReplyBusy, onReply }: InlineThreadCardProps) {
+  const [open, setOpen] = useState(true);
+  const t = thread;
+  const summaryAuthor = t.comments[0]?.authorLogin ?? '?';
+  const count = t.comments.length;
+  return (
+    <article className={`thread-card thread-card-tone-${tone}${open ? '' : ' thread-card-collapsed'}`}>
+      <button
+        type="button"
+        className="thread-card-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="thread-card-toggle-caret">{open ? <ChevronDownIconSmall /> : <ChevronRightIcon />}</span>
+        <span className="thread-card-toggle-label">
+          {open ? 'Comment' : `${summaryAuthor} · ${count} comment${count === 1 ? '' : 's'}`} on line {t.line}
+        </span>
+      </button>
+      {open && (
+        <div className="thread-card-body">
+          {t.comments.map((c) => (
+            <div key={c.id} className="thread-message">
+              <div className="thread-message-author"><PersonIcon /><strong>{c.authorLogin ?? '?'}</strong></div>
+              <p>{c.body}</p>
+            </div>
+          ))}
+          <div className="thread-reply">
+            <EmojiTextarea
+              placeholder="Write a reply…"
+              value={replyState?.threadId === t.id ? replyState.body : ''}
+              onChange={(e) => setReplyState({ threadId: t.id, body: e.target.value })}
+            />
+            <div className="thread-reply-actions">
+              <button
+                type="button"
+                disabled={replyBusy || !replyState || replyState.threadId !== t.id || replyState.body.trim() === ''}
+                onClick={async () => {
+                  if (!replyState) return;
+                  setReplyBusy(true);
+                  try {
+                    await onReply(replyState.threadId, replyState.body);
+                    setReplyState(null);
+                  } finally { setReplyBusy(false); }
+                }}
+              >Reply</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
 function ChevronUpIcon() {
   return (
     <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
@@ -272,6 +352,16 @@ function DiffFile({
     return byKey;
   }, [threads, anchors, path]);
 
+  // Pick a tone (add/del/normal) for each anchor based on the change type, used to
+  // tint the thread card background to match the diff row underneath.
+  function toneForChangeKey(key: string): ChangeTone {
+    const a = anchors.find((x) => x.changeKey === key);
+    if (!a) return 'normal';
+    if (a.change.type === 'insert') return 'add';
+    if (a.change.type === 'delete') return 'del';
+    return 'normal';
+  }
+
   function rangeLabel(): string {
     if (!editor) return '';
     if (editor.startLine != null) return `${path}:${editor.startLine}–${editor.line} (${editor.side})`;
@@ -281,41 +371,20 @@ function DiffFile({
   // Construct widgets per change: any threads + the editor (if active on this change).
   const widgets: Record<string, React.ReactNode> = {};
   for (const [key, ts] of Object.entries(threadsByAnchor)) {
+    const tone = toneForChangeKey(key);
     widgets[key] = (
-      <div className="thread-stack">
+      <div className={`thread-stack thread-stack-tone-${tone}`}>
         {ts.map((t) => (
-          <article key={t.id} className="thread-card">
-            <header className="thread-card-header">
-              <span className="thread-anchor">{t.path}:{t.line}</span>
-            </header>
-            {t.comments.map((c) => (
-              <div key={c.id} className="thread-message">
-                <div className="thread-message-author"><PersonIcon /><strong>{c.authorLogin ?? '?'}</strong></div>
-                <p>{c.body}</p>
-              </div>
-            ))}
-            <div className="thread-reply">
-              <EmojiTextarea
-                placeholder="Write a reply…"
-                value={replyState?.threadId === t.id ? replyState.body : ''}
-                onChange={(e) => setReplyState({ threadId: t.id, body: e.target.value })}
-              />
-              <div className="thread-reply-actions">
-                <button
-                  type="button"
-                  disabled={replyBusy || !replyState || replyState.threadId !== t.id || replyState.body.trim() === ''}
-                  onClick={async () => {
-                    if (!replyState) return;
-                    setReplyBusy(true);
-                    try {
-                      await onReply(replyState.threadId, replyState.body);
-                      setReplyState(null);
-                    } finally { setReplyBusy(false); }
-                  }}
-                >Reply</button>
-              </div>
-            </div>
-          </article>
+          <InlineThreadCard
+            key={t.id}
+            thread={t}
+            tone={tone}
+            replyState={replyState}
+            setReplyState={setReplyState}
+            replyBusy={replyBusy}
+            setReplyBusy={setReplyBusy}
+            onReply={onReply}
+          />
         ))}
       </div>
     );

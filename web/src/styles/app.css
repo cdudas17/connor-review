@@ -285,8 +285,19 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .diff-expand-button:hover { background: rgba(56, 139, 253, 0.25); color: #58a6ff; }
 .diff-expand-button svg { display: block; }
 /* Inline thread (existing review comments) — GitHub-style card under the diff line */
-.thread-stack { display: flex; flex-direction: column; gap: 12px; padding: 12px; background: var(--bg-subtle); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.thread-card { border: 1px solid var(--border); border-radius: 6px; background: var(--bg); padding: 12px 14px; }
+/* Backdrop behind the inline thread card matches the diff row color */
+.thread-stack { display: flex; flex-direction: column; gap: 12px; padding: 12px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg-subtle); }
+.thread-stack-tone-add { background: var(--diff-code-insert-background-color); }
+.thread-stack-tone-del { background: var(--diff-code-delete-background-color); }
+.thread-stack-tone-normal { background: var(--bg-subtle); }
+
+.thread-card { border: 1px solid var(--border); border-radius: 6px; background: var(--bg); overflow: hidden; }
+.thread-card-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; color: var(--accent); cursor: pointer; font: inherit; font-size: 0.9rem; text-align: left; }
+.thread-card-toggle:hover { background: rgba(56, 139, 253, 0.10); }
+.thread-card-toggle-caret { display: inline-flex; color: var(--accent); }
+.thread-card-toggle-label { color: var(--fg); font-weight: 500; }
+.thread-card-collapsed .thread-card-toggle-label { color: var(--muted); font-weight: 400; }
+.thread-card-body { padding: 12px 14px; border-top: 1px solid var(--border); }
 .thread-card-header { color: var(--muted); font-size: 0.85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-bottom: 6px; }
 .thread-anchor { color: var(--muted); }
 .thread-message { margin: 8px 0; line-height: 1.5; }
