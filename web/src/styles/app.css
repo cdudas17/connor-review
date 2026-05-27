@@ -218,6 +218,7 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .notes-panel-hint { color: var(--muted); font-size: 0.75rem; margin: 6px 0 0; text-align: right; }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 70vw; min-width: 720px; background: var(--bg); border-left: 1px solid var(--border); box-shadow: -8px 0 32px rgba(0,0,0,0.18); overflow: auto; padding: 16px 24px 120px; z-index: 11; }
 .drawer-close { position: absolute; top: 12px; right: 16px; font-size: 1.4rem; background: transparent; border: none; cursor: pointer; }
+.drawer-refresh-indicator { position: absolute; top: 18px; right: 48px; display: inline-flex; align-items: center; color: var(--muted); }
 .pr-header h2 { margin-bottom: 4px; }
 .pr-header-meta { color: var(--muted); font-size: 0.9rem; }
 

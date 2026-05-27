@@ -93,7 +93,11 @@ export function ReviewDrawer(props: Props) {
   }, [current?.owner, current?.repo, current?.number, meta?.headSha]);
 
   if (!current) return null;
-  if (loading || !meta || diff == null) {
+  // Only show the "Loading…" placeholder on the very first fetch (no data yet).
+  // On reloads after posting a comment/reply, keep the previous meta + diff rendered
+  // so the user's scroll position and thought process aren't interrupted; the new
+  // thread will pop in once the fetch resolves.
+  if (!meta || diff == null) {
     return (
       <>
         <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
@@ -137,6 +141,7 @@ export function ReviewDrawer(props: Props) {
       <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
       <aside className="drawer" aria-label="Review drawer">
         <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
+        {loading && <span className="drawer-refresh-indicator" aria-label="Refreshing"><span className="loading-spinner" /></span>}
       <PRHeader meta={meta} latestGhStatus={latestGhStatus} latestCiStatus={latestCiStatus} latestCiUrl={latestCiUrl} />
       <PRDescription bodyHtml={meta.bodyHtml} />
       <ConversationsList threads={meta.reviewThreads} onReply={reply} />
