@@ -393,7 +393,7 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .error-toast button { background: transparent; border: none; color: white; cursor: pointer; font-size: 1.2rem; line-height: 1; }
 
 /* Stacked notification toasts (success/error/info on review submit, etc.) */
-.toast-stack { position: fixed; bottom: 20px; right: 20px; z-index: 80; display: flex; flex-direction: column; gap: 8px; pointer-events: none; max-width: 420px; }
+.toast-stack { position: fixed; bottom: 20px; left: 76px; z-index: 80; display: flex; flex-direction: column; gap: 8px; pointer-events: none; max-width: 420px; }
 .toast { pointer-events: auto; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4); border: 1px solid; min-width: 240px; font-size: 0.9rem; animation: toast-in 160ms ease-out; }
 .toast-success { background: rgba(31, 136, 61, 0.20); border-color: var(--ok); color: var(--fg); }
 .toast-error { background: rgba(248, 81, 73, 0.18); border-color: var(--danger); color: var(--fg); }
