@@ -34,11 +34,22 @@ interface PullRequestMeta {
   viewerPendingReviewId: string | null;
   labels: PRLabel[];
   assignees: PRAssignee[];
+  reviews: ReviewSummary[];
   reviewThreads: ReviewThread[];
 }
 
 interface PRLabel { name: string; color: string; }
 interface PRAssignee { login: string; avatarUrl: string | null; url: string | null; }
+interface ReviewSummary {
+  id: string;
+  state: 'COMMENTED' | 'APPROVED' | 'CHANGES_REQUESTED' | 'DISMISSED' | 'PENDING';
+  body: string;
+  bodyHtml: string;
+  authorLogin: string | null;
+  authorAvatarUrl: string | null;
+  createdAt: string;
+  url: string;
+}
 
 interface ReviewThread {
   id: string;
@@ -139,6 +150,19 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
       avatarUrl: a.avatarUrl ?? null,
       url: a.url ?? null,
     })).filter((a: PRAssignee) => a.login),
+    reviews: (pr.reviews?.nodes ?? [])
+      .map((r: { id: string; state: ReviewSummary['state']; body?: string; bodyHTML?: string; author?: { login?: string; avatarUrl?: string }; createdAt?: string; url?: string }) => ({
+        id: r.id,
+        state: r.state,
+        body: r.body ?? '',
+        bodyHtml: r.bodyHTML ?? '',
+        authorLogin: r.author?.login ?? null,
+        authorAvatarUrl: r.author?.avatarUrl ?? null,
+        createdAt: r.createdAt ?? '',
+        url: r.url ?? '',
+      } satisfies ReviewSummary))
+      // Drop pending drafts, empty bodies, and bot accounts (login ends in [bot]).
+      .filter((r: ReviewSummary) => r.state !== 'PENDING' && r.body.trim().length > 0 && !(r.authorLogin ?? '').endsWith('[bot]')),
     reviewThreads: (pr.reviewThreads?.nodes ?? []).map((t: {
       id: string;
       isResolved: boolean;

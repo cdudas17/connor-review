@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PRHeader } from './PRHeader.js';
 import { PRDescription } from './PRDescription.js';
+import { ReviewSummaryList } from './ReviewSummaryList.js';
 import { ConversationsList } from './ConversationsList.js';
 import { DiffViewer } from './DiffViewer.js';
 import { ReviewFooter } from './ReviewFooter.js';
@@ -163,6 +164,7 @@ export function ReviewDrawer(props: Props) {
         {loading && <span className="drawer-refresh-indicator" aria-label="Refreshing"><span className="loading-spinner" /></span>}
       <PRHeader meta={meta} latestGhStatus={latestGhStatus} latestCiStatus={latestCiStatus} latestCiUrl={latestCiUrl} />
       <PRDescription bodyHtml={meta.bodyHtml} />
+      <ReviewSummaryList reviews={meta.reviews ?? []} />
       <ConversationsList threads={meta.reviewThreads} onReply={reply} />
       <DiffViewer
         diff={diff}

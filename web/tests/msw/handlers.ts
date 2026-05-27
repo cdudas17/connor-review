@@ -14,6 +14,7 @@ export const META_FIXTURE: PullRequestMeta = {
   ciUrl: null,
   labels: [],
   assignees: [],
+  reviews: [],
   createdAt: '2026-02-25T00:00:00Z',
   bodyHtml: '<p>Test PR description</p>',
   viewerPendingReviewId: null,

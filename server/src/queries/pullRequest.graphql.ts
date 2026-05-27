@@ -19,6 +19,17 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
         viewerLatestReview { id state }
         labels(first: 50) { nodes { name color } }
         assignees(first: 20) { nodes { login avatarUrl url } }
+        reviews(first: 100) {
+          nodes {
+            id
+            state
+            body
+            bodyHTML
+            author { login avatarUrl }
+            createdAt
+            url
+          }
+        }
         commits(last: 1) {
           nodes {
             commit {

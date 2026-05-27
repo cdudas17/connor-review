@@ -7,6 +7,18 @@ export type CiStatus = 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' 
 export interface PRLabel { name: string; color: string; }
 export interface PRAssignee { login: string; avatarUrl: string | null; url: string | null; }
 
+/** Top-level review submission (the "Approved with comment" / "Commented" summary text). */
+export interface ReviewSummary {
+  id: string;
+  state: 'COMMENTED' | 'APPROVED' | 'CHANGES_REQUESTED' | 'DISMISSED' | 'PENDING';
+  body: string;
+  bodyHtml: string;
+  authorLogin: string | null;
+  authorAvatarUrl: string | null;
+  createdAt: string;
+  url: string;
+}
+
 export interface TrackedPR {
   owner: string;
   repo: string;
@@ -42,6 +54,7 @@ export interface PullRequestMeta {
   ciUrl: string | null;
   labels: PRLabel[];
   assignees: PRAssignee[];
+  reviews: ReviewSummary[];
   createdAt: string | null;
   /** Pre-rendered GitHub-flavored markdown HTML for the PR body. Safe — GitHub sanitizes. */
   bodyHtml: string | null;
