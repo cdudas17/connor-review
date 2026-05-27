@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PRHeader } from './PRHeader.js';
 import { PRDescription } from './PRDescription.js';
 import { ConversationsList } from './ConversationsList.js';
@@ -42,8 +42,16 @@ export function ReviewDrawer(props: Props) {
   const { current, prs, pendingReviewId, latestGhStatus, latestCiStatus, latestCiUrl, viewedPaths, onViewedChange, onPendingReviewChange, onMetaLoaded, onAdvance, onNavigatePrev, onNavigateNext, canNavigatePrev, canNavigateNext, onToast, onSetStatus, onClose } = props;
   const { meta, diff, loading, error, reload } = usePRDetails(current);
   const [summary, setSummary] = useState('');
+  const drawerRef = useRef<HTMLElement | null>(null);
 
   useNextPRPrefetch({ current, prs });
+
+  // When the drawer's PR changes (after Approve / Reviewed / nav arrows), reset
+  // the scroll position so the new diff opens at the top instead of inheriting
+  // the previous PR's scroll.
+  useEffect(() => {
+    if (drawerRef.current) drawerRef.current.scrollTop = 0;
+  }, [current?.owner, current?.repo, current?.number]);
 
   // Reset summary draft when switching PRs.
   // (Per-PR persistence of summary across drawer close/reopen is intentional and lives in App.)
@@ -150,7 +158,7 @@ export function ReviewDrawer(props: Props) {
   return (
     <>
       <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
-      <aside className="drawer" aria-label="Review drawer">
+      <aside className="drawer" aria-label="Review drawer" ref={drawerRef}>
         <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
         {loading && <span className="drawer-refresh-indicator" aria-label="Refreshing"><span className="loading-spinner" /></span>}
       <PRHeader meta={meta} latestGhStatus={latestGhStatus} latestCiStatus={latestCiStatus} latestCiUrl={latestCiUrl} />
