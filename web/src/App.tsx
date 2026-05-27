@@ -10,6 +10,8 @@ import { BulkActionsBar } from './components/BulkActionsBar.js';
 import { MemberFilter } from './components/MemberFilter.js';
 import { OncallStateFilter, type OncallState } from './components/OncallStateFilter.js';
 import { NotesFab } from './components/NotesFab.js';
+import { ToastStack } from './components/ToastStack.js';
+import { useToasts } from './hooks/useToasts.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
 import { useLabeledPRs } from './hooks/useLabeledPRs.js';
@@ -37,6 +39,7 @@ export function App() {
   const [authRequired, setAuthRequired] = useState(false);
   const [pendingReviews, setPendingReviews] = useState<Record<string, string>>({});
   const viewedPaths = useViewedPaths();
+  const { toasts, addToast, dismissToast } = useToasts();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [memberFilter, setMemberFilter] = useState<Set<string> | null>(null);
@@ -466,11 +469,14 @@ export function App() {
             onNavigateNext={() => nextPr && setCurrent(toIdentity(nextPr))}
             canNavigatePrev={!!prevPr}
             canNavigateNext={!!nextPr}
+            onToast={addToast}
+            onSetStatus={activeSetStatus}
             onClose={() => setCurrent(null)}
           />
         );
       })()}
       <NotesFab />
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </main>
   );
 }

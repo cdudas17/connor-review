@@ -31,14 +31,16 @@ interface Props {
   onNavigateNext: () => void;
   canNavigatePrev: boolean;
   canNavigateNext: boolean;
+  /** Fire a toast notification (success/error/info). */
+  onToast: (kind: 'success' | 'error' | 'info', message: string) => void;
+  /** Reset a PR's local status — used to revert when a fire-and-forget API call fails. */
+  onSetStatus: (id: Identity, status: PRStatus) => void;
   onClose: () => void;
 }
 
 export function ReviewDrawer(props: Props) {
-  const { current, prs, pendingReviewId, latestGhStatus, latestCiStatus, latestCiUrl, viewedPaths, onViewedChange, onPendingReviewChange, onMetaLoaded, onAdvance, onNavigatePrev, onNavigateNext, canNavigatePrev, canNavigateNext, onClose } = props;
+  const { current, prs, pendingReviewId, latestGhStatus, latestCiStatus, latestCiUrl, viewedPaths, onViewedChange, onPendingReviewChange, onMetaLoaded, onAdvance, onNavigatePrev, onNavigateNext, canNavigatePrev, canNavigateNext, onToast, onSetStatus, onClose } = props;
   const { meta, diff, loading, error, reload } = usePRDetails(current);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [summary, setSummary] = useState('');
 
   useNextPRPrefetch({ current, prs });
@@ -106,32 +108,41 @@ export function ReviewDrawer(props: Props) {
     );
   }
 
-  const canSubmit = meta.state === 'OPEN' && !submitting;
-  const canNext = !submitting;
+  const canSubmit = meta.state === 'OPEN';
+  const canNext = true;
 
-  const submitReview = async (event: ReviewEvent) => {
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
-      if (pendingReviewId) {
-        await api.submitPendingReview(current.owner, current.repo, current.number, pendingReviewId, {
-          event,
-          body: summary || undefined,
-        });
-        onPendingReviewChange(current, null);
-      } else {
-        await api.createReview(current.owner, current.repo, current.number, {
-          event,
-          body: summary || undefined,
-        });
+  const submitReview = (event: ReviewEvent) => {
+    // Snapshot the data we need, then advance immediately so the user moves to
+    // the next PR without waiting on the network. The API call runs in the
+    // background and toasts success/failure.
+    const target: Identity = { owner: current.owner, repo: current.repo, number: current.number };
+    const body = summary || undefined;
+    const reviewIdForSubmit = pendingReviewId;
+    const newStatus: PRStatus = event === 'APPROVE' ? 'approved' : 'reviewed';
+
+    setSummary('');
+    if (reviewIdForSubmit) onPendingReviewChange(target, null);
+    onAdvance(target, newStatus);
+
+    const verb = event === 'APPROVE' ? 'Approved' : event === 'REQUEST_CHANGES' ? 'Requested changes on' : 'Commented on';
+    const prRef = `${target.owner}/${target.repo}#${target.number}`;
+
+    (async () => {
+      try {
+        if (reviewIdForSubmit) {
+          await api.submitPendingReview(target.owner, target.repo, target.number, reviewIdForSubmit, { event, body });
+        } else {
+          await api.createReview(target.owner, target.repo, target.number, { event, body });
+        }
+        onToast('success', `${verb} ${prRef}`);
+      } catch (e) {
+        // Revert the local status so the PR stays in the queue for retry.
+        onSetStatus(target, 'untouched');
+        // If we cleared a pending review id optimistically, restore it.
+        if (reviewIdForSubmit) onPendingReviewChange(target, reviewIdForSubmit);
+        onToast('error', `Failed to ${verb.toLowerCase()} ${prRef}: ${(e as Error).message}`);
       }
-      setSummary('');
-      onAdvance(current, event === 'APPROVE' ? 'approved' : 'reviewed');
-    } catch (e) {
-      setSubmitError((e as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
+    })();
   };
 
   const doNext = () => onAdvance(current, 'reviewed');
@@ -170,7 +181,6 @@ export function ReviewDrawer(props: Props) {
         finishLabel={pendingReviewId ? 'Finish your review' : null}
       />
       {error && <ErrorToast message={error.message} onDismiss={() => { /* user can reload */ }} />}
-      {submitError && <ErrorToast message={submitError} onDismiss={() => setSubmitError(null)} />}
       </aside>
     </>
   );

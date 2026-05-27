@@ -391,6 +391,17 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .modal-actions button { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; cursor: pointer; font: inherit; }
 .error-toast { position: fixed; bottom: 12px; right: 12px; background: var(--danger); color: white; padding: 8px 12px; border-radius: 6px; z-index: 60; display: flex; align-items: center; gap: 8px; }
 .error-toast button { background: transparent; border: none; color: white; cursor: pointer; font-size: 1.2rem; line-height: 1; }
+
+/* Stacked notification toasts (success/error/info on review submit, etc.) */
+.toast-stack { position: fixed; bottom: 20px; right: 20px; z-index: 80; display: flex; flex-direction: column; gap: 8px; pointer-events: none; max-width: 420px; }
+.toast { pointer-events: auto; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4); border: 1px solid; min-width: 240px; font-size: 0.9rem; animation: toast-in 160ms ease-out; }
+.toast-success { background: rgba(31, 136, 61, 0.20); border-color: var(--ok); color: var(--fg); }
+.toast-error { background: rgba(248, 81, 73, 0.18); border-color: var(--danger); color: var(--fg); }
+.toast-info { background: var(--bg-subtle); border-color: var(--border); color: var(--fg); }
+.toast-message { flex: 1; line-height: 1.4; word-break: break-word; }
+.toast-dismiss { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 2px; }
+.toast-dismiss:hover { color: var(--fg); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .auth-banner { background: rgba(239, 68, 68, 0.12); border: 1px solid var(--danger); color: var(--danger); padding: 8px 12px; border-radius: 6px; margin: 8px 0; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .auth-banner button { padding: 4px 8px; font-size: 0.85rem; border: 1px solid var(--danger); background: transparent; color: var(--danger); border-radius: 4px; cursor: pointer; }
 .empty { color: var(--muted); padding: 16px 0; }
