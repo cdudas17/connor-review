@@ -30,7 +30,7 @@ const PANEL_GAP = 12;
  * on screen. Position is persisted to localStorage and clamped to the viewport.
  */
 export function NotesFab() {
-  const { notes, setNotes, clear, status, filePath } = useNotes();
+  const { notes, setNotes, clear, status } = useNotes();
   const { pos, setPos } = useFabPosition();
   const [open, setOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -142,7 +142,7 @@ export function NotesFab() {
           <p className="notes-panel-hint">
             {status === 'loading' && 'Loading notes…'}
             {status === 'saving' && 'Saving…'}
-            {status === 'saved' && (filePath ? <>Saved to <code>{filePath}</code></> : 'Saved')}
+            {status === 'saved' && 'Saved'}
             {status === 'offline' && 'Server offline — using browser cache'}
             {status === 'error' && 'Save failed — will retry on next change'}
             {' · ⌘⇧N to toggle · drag the pencil to move'}
