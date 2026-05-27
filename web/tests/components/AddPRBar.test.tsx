@@ -50,6 +50,24 @@ describe('AddPRBar', () => {
     expect(textarea.value).toBe('');
   });
 
+  it('Enter submits, Shift+Enter inserts a newline', async () => {
+    const onAdd = vi.fn();
+    render(<AddPRBar onAdd={onAdd} />);
+    const textarea = screen.getByPlaceholderText(placeholder) as HTMLTextAreaElement;
+
+    // Shift+Enter inside an in-progress entry — should NOT submit and should leave a newline.
+    await userEvent.type(textarea, 'https://github.com/Gusto/zenpayroll/pull/1{Shift>}{Enter}{/Shift}https://github.com/Gusto/zenpayroll/pull/2');
+    expect(onAdd).not.toHaveBeenCalled();
+    expect(textarea.value).toContain('\n');
+
+    // Plain Enter submits both URLs.
+    await userEvent.type(textarea, '{Enter}');
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    const args = onAdd.mock.calls[0][0] as Array<{ number: number }>;
+    expect(args.map((p) => p.number)).toEqual([1, 2]);
+    expect(textarea.value).toBe('');
+  });
+
   it('shows an ignored count when input has mixed valid + invalid lines', async () => {
     render(<AddPRBar onAdd={() => {}} />);
     const textarea = screen.getByPlaceholderText(placeholder);

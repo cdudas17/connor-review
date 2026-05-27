@@ -32,7 +32,8 @@ export function AddPRBar({ onAdd }: Props) {
         value={value}
         onChange={(e) => { setValue(e.target.value); if (error) setError(null); }}
         onKeyDown={(e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+          // Enter submits; Shift+Enter inserts a newline (default behavior).
+          if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             submit();
           }
@@ -48,7 +49,7 @@ export function AddPRBar({ onAdd }: Props) {
             {preview.prs.length === 0
               ? `0 valid URLs · ${preview.invalidCount} ignored`
               : `${preview.prs.length} valid${preview.invalidCount > 0 ? ` · ${preview.invalidCount} ignored` : ''}`}
-            {' · '}<kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>Enter</kbd> to add
+            {' · '}<kbd>Enter</kbd> to add · <kbd>Shift</kbd>+<kbd>Enter</kbd> for new line
           </p>
         )}
       </div>
