@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { registerPullsRoutes } from './routes/pulls.js';
 import { registerTeamRoutes } from './routes/team.js';
+import { registerNotesRoutes } from './routes/notes.js';
 
 export async function buildServer() {
   const app = Fastify({ logger: { level: 'warn' } });
@@ -9,6 +10,7 @@ export async function buildServer() {
   app.get('/api/health', async () => ({ ok: true }));
   await registerPullsRoutes(app);
   await registerTeamRoutes(app);
+  await registerNotesRoutes(app);
   return app;
 }
 
