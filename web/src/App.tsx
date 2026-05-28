@@ -311,7 +311,7 @@ export function App() {
 
       <Tabs
         tabs={[
-          { id: 'my', label: 'My PRs', badge: untouchedCount(myPRs.prs) || null },
+          { id: 'my', label: 'Added PRs', badge: untouchedCount(myPRs.prs) || null },
           { id: 'team', label: 'Team PRs', badge: teamPRs.hasLoaded ? (untouchedCount(teamPRs.prs) || null) : null },
           { id: 'oncall', label: `Oncall (${APP_CONFIG.oncallLabel})`, badge: oncallPRs.hasLoaded ? (untouchedCount(oncallPRs.prs) || null) : null },
         ]}
