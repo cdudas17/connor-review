@@ -74,6 +74,9 @@ export const api = {
   getLabeledPRs(label = 'needs-review'): Promise<{ label: string; prs: TeamPR[] }> {
     return call(`/api/labeled-prs?label=${encodeURIComponent(label)}`);
   },
+  getAuthoredPRs(author: string): Promise<{ author: string; prs: TeamPR[] }> {
+    return call(`/api/authored-prs?author=${encodeURIComponent(author)}`);
+  },
   getFileContent(owner: string, repo: string, number: number, path: string, ref: string): Promise<string> {
     const qs = new URLSearchParams({ path, ref });
     return call(`/api/pulls/${owner}/${repo}/${number}/files/content?${qs.toString()}`);

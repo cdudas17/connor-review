@@ -15,6 +15,7 @@ import { useToasts } from './hooks/useToasts.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
 import { useLabeledPRs } from './hooks/useLabeledPRs.js';
+import { useAuthoredPRs } from './hooks/useAuthoredPRs.js';
 import { useViewedPaths } from './hooks/useViewedPaths.js';
 import { nextUntouchedAfter } from './hooks/useNextPRPrefetch.js';
 import { api, ApiCallError } from './lib/api.js';
@@ -36,6 +37,7 @@ export function App() {
     repo: APP_CONFIG.teamRepo,
     path: APP_CONFIG.teamYmlPath,
   });
+  const minePRs = useAuthoredPRs(APP_CONFIG.myPRsAuthor, { autoRefreshMs: 60 * 1000 });
   const oncallPRs = useLabeledPRs(APP_CONFIG.oncallLabel);
   const [tab, setTab] = useState<TabId>('my');
   const [mode, setMode] = useState<FilterMode>('all');
@@ -113,10 +115,12 @@ export function App() {
 
   const activePRs: TrackedPR[] =
     tab === 'my' ? myPRs.prs
+    : tab === 'mine' ? minePRs.prs
     : tab === 'team' ? filteredTeamPRs
     : filteredOncallPRs;
   const activeSetStatus =
     tab === 'my' ? myPRs.setStatus
+    : tab === 'mine' ? minePRs.setStatus
     : tab === 'team' ? teamPRs.setStatus
     : oncallPRs.setStatus;
 
@@ -281,13 +285,15 @@ export function App() {
           ? failures[0].message
           : `${failures.length} of ${myPRs.prs.length} PRs failed to refresh.`);
       }
+    } else if (tab === 'mine') {
+      await minePRs.fetch();
     } else if (tab === 'team') {
       await teamPRs.fetch();
     } else {
       await oncallPRs.fetch();
     }
     setRefreshing(false);
-  }, [tab, myPRs, teamPRs, oncallPRs, refreshing]);
+  }, [tab, myPRs, minePRs, teamPRs, oncallPRs, refreshing]);
 
   const untouchedCount = (list: TrackedPR[]) => list.filter((p) => p.status === 'untouched').length;
 
@@ -312,6 +318,9 @@ export function App() {
       <Tabs
         tabs={[
           { id: 'my', label: 'Added PRs', badge: untouchedCount(myPRs.prs) || null },
+          ...(APP_CONFIG.myPRsAuthor
+            ? [{ id: 'mine' as const, label: 'My PRs', badge: minePRs.hasLoaded ? (minePRs.prs.length || null) : null }]
+            : []),
           { id: 'team', label: 'Team PRs', badge: teamPRs.hasLoaded ? (untouchedCount(teamPRs.prs) || null) : null },
           { id: 'oncall', label: `Oncall (${APP_CONFIG.oncallLabel})`, badge: oncallPRs.hasLoaded ? (untouchedCount(oncallPRs.prs) || null) : null },
         ]}
@@ -372,6 +381,29 @@ export function App() {
             <ErrorToast
               message={`Failed to load ${APP_CONFIG.oncallLabel} PRs: ${oncallPRs.error.message}`}
               onDismiss={oncallPRs.dismissError}
+            />
+          )}
+        </>
+      )}
+      {tab === 'mine' && (
+        <>
+          {minePRs.lastFetchedAt && (
+            <p className="tab-context">
+              <span className="tab-context-freshness">
+                Open PRs authored by <code>{APP_CONFIG.myPRsAuthor}</code> · auto-refreshes every minute · last updated {new Date(minePRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
+                {minePRs.loading && <span className="loading-spinner" aria-label="Refreshing" />}
+              </span>
+            </p>
+          )}
+          {!minePRs.lastFetchedAt && minePRs.loading && (
+            <p className="tab-context">
+              <span className="tab-context-freshness">loading my PRs<span className="loading-spinner" aria-label="Loading" /></span>
+            </p>
+          )}
+          {minePRs.error && !minePRs.errorDismissed && (
+            <ErrorToast
+              message={`Failed to load my PRs: ${minePRs.error.message}`}
+              onDismiss={minePRs.dismissError}
             />
           )}
         </>

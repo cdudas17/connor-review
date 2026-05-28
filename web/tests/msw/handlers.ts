@@ -33,6 +33,7 @@ export const handlers = [
   http.get('/api/notes', () => HttpResponse.json({ notes: '', path: '/tmp/notes.html' })),
   http.put('/api/notes', async () => new HttpResponse(null, { status: 204 })),
   http.get('/api/team/prs', () => HttpResponse.json({ members: [], prs: [] })),
+  http.get('/api/authored-prs', () => HttpResponse.json({ author: '', prs: [] })),
   http.get('/api/pulls/:owner/:repo/:number', ({ params }) => {
     const n = Number(params.number);
     if (n === 2) return HttpResponse.json(META_FIXTURE_2);

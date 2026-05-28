@@ -20,4 +20,8 @@ export const APP_CONFIG: Partial<AppConfig> = {
     // { label: '📥 Incoming TPOs (Jira)', url: 'https://yourorg.atlassian.net/...' },
     // { label: '⚰️ Sidekiq Morgue', url: 'https://your-internal-tool/...' },
   ],
+
+  // Your GitHub login. Powers the "My PRs" tab (your own open PRs, drafts
+  // included). Leave empty to hide the tab.
+  myPRsAuthor: 'your-gh-username',
 };

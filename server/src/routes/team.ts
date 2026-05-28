@@ -124,6 +124,72 @@ export async function registerTeamRoutes(app: FastifyInstance) {
     },
   );
 
+  // Returns open PRs authored by a single GitHub login. Includes drafts (the
+  // user's own work-in-progress is useful to see in the My PRs tab) and does
+  // NOT filter out approved-but-unmerged PRs (those might still need action
+  // from the author).
+  app.get<{ Querystring: { author?: string } }>(
+    '/api/authored-prs',
+    async (req, reply) => {
+      const author = req.query.author;
+      if (!author) {
+        reply.code(400).send({ code: 'BAD_PARAMS', message: 'author query param is required' });
+        return;
+      }
+      const q = ['is:pr', 'is:open', `author:${author}`].join(' ');
+      const out = await ghExec(['api', 'graphql', '--input', '-'], {
+        input: JSON.stringify({ query: TEAM_PR_SEARCH_QUERY, variables: { q } }),
+      });
+      type AuthoredNode = {
+        id?: string;
+        number?: number;
+        title?: string;
+        url?: string;
+        author?: { login?: string };
+        repository?: { owner?: { login?: string }; name?: string };
+        isDraft?: boolean;
+        state?: 'OPEN' | 'CLOSED' | 'MERGED';
+        merged?: boolean;
+        reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+        baseRefName?: string;
+        headRefName?: string;
+        headRefOid?: string;
+        createdAt?: string;
+        updatedAt?: string;
+        labels?: { nodes?: Array<{ name?: string; color?: string }> };
+        commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string; contexts?: { nodes?: Array<{ __typename?: string; context?: string; name?: string; targetUrl?: string | null; detailsUrl?: string | null; state?: string; status?: string; conclusion?: string | null }> } } } }> };
+      };
+      const parsed = JSON.parse(out) as { data?: { search?: { nodes?: AuthoredNode[] } } };
+      const nodes = (parsed.data?.search?.nodes ?? []) as AuthoredNode[];
+      const prs: TeamPR[] = nodes
+        // Keep drafts and approved-but-unmerged — author still owns the next move.
+        .filter((n) => n && n.id && !n.merged && n.state === 'OPEN')
+        .map((n) => ({
+          id: n.id!,
+          number: n.number!,
+          title: n.title ?? '',
+          url: n.url ?? '',
+          authorLogin: n.author?.login ?? null,
+          owner: n.repository?.owner?.login ?? '',
+          repo: n.repository?.name ?? '',
+          isDraft: !!n.isDraft,
+          state: n.state!,
+          merged: !!n.merged,
+          reviewDecision: n.reviewDecision ?? null,
+          ciStatus: (n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
+          ciUrl: extractBuildkiteCheckUrl(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+          labels: (n.labels?.nodes ?? []).map((l) => ({ name: l.name ?? '', color: l.color ?? '888888' })).filter((l) => l.name),
+          baseRefName: n.baseRefName ?? 'main',
+          headRefName: n.headRefName ?? '',
+          headSha: n.headRefOid ?? '',
+          createdAt: n.createdAt ?? null,
+          updatedAt: n.updatedAt ?? new Date().toISOString(),
+        }))
+        .filter((p) => p.owner && p.repo);
+      return { author, prs };
+    },
+  );
+
   // Returns open, non-draft, non-approved PRs that carry the given label. The
   // caller passes `?label=` (e.g. `needs-review`); filtering happens server-side.
   app.get<{ Querystring: { label?: string } }>(

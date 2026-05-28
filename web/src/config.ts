@@ -24,6 +24,8 @@ export interface AppConfig {
   oncallLabel: string;
   /** External quick-links pinned to the top of the Oncall tab. */
   oncallLinks: ExternalLink[];
+  /** GitHub login whose authored PRs populate the My PRs tab. Empty disables the tab. */
+  myPRsAuthor: string;
 }
 
 const DEFAULTS: AppConfig = {
@@ -31,6 +33,7 @@ const DEFAULTS: AppConfig = {
   teamYmlPath: '',
   oncallLabel: 'needs-review',
   oncallLinks: [],
+  myPRsAuthor: '',
 };
 
 // Vite's import.meta.glob lets us optionally pull in config.local.ts if it

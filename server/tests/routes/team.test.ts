@@ -183,4 +183,55 @@ describe('team routes', () => {
       await app.close();
     });
   });
+
+  describe('GET /api/authored-prs', () => {
+    it('returns 400 when author is missing', async () => {
+      const app = await buildServer();
+      const res = await app.inject({ url: '/api/authored-prs' });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().code).toBe('BAD_PARAMS');
+      await app.close();
+    });
+
+    it('builds the right search query and keeps drafts + approved (only excludes merged/closed)', async () => {
+      mocked.mockResolvedValueOnce(JSON.stringify({
+        data: {
+          search: {
+            nodes: [
+              // open draft → KEEP
+              { id: 'p1', number: 1, title: 'wip', url: 'u', author: { login: 'alice' },
+                repository: { owner: { login: 'org' }, name: 'app' },
+                isDraft: true, state: 'OPEN', merged: false, reviewDecision: null,
+                baseRefName: 'main', headRefName: 'b', headRefOid: 's1', createdAt: 'x', updatedAt: 'y' },
+              // approved-but-unmerged → KEEP (author's still on the hook to merge)
+              { id: 'p2', number: 2, title: 'approved', url: 'u', author: { login: 'alice' },
+                repository: { owner: { login: 'org' }, name: 'app' },
+                isDraft: false, state: 'OPEN', merged: false, reviewDecision: 'APPROVED',
+                baseRefName: 'main', headRefName: 'b', headRefOid: 's2', createdAt: 'x', updatedAt: 'y' },
+              // merged → DROP
+              { id: 'p3', number: 3, title: 'merged', url: 'u', author: { login: 'alice' },
+                repository: { owner: { login: 'org' }, name: 'app' },
+                isDraft: false, state: 'MERGED', merged: true, reviewDecision: 'APPROVED',
+                baseRefName: 'main', headRefName: 'b', headRefOid: 's3', createdAt: 'x', updatedAt: 'y' },
+            ],
+          },
+        },
+      }));
+      const app = await buildServer();
+      const res = await app.inject({ url: '/api/authored-prs?author=alice' });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.author).toBe('alice');
+      expect(body.prs.map((p: { number: number }) => p.number).sort()).toEqual([1, 2]);
+
+      const callInput = mocked.mock.calls[0][1] as { input?: string };
+      const queryBody = JSON.parse(callInput.input!);
+      expect(queryBody.variables.q).toContain('author:alice');
+      expect(queryBody.variables.q).toContain('is:pr');
+      expect(queryBody.variables.q).toContain('is:open');
+      // Drafts are intentionally NOT filtered out in the search query.
+      expect(queryBody.variables.q).not.toContain('draft:false');
+      await app.close();
+    });
+  });
 });
