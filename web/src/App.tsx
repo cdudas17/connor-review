@@ -380,12 +380,12 @@ export function App() {
       />
 
       {tab === 'my' && (() => {
-        const approvedCount = myPRs.prs.filter((p) => p.ghStatus === 'approved').length;
+        const approvedCount = myPRs.prs.filter((p) => p.status === 'approved').length;
         const removeApproved = () => {
           if (approvedCount === 0) return;
           const ok = window.confirm(`Remove ${approvedCount} approved PR${approvedCount === 1 ? '' : 's'} from the Added list? (This only removes them from this app — it doesn't affect the PR on GitHub.)`);
           if (!ok) return;
-          for (const p of myPRs.prs.filter((pr) => pr.ghStatus === 'approved')) {
+          for (const p of myPRs.prs.filter((pr) => pr.status === 'approved')) {
             myPRs.remove({ owner: p.owner, repo: p.repo, number: p.number });
           }
         };
