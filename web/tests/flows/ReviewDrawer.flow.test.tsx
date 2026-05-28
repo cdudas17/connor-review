@@ -21,10 +21,10 @@ describe('ReviewDrawer flow', () => {
 
     // open the first one
     await userEvent.click(screen.getByText(/Test PR/i));
-    await screen.findByRole('button', { name: /approve/i });
+    await screen.findByRole('button', { name: /^approve$/i });
 
     // approve PR 1 — fires a fresh APPROVE review (no pending), advances to PR 2
-    await userEvent.click(screen.getByRole('button', { name: /approve/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^approve$/i }));
     await screen.findByRole('heading', { name: /Second PR/i });
 
     // Reviewed on PR 2 — status flips to reviewed, drawer closes (no more untouched in queue).
