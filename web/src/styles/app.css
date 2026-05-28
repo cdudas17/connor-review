@@ -202,6 +202,9 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .pr-header { padding-right: 40px; }
 .pr-header-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .pr-header-title h2 { margin: 0; word-break: break-word; overflow-wrap: anywhere; min-width: 0; }
+.pr-mark-ready-button { padding: 3px 10px; font-size: 0.8rem; border: 1px solid var(--ok); border-radius: 999px; background: transparent; color: var(--ok); cursor: pointer; font-weight: 500; transition: background 80ms; }
+.pr-mark-ready-button:hover:not(:disabled) { background: rgba(31, 136, 61, 0.15); }
+.pr-mark-ready-button:disabled { opacity: 0.5; cursor: not-allowed; }
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(13, 17, 23, 0.35); z-index: 10; cursor: pointer; }
 
 /* Floating notes pencil — always on screen, above the drawer. */

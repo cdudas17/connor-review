@@ -89,6 +89,18 @@ export function ReviewDrawer(props: Props) {
     reload();
   }, [current, reload]);
 
+  const markReady = useCallback(async () => {
+    if (!current) return;
+    const prRef = `${current.owner}/${current.repo}#${current.number}`;
+    try {
+      await api.markReadyForReview(current.owner, current.repo, current.number);
+      onToast('success', `Marked ${prRef} ready for review`);
+      reload();
+    } catch (e) {
+      onToast('error', `Failed to mark ${prRef} ready for review: ${(e as Error).message}`);
+    }
+  }, [current, onToast, reload]);
+
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     if (!current) return;
@@ -162,7 +174,7 @@ export function ReviewDrawer(props: Props) {
       <aside className="drawer" aria-label="Review drawer" ref={drawerRef}>
         <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
         {loading && <span className="drawer-refresh-indicator" aria-label="Refreshing"><span className="loading-spinner" /></span>}
-      <PRHeader meta={meta} latestGhStatus={latestGhStatus} latestCiStatus={latestCiStatus} latestCiUrl={latestCiUrl} />
+      <PRHeader meta={meta} latestGhStatus={latestGhStatus} latestCiStatus={latestCiStatus} latestCiUrl={latestCiUrl} onMarkReady={markReady} />
       <PRDescription bodyHtml={meta.bodyHtml} />
       <ReviewSummaryList reviews={meta.reviews ?? []} />
       <ConversationsList threads={meta.reviewThreads} onReply={reply} />

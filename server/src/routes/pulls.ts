@@ -8,6 +8,7 @@ import { ADD_PULL_REQUEST_REVIEW_MUTATION } from '../queries/addPullRequestRevie
 import { ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION } from '../queries/addPullRequestReviewThread.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_THREAD_REPLY_MUTATION } from '../queries/addPullRequestReviewThreadReply.graphql.js';
 import { SUBMIT_PULL_REQUEST_REVIEW_MUTATION } from '../queries/submitPullRequestReview.graphql.js';
+import { MARK_READY_FOR_REVIEW_MUTATION } from '../queries/markReadyForReview.graphql.js';
 
 type CiStatus = 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' | null;
 
@@ -411,4 +412,24 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     ]);
     return JSON.parse(out);
   });
+
+  // Flip a draft PR to ready-for-review. Invalidates the cached meta so the
+  // next /api/pulls/... fetch reflects the new state.
+  app.post<{ Params: { owner: string; repo: string; number: string } }>(
+    '/api/pulls/:owner/:repo/:number/ready-for-review',
+    async (req) => {
+      const params = parsePullParams(req.params);
+      const meta = metaCache.get(metaKey(params)) ?? (await fetchMeta(params.owner, params.repo, params.number));
+      const out = await ghExec(['api', 'graphql', '--input', '-'], {
+        input: JSON.stringify({
+          query: MARK_READY_FOR_REVIEW_MUTATION,
+          variables: { pullRequestId: meta.id },
+        }),
+      });
+      // Drop the cached meta so a follow-up fetch sees the new isDraft=false.
+      metaCache.set(metaKey(params), { ...meta, isDraft: false });
+      const parsed = JSON.parse(out) as { data?: { markPullRequestReadyForReview?: { pullRequest?: { id: string; isDraft: boolean } } } };
+      return parsed.data?.markPullRequestReadyForReview?.pullRequest ?? { id: meta.id, isDraft: false };
+    },
+  );
 }

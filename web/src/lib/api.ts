@@ -81,6 +81,9 @@ export const api = {
     const qs = new URLSearchParams({ path, ref });
     return call(`/api/pulls/${owner}/${repo}/${number}/files/content?${qs.toString()}`);
   },
+  markReadyForReview(owner: string, repo: string, number: number): Promise<{ id: string; isDraft: boolean }> {
+    return call(`/api/pulls/${owner}/${repo}/${number}/ready-for-review`, { method: 'POST' });
+  },
   replyToThread(owner: string, repo: string, number: number, threadId: string, body: string) {
     return call(`/api/pulls/${owner}/${repo}/${number}/threads/${threadId}/reply`, {
       method: 'POST',
