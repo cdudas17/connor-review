@@ -127,6 +127,9 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 
 /* GitHub-style label chips */
 .label-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+/* When LabelChips renders inside the PR header (not inline next to a title),
+   give it a bit of breathing room so the meta line below doesn't crowd it. */
+.pr-header > .label-chips:not(:empty) { display: flex; margin: 8px 0 4px; }
 .label-chip { font-size: 0.72rem; padding: 1px 8px; border-radius: 999px; line-height: 1.4; font-weight: 500; border: 1px solid rgba(0, 0, 0, 0.2); }
 .label-chip-overflow { font-size: 0.72rem; padding: 1px 8px; border-radius: 999px; line-height: 1.4; color: var(--muted); border: 1px solid var(--border); background: var(--bg-subtle); }
 
@@ -225,7 +228,7 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .drawer-close { position: absolute; top: 12px; right: 16px; font-size: 1.4rem; background: transparent; border: none; cursor: pointer; }
 .drawer-refresh-indicator { position: absolute; top: 18px; right: 48px; display: inline-flex; align-items: center; color: var(--muted); }
 .pr-header h2 { margin-bottom: 4px; }
-.pr-header-meta { color: var(--muted); font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pr-header-meta { color: var(--muted); font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .pr-link-copy { display: inline-flex; align-items: center; justify-content: center; padding: 2px; margin-left: 2px; border: none; background: transparent; color: var(--muted); cursor: pointer; border-radius: 4px; transition: color 80ms, background-color 80ms; }
 .pr-link-copy:hover { color: var(--fg); background: var(--bg-subtle); }
 .pr-link-copy-copied { color: var(--ok); }
