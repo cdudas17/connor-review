@@ -13,9 +13,6 @@ interface Props {
   latestGhStatus?: GhStatus | null;
   latestCiStatus?: CiStatus;
   latestCiUrl?: string | null;
-  /** When provided AND the PR is currently in draft, a "Mark ready for review" button
-   *  appears next to the Draft pill. Fires this callback on click. */
-  onMarkReady?: () => Promise<void>;
 }
 
 function CopyIcon({ size = 14 }: { size?: number }) {
@@ -34,12 +31,11 @@ function CheckIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl, onMarkReady }: Props) {
+export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl }: Props) {
   const status = latestGhStatus ?? computeGhStatus(meta);
   const ci = latestCiStatus !== undefined ? latestCiStatus : meta.ciStatus;
   const ciUrl = latestCiUrl !== undefined ? latestCiUrl : meta.ciUrl;
   const [copied, setCopied] = useState(false);
-  const [markingReady, setMarkingReady] = useState(false);
 
   const onCopy = async () => {
     try {
@@ -57,21 +53,6 @@ export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl, on
         <h2>{meta.title}</h2>
         <GhStatusBadge status={status} />
         <CiBadge status={ci} url={ciUrl} />
-        {status === 'draft' && onMarkReady && (
-          <button
-            type="button"
-            className="pr-mark-ready-button"
-            disabled={markingReady}
-            onClick={async () => {
-              setMarkingReady(true);
-              try { await onMarkReady(); }
-              finally { setMarkingReady(false); }
-            }}
-            title="Flip this draft PR to ready for review"
-          >
-            {markingReady ? 'Marking…' : 'Mark ready for review'}
-          </button>
-        )}
       </div>
       <LabelChips labels={meta.labels ?? []} />
       <AssigneesRow assignees={meta.assignees ?? []} />

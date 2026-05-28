@@ -174,7 +174,7 @@ export function ReviewDrawer(props: Props) {
       <aside className="drawer" aria-label="Review drawer" ref={drawerRef}>
         <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
         {loading && <span className="drawer-refresh-indicator" aria-label="Refreshing"><span className="loading-spinner" /></span>}
-      <PRHeader meta={meta} latestGhStatus={latestGhStatus} latestCiStatus={latestCiStatus} latestCiUrl={latestCiUrl} onMarkReady={markReady} />
+      <PRHeader meta={meta} latestGhStatus={latestGhStatus} latestCiStatus={latestCiStatus} latestCiUrl={latestCiUrl} />
       <PRDescription bodyHtml={meta.bodyHtml} />
       <ReviewSummaryList reviews={meta.reviews ?? []} />
       <ConversationsList threads={meta.reviewThreads} onReply={reply} />
@@ -201,6 +201,7 @@ export function ReviewDrawer(props: Props) {
         canPrev={canNavigatePrev && canNext}
         canNextPR={canNavigateNext && canNext}
         finishLabel={pendingReviewId ? 'Finish your review' : null}
+        onMarkReady={meta.isDraft ? markReady : undefined}
       />
       {error && <ErrorToast message={error.message} onDismiss={() => { /* user can reload */ }} />}
       </aside>

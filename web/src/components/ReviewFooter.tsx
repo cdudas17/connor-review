@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ReviewEvent } from '../types.js';
 import { EmojiTextarea } from './EmojiTextarea.js';
 
@@ -17,6 +18,8 @@ interface Props {
   canNextPR: boolean;
   /** When set, footer shows this as a heading and submit buttons mean "submit pending review". */
   finishLabel?: string | null;
+  /** When provided, a "Mark ready for review" button renders alongside the other actions. */
+  onMarkReady?: () => Promise<void>;
 }
 
 function ChevronLeftIcon() {
@@ -36,8 +39,9 @@ function ChevronRightIcon() {
 
 export function ReviewFooter({
   summary, onSummaryChange, onSubmit, onReviewed, onPrev, onNextPR,
-  canSubmit, canReviewed, canPrev, canNextPR, finishLabel,
+  canSubmit, canReviewed, canPrev, canNextPR, finishLabel, onMarkReady,
 }: Props) {
+  const [markingReady, setMarkingReady] = useState(false);
   return (
     <footer className="review-footer">
       {finishLabel && <h4 className="review-footer-heading">{finishLabel}</h4>}
@@ -52,6 +56,21 @@ export function ReviewFooter({
         <button type="button" disabled={!canSubmit} onClick={() => onSubmit('REQUEST_CHANGES')}>Request changes</button>
         <button type="button" disabled={!canSubmit} onClick={() => onSubmit('COMMENT')}>Comment</button>
         <button type="button" disabled={!canReviewed} onClick={onReviewed}>Reviewed</button>
+        {onMarkReady && (
+          <button
+            type="button"
+            className="footer-mark-ready"
+            disabled={markingReady}
+            onClick={async () => {
+              setMarkingReady(true);
+              try { await onMarkReady(); }
+              finally { setMarkingReady(false); }
+            }}
+            title="Flip this draft PR to ready for review"
+          >
+            {markingReady ? 'Marking…' : 'Mark ready for review'}
+          </button>
+        )}
         <div className="review-footer-nav">
           <button type="button" className="review-footer-arrow" disabled={!canPrev} onClick={onPrev} aria-label="Previous PR" title="Previous PR">
             <ChevronLeftIcon />
