@@ -70,13 +70,21 @@ const SEARCH_RESPONSE = JSON.stringify({
 describe('team routes', () => {
   beforeEach(() => mocked.mockReset());
 
-  it('GET /api/team/prs returns members + filtered PRs', async () => {
-    // first call → contents of talent.yml (base64-encoded by gh --jq .content)
+  it('GET /api/team/prs returns 400 when repo + path are not provided', async () => {
+    const app = await buildServer();
+    const res = await app.inject({ url: '/api/team/prs' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('BAD_PARAMS');
+    await app.close();
+  });
+
+  it('GET /api/team/prs returns members + filtered PRs when repo + path are passed', async () => {
+    // first call → contents of the team file (base64-encoded by gh --jq .content)
     mocked.mockResolvedValueOnce(Buffer.from(TALENT_YML).toString('base64') + '\n');
     // second call → graphql search
     mocked.mockResolvedValueOnce(SEARCH_RESPONSE);
     const app = await buildServer();
-    const res = await app.inject({ url: '/api/team/prs' });
+    const res = await app.inject({ url: '/api/team/prs?repo=Gusto/zenpayroll&path=config/teams/people_os/talent.yml' });
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.members).toEqual(['alice', 'bob', 'cdudas17']);
@@ -108,18 +116,18 @@ describe('team routes', () => {
   });
 
   describe('GET /api/labeled-prs', () => {
-    it('uses label:"talent-alerts" by default and does NOT filter drafts in the query', async () => {
+    it('uses label:"needs-review" by default and does NOT filter drafts in the query', async () => {
       mocked.mockResolvedValueOnce(JSON.stringify({ data: { search: { nodes: [] } } }));
       const app = await buildServer();
       const res = await app.inject({ url: '/api/labeled-prs' });
       expect(res.statusCode).toBe(200);
-      expect(res.json()).toEqual({ label: 'talent-alerts', prs: [] });
+      expect(res.json()).toEqual({ label: 'needs-review', prs: [] });
 
       const callInput = mocked.mock.calls[0][1] as { input?: string };
       const body = JSON.parse(callInput.input!);
       expect(body.variables.q).toContain('is:pr');
       expect(body.variables.q).toContain('is:open');
-      expect(body.variables.q).toContain('label:"talent-alerts"');
+      expect(body.variables.q).toContain('label:"needs-review"');
       // Critically: no draft filter (oncall workflow needs to see drafts).
       expect(body.variables.q).not.toContain('draft:false');
       await app.close();

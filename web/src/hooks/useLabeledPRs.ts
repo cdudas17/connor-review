@@ -31,11 +31,11 @@ interface State {
 }
 
 /**
- * Fetches PRs that carry a given label (default: talent-alerts). Manual-only —
+ * Fetches PRs that carry a given label (e.g. "needs-review"). Manual-only —
  * no auto-refresh — since the result set can be large and the user only
  * needs it when on-call.
  */
-export function useLabeledPRs(label = 'talent-alerts') {
+export function useLabeledPRs(label = 'needs-review') {
   const [state, setState] = useState<State>({ prs: [], loading: false, error: null, errorDismissed: false, hasLoaded: false, lastFetchedAt: null });
   const [statuses, setStatuses] = useState<Record<string, PRStatus>>(() => loadStatuses());
   const loadingRef = useRef(false);

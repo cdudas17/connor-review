@@ -19,6 +19,7 @@ import { useViewedPaths } from './hooks/useViewedPaths.js';
 import { nextUntouchedAfter } from './hooks/useNextPRPrefetch.js';
 import { api, ApiCallError } from './lib/api.js';
 import { computeGhStatus } from './lib/ghStatus.js';
+import { APP_CONFIG } from './config.js';
 import type { PRStatus, PullRequestMeta, TrackedPR } from './types.js';
 
 interface Identity { owner: string; repo: string; number: number; }
@@ -30,8 +31,12 @@ export function App() {
   // Auto-fetch team PRs on app launch and every 1 minute while the tab is visible.
   // 2 API calls per refresh × 60 refreshes/hour = ~120 calls/hr, still well under
   // GitHub's 5,000/hour authenticated rate limit.
-  const teamPRs = useTeamPRs({ autoRefreshMs: 60 * 1000 });
-  const oncallPRs = useLabeledPRs('talent-alerts');
+  const teamPRs = useTeamPRs({
+    autoRefreshMs: 60 * 1000,
+    repo: APP_CONFIG.teamRepo,
+    path: APP_CONFIG.teamYmlPath,
+  });
+  const oncallPRs = useLabeledPRs(APP_CONFIG.oncallLabel);
   const [tab, setTab] = useState<TabId>('my');
   const [mode, setMode] = useState<FilterMode>('all');
   const [current, setCurrent] = useState<Identity | null>(null);
@@ -308,7 +313,7 @@ export function App() {
         tabs={[
           { id: 'my', label: 'My PRs', badge: untouchedCount(myPRs.prs) || null },
           { id: 'team', label: 'Team PRs', badge: teamPRs.hasLoaded ? (untouchedCount(teamPRs.prs) || null) : null },
-          { id: 'oncall', label: 'Oncall (talent-alerts)', badge: oncallPRs.hasLoaded ? (untouchedCount(oncallPRs.prs) || null) : null },
+          { id: 'oncall', label: `Oncall (${APP_CONFIG.oncallLabel})`, badge: oncallPRs.hasLoaded ? (untouchedCount(oncallPRs.prs) || null) : null },
         ]}
         active={tab}
         onChange={setTab}
@@ -322,39 +327,18 @@ export function App() {
       )}
       {tab === 'oncall' && (
         <>
-          <p className="oncall-external-links">
-            <a
-              href="https://app.datadoghq.com/dashboard/twu-4eu-hgm?fromUser=false&refresh_mode=sliding&tpl_var_team%5B0%5D=team-member-lifecycle&view=spans&from_ts=1779802221972&to_ts=1779805821972&live=true"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              📊 Team SLOs (Datadog)
-            </a>
-            <a
-              href="https://gustohq.atlassian.net/jira/people/712020%3A2b9e829a-ea58-4cb9-be41-514738b76be8/boards/66"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              📥 Incoming TPOs (Jira)
-            </a>
-            <a
-              href="https://app.gusto.com/panda/sidekiq/morgue?substr=%22team%3Atalent%22"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              ⚰️ Sidekiq Morgue (team:talent)
-            </a>
-            <a
-              href="https://app.datadoghq.com/dashboard/j8a-aq4-54t?fromUser=false&refresh_mode=sliding&tpl_var_env%5B0%5D=production&tpl_var_team%5B0%5D=team-member-lifecycle&from_ts=1779726797061&to_ts=1779813197061&live=true"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              🚨 Alert frequency (Datadog)
-            </a>
-          </p>
+          {APP_CONFIG.oncallLinks.length > 0 && (
+            <p className="oncall-external-links">
+              {APP_CONFIG.oncallLinks.map((link) => (
+                <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer">
+                  {link.label}
+                </a>
+              ))}
+            </p>
+          )}
           {!oncallPRs.hasLoaded ? (
             <div className="oncall-empty">
-              <p>Pull all open, non-draft, non-approved PRs labeled <code>talent-alerts</code>.</p>
+              <p>Pull all open, non-draft, non-approved PRs labeled <code>{APP_CONFIG.oncallLabel}</code>.</p>
               <p className="oncall-note">Manual fetch — this can be a large list, so it isn't auto-refreshed.</p>
               <button
                 type="button"
@@ -362,7 +346,7 @@ export function App() {
                 onClick={oncallPRs.fetch}
                 disabled={oncallPRs.loading}
               >
-                {oncallPRs.loading ? 'Loading…' : 'Load talent-alerts PRs'}
+                {oncallPRs.loading ? 'Loading…' : `Load ${APP_CONFIG.oncallLabel} PRs`}
               </button>
             </div>
           ) : (
@@ -386,7 +370,7 @@ export function App() {
           )}
           {oncallPRs.error && !oncallPRs.errorDismissed && (
             <ErrorToast
-              message={`Failed to load talent-alerts PRs: ${oncallPRs.error.message}`}
+              message={`Failed to load ${APP_CONFIG.oncallLabel} PRs: ${oncallPRs.error.message}`}
               onDismiss={oncallPRs.dismissError}
             />
           )}

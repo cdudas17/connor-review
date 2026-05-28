@@ -6,3 +6,6 @@ coverage
 .env.local
 .DS_Store
 .superpowers/
+
+# Personal / org-specific config (real URLs, repo names, labels)
+web/src/config.local.ts

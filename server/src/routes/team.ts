@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import yaml from 'js-yaml';
 import { ghExec } from '../lib/ghExec.js';
 import { TEAM_PR_SEARCH_QUERY } from '../queries/teamPRs.graphql.js';
-import { extractBuildkiteZenpayrollUrl } from '../lib/ciUrl.js';
+import { extractBuildkiteCheckUrl } from '../lib/ciUrl.js';
 
 type CiStatus = 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' | null;
 
@@ -95,7 +95,7 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
       merged: n.merged,
       reviewDecision: n.reviewDecision,
       ciStatus: (n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
-      ciUrl: extractBuildkiteZenpayrollUrl(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+      ciUrl: extractBuildkiteCheckUrl(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
       labels: (n.labels?.nodes ?? []).map((l) => ({ name: l.name ?? '', color: l.color ?? '888888' })).filter((l) => l.name),
       baseRefName: n.baseRefName,
       headRefName: n.headRefName,
@@ -111,22 +111,25 @@ export async function registerTeamRoutes(app: FastifyInstance) {
   // Defaults to Gusto/zenpayroll's config/teams/people_os/talent.yml.
   app.get<{ Querystring: { repo?: string; path?: string } }>(
     '/api/team/prs',
-    async (req) => {
-      const repo = req.query.repo ?? 'Gusto/zenpayroll';
-      const path = req.query.path ?? 'config/teams/people_os/talent.yml';
+    async (req, reply) => {
+      const repo = req.query.repo;
+      const path = req.query.path;
+      if (!repo || !path) {
+        reply.code(400).send({ code: 'BAD_PARAMS', message: 'repo and path query params are required' });
+        return;
+      }
       const members = await fetchTalentMembers(repo, path);
       const prs = await searchTeamPRs(members);
       return { members, prs };
     },
   );
 
-  // Returns open, non-draft, non-approved PRs that carry the given label. Defaults to
-  // `talent-alerts` for the Talent oncall workflow. Filters server-side just like the
-  // talent.yml endpoint.
+  // Returns open, non-draft, non-approved PRs that carry the given label. The
+  // caller passes `?label=` (e.g. `needs-review`); filtering happens server-side.
   app.get<{ Querystring: { label?: string } }>(
     '/api/labeled-prs',
     async (req) => {
-      const label = req.query.label ?? 'talent-alerts';
+      const label = req.query.label ?? 'needs-review';
       // No draft filter — caller filters drafts vs ready-for-review client-side.
       const q = ['is:pr', 'is:open', `label:"${label}"`].join(' ');
       const out = await ghExec(['api', 'graphql', '--input', '-'], {
@@ -169,7 +172,7 @@ export async function registerTeamRoutes(app: FastifyInstance) {
           merged: !!n.merged,
           reviewDecision: n.reviewDecision ?? null,
           ciStatus: (n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
-          ciUrl: extractBuildkiteZenpayrollUrl(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+          ciUrl: extractBuildkiteCheckUrl(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
           labels: (n.labels?.nodes ?? []).map((l) => ({ name: l.name ?? '', color: l.color ?? '888888' })).filter((l) => l.name),
           baseRefName: n.baseRefName ?? 'main',
           headRefName: n.headRefName ?? '',

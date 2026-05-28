@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { ghExec, GhCliError } from '../lib/ghExec.js';
 import { LRUCache } from '../lib/lruCache.js';
 import { BadParamsError, parsePullParams } from '../lib/parseRouteParams.js';
-import { extractBuildkiteZenpayrollUrl } from '../lib/ciUrl.js';
+import { extractBuildkiteCheckUrl } from '../lib/ciUrl.js';
 import { PULL_REQUEST_QUERY } from '../queries/pullRequest.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_MUTATION } from '../queries/addPullRequestReview.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION } from '../queries/addPullRequestReviewThread.graphql.js';
@@ -133,7 +133,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
     isDraft: !!pr.isDraft,
     reviewDecision: pr.reviewDecision ?? null,
     ciStatus: (pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
-    ciUrl: extractBuildkiteZenpayrollUrl(pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+    ciUrl: extractBuildkiteCheckUrl(pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
     baseRefName: pr.baseRefName,
     headRefName: pr.headRefName,
     headSha: pr.headRefOid,

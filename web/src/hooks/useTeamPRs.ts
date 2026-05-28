@@ -35,17 +35,25 @@ interface State {
 interface Options {
   /** If set, auto-fetch on mount and every N ms (only while the tab is visible). */
   autoRefreshMs?: number;
+  /** GitHub repo to read the team file from, e.g. "OrgName/monorepo". */
+  repo?: string;
+  /** Path inside `repo` to the YAML file with `github.members`. */
+  path?: string;
 }
 
 /**
- * Fetches team PRs from the server (driven by Gusto/zenpayroll's talent.yml by default)
+ * Fetches team PRs from the server (driven by a configurable team-members YAML file)
  * and merges them with locally-persisted per-PR statuses (untouched/reviewed/approved).
  *
  * `refresh` triggers a fresh fetch. `setStatus` updates the local status for a single PR.
  * Drafts/merged/already-approved PRs are filtered out server-side.
+ *
+ * If `repo` or `path` are not provided, the Team PRs tab is effectively disabled
+ * (the underlying endpoint will reject with no defaults).
  */
 export function useTeamPRs(opts: Options = {}) {
-  const { autoRefreshMs } = opts;
+  const { autoRefreshMs, repo, path } = opts;
+  const isConfigured = !!(repo && path);
   const [state, setState] = useState<State>({ prs: [], members: [], loading: false, error: null, errorDismissed: false, hasLoaded: false, lastFetchedAt: null });
   const [statuses, setStatuses] = useState<Record<string, PRStatus>>(() => loadStatuses());
   const loadingRef = useRef(false);
@@ -53,11 +61,16 @@ export function useTeamPRs(opts: Options = {}) {
   useEffect(() => { saveStatuses(statuses); }, [statuses]);
 
   const fetch = useCallback(async () => {
+    if (!isConfigured) {
+      // No team file configured — nothing to fetch. Mark loaded so the UI doesn't spin.
+      setState((s) => ({ ...s, loading: false, hasLoaded: true, lastFetchedAt: Date.now() }));
+      return;
+    }
     if (loadingRef.current) return; // skip concurrent fetches — protects against rate-limit bursts
     loadingRef.current = true;
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const { prs, members } = await api.getTeamPRs();
+      const { prs, members } = await api.getTeamPRs({ repo, path });
       const tracked: TrackedPR[] = prs.map((p: TeamPR) => ({
         owner: p.owner,
         repo: p.repo,
@@ -80,7 +93,7 @@ export function useTeamPRs(opts: Options = {}) {
     } finally {
       loadingRef.current = false;
     }
-  }, [statuses]);
+  }, [statuses, isConfigured, repo, path]);
 
   // Auto-refresh: initial fetch on mount, then every autoRefreshMs while the tab is visible.
   // Visibility-aware refresh re-syncs immediately when the user returns to the tab after
