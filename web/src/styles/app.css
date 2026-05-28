@@ -143,6 +143,8 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .pr-row-selected:hover { background: rgba(99, 102, 241, 0.18); }
 .pr-row-checkbox { display: inline-flex; align-items: center; cursor: pointer; padding: 0 2px; }
 .pr-row-checkbox input { cursor: pointer; width: 16px; height: 16px; accent-color: var(--accent); }
+/* Reserve the checkbox column width so rows without a checkbox align with those that have one. */
+.pr-row-checkbox-spacer { display: inline-block; width: 20px; }
 
 .bulk-actions-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 12px; margin: 0 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); }
 .bulk-actions-count { color: var(--muted); font-size: 0.9rem; }
@@ -220,7 +222,10 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .drawer-close { position: absolute; top: 12px; right: 16px; font-size: 1.4rem; background: transparent; border: none; cursor: pointer; }
 .drawer-refresh-indicator { position: absolute; top: 18px; right: 48px; display: inline-flex; align-items: center; color: var(--muted); }
 .pr-header h2 { margin-bottom: 4px; }
-.pr-header-meta { color: var(--muted); font-size: 0.9rem; }
+.pr-header-meta { color: var(--muted); font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pr-link-copy { display: inline-flex; align-items: center; justify-content: center; padding: 2px; margin-left: 2px; border: none; background: transparent; color: var(--muted); cursor: pointer; border-radius: 4px; transition: color 80ms, background-color 80ms; }
+.pr-link-copy:hover { color: var(--fg); background: var(--bg-subtle); }
+.pr-link-copy-copied { color: var(--ok); }
 
 /* PR description card */
 .pr-description { position: relative; margin: 12px 0 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); padding: 16px 20px; }

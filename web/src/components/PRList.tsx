@@ -26,6 +26,8 @@ interface Props {
   selection?: {
     selectedKeys: Set<string>;
     onToggle: (id: Identity) => void;
+    /** Optional predicate — when false for a row, no checkbox renders on that row. */
+    isSelectable?: (id: Identity) => boolean;
   };
 }
 
@@ -39,15 +41,16 @@ export function PRList({ prs, mode, onOpen, selection }: Props) {
       {filtered.map((p) => {
         const id = { owner: p.owner, repo: p.repo, number: p.number };
         const key = prKey(id);
+        const rowSelectable = selection ? (selection.isSelectable?.(id) ?? true) : false;
         const selected = selection?.selectedKeys.has(key) ?? false;
         const opened = formatOpenedAt(p.createdAt);
         return (
           <li
             key={key}
-            className={`pr-row${selection ? ' pr-row-selectable' : ''}${selected ? ' pr-row-selected' : ''}`}
+            className={`pr-row${rowSelectable ? ' pr-row-selectable' : ''}${selected ? ' pr-row-selected' : ''}`}
             onClick={() => onOpen(id)}
           >
-            {selection && (
+            {rowSelectable && selection && (
               <label className="pr-row-checkbox" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
@@ -57,6 +60,7 @@ export function PRList({ prs, mode, onOpen, selection }: Props) {
                 />
               </label>
             )}
+            {!rowSelectable && selection && <span className="pr-row-checkbox-spacer" aria-hidden="true" />}
             <span className="pr-text">
               <span className="pr-title-row">
                 <span className="pr-title">{p.title}</span>

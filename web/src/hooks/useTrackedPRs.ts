@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { PRStatus, TrackedPR } from '../types.js';
 
+/** Default storage key for the Added PRs tab. */
 export const STORAGE_KEY = 'connor-review.trackedPRs.v1';
 
 interface Identity { owner: string; repo: string; number: number; }
@@ -8,9 +9,9 @@ function same(a: Identity, b: Identity) {
   return a.owner === b.owner && a.repo === b.repo && a.number === b.number;
 }
 
-function load(): TrackedPR[] {
+function load(storageKey: string): TrackedPR[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -20,14 +21,20 @@ function load(): TrackedPR[] {
   }
 }
 
-function save(prs: TrackedPR[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(prs));
+function save(storageKey: string, prs: TrackedPR[]) {
+  localStorage.setItem(storageKey, JSON.stringify(prs));
 }
 
-export function useTrackedPRs() {
-  const [prs, setPrs] = useState<TrackedPR[]>(() => load());
+interface Options {
+  /** localStorage key override — useful when multiple tabs want independent paste-tracked lists. */
+  storageKey?: string;
+}
 
-  useEffect(() => { save(prs); }, [prs]);
+export function useTrackedPRs(opts: Options = {}) {
+  const storageKey = opts.storageKey ?? STORAGE_KEY;
+  const [prs, setPrs] = useState<TrackedPR[]>(() => load(storageKey));
+
+  useEffect(() => { save(storageKey, prs); }, [storageKey, prs]);
 
   const add = useCallback((pr: Omit<TrackedPR, 'status' | 'addedAt' | 'ghStatus' | 'ciStatus' | 'ciUrl' | 'labels' | 'createdAt'> & Partial<Pick<TrackedPR, 'ghStatus' | 'ciStatus' | 'ciUrl' | 'labels' | 'createdAt'>>) => {
     setPrs((cur) => (cur.some((p) => same(p, pr))

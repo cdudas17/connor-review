@@ -38,6 +38,9 @@ export function App() {
     path: APP_CONFIG.teamYmlPath,
   });
   const minePRs = useAuthoredPRs(APP_CONFIG.myPRsAuthor, { autoRefreshMs: 60 * 1000 });
+  // Separate tracked-PR bucket scoped to the My PRs tab — PRs the user pastes
+  // here are kept distinct from the Added PRs tab.
+  const mineAddedPRs = useTrackedPRs({ storageKey: 'connor-review.mineAddedPRs.v1' });
   const oncallPRs = useLabeledPRs(APP_CONFIG.oncallLabel);
   const [tab, setTab] = useState<TabId>('my');
   const [mode, setMode] = useState<FilterMode>('all');
@@ -97,6 +100,26 @@ export function App() {
     });
   }, [oncallPRs.prs, oncallStates]);
 
+  /**
+   * Combined My PRs list = authored (auto-fetched) ∪ manually-added (pasted).
+   * Dedupe by `owner/repo/number`. Authored entries win on conflict because
+   * their meta comes fresh from the API on every refresh.
+   */
+  const combinedMinePRs = useMemo(() => {
+    const seen = new Set<string>();
+    const out: TrackedPR[] = [];
+    for (const p of minePRs.prs) {
+      seen.add(prKey(p));
+      out.push(p);
+    }
+    for (const p of mineAddedPRs.prs) {
+      if (seen.has(prKey(p))) continue;
+      seen.add(prKey(p));
+      out.push(p);
+    }
+    return out.sort((a, b) => b.addedAt - a.addedAt);
+  }, [minePRs.prs, mineAddedPRs.prs]);
+
   const oncallCountsByState: Record<OncallState, number> = useMemo(() => {
     const c: Record<OncallState, number> = { draft: 0, ready: 0 };
     for (const p of oncallPRs.prs) c[p.isDraft ? 'draft' : 'ready']++;
@@ -115,12 +138,20 @@ export function App() {
 
   const activePRs: TrackedPR[] =
     tab === 'my' ? myPRs.prs
-    : tab === 'mine' ? minePRs.prs
+    : tab === 'mine' ? combinedMinePRs
     : tab === 'team' ? filteredTeamPRs
     : filteredOncallPRs;
+  // For setStatus on the My PRs tab, route to whichever underlying list owns
+  // the PR: authored ones go to the authored hook, pasted ones to the tracked
+  // hook. If a PR id ends up in both, prefer authored (matches the dedupe rule).
+  const setMineStatus = useCallback((id: { owner: string; repo: string; number: number }, status: PRStatus) => {
+    const inAuthored = minePRs.prs.some((p) => same(p, id));
+    if (inAuthored) minePRs.setStatus(id, status);
+    else mineAddedPRs.setStatus(id, status);
+  }, [minePRs, mineAddedPRs]);
   const activeSetStatus =
     tab === 'my' ? myPRs.setStatus
-    : tab === 'mine' ? minePRs.setStatus
+    : tab === 'mine' ? setMineStatus
     : tab === 'team' ? teamPRs.setStatus
     : oncallPRs.setStatus;
 
@@ -164,30 +195,34 @@ export function App() {
     });
   }, []);
 
-  const selectAllVisible = useCallback(() => {
-    setSelectedKeys(new Set(visiblePRs.map(prKey)));
-  }, [visiblePRs]);
-
   const clearSelection = useCallback(() => setSelectedKeys(new Set()), []);
 
   const deleteSelected = useCallback(() => {
     if (selectedKeys.size === 0) return;
     const ok = window.confirm(`Delete ${selectedKeys.size} PR${selectedKeys.size === 1 ? '' : 's'} from the list? (This only removes them from this app — it doesn't affect the PR on GitHub.)`);
     if (!ok) return;
+    // Route each removal to the right list. Added tab uses `myPRs`; the My PRs
+    // tab's pasted bucket is `mineAddedPRs`. Authored entries on the My tab
+    // aren't selectable (PRList skips checkboxes for them), so we won't hit them.
+    const removeFn = tab === 'mine' ? mineAddedPRs.remove : myPRs.remove;
     for (const p of activePRs) {
       if (selectedKeys.has(prKey(p))) {
-        myPRs.remove({ owner: p.owner, repo: p.repo, number: p.number });
+        removeFn({ owner: p.owner, repo: p.repo, number: p.number });
       }
     }
     setSelectedKeys(new Set());
     if (current && selectedKeys.has(prKey(current))) setCurrent(null);
-  }, [selectedKeys, activePRs, myPRs, current]);
+  }, [selectedKeys, activePRs, myPRs, mineAddedPRs, tab, current]);
 
-  const handleAdd = useCallback(async (parsed: Identity[]) => {
+  /**
+   * Optimistically add a batch of PRs to `target` (one of the tracked-PR hooks),
+   * then fetch meta in parallel and patch each entry as it resolves.
+   */
+  const addPRsTo = useCallback(async (parsed: Identity[], target: typeof myPRs) => {
     if (parsed.length === 0) return;
     setAddError(null);
     for (const p of parsed) {
-      myPRs.add({ owner: p.owner, repo: p.repo, number: p.number, title: `PR #${p.number}`, authorLogin: null });
+      target.add({ owner: p.owner, repo: p.repo, number: p.number, title: `PR #${p.number}`, authorLogin: null });
     }
     const results = await Promise.allSettled(
       parsed.map((p) => api.getPullRequest(p.owner, p.repo, p.number).then((meta) => ({ p, meta }))),
@@ -197,7 +232,7 @@ export function App() {
     for (const r of results) {
       if (r.status === 'fulfilled') {
         const { p, meta } = r.value;
-        myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt });
+        target.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt });
       } else {
         const err = r.reason as ApiCallError;
         console.error('Failed to fetch PR meta', err);
@@ -211,7 +246,10 @@ export function App() {
         ? failures[0].message
         : `${failures.length} of ${parsed.length} PRs failed to load metadata. See devtools console for details.`);
     }
-  }, [myPRs]);
+  }, []);
+
+  const handleAdd = useCallback((parsed: Identity[]) => addPRsTo(parsed, myPRs), [addPRsTo, myPRs]);
+  const handleAddMine = useCallback((parsed: Identity[]) => addPRsTo(parsed, mineAddedPRs), [addPRsTo, mineAddedPRs]);
 
   const handleAdvance = useCallback((id: Identity, newStatus: PRStatus) => {
     activeSetStatus(id, newStatus);
@@ -286,14 +324,27 @@ export function App() {
           : `${failures.length} of ${myPRs.prs.length} PRs failed to refresh.`);
       }
     } else if (tab === 'mine') {
-      await minePRs.fetch();
+      // Refresh both lists: re-search authored PRs AND re-fetch meta for any
+      // manually-pasted PRs (these don't auto-refresh on their own).
+      const refreshAuthored = minePRs.fetch();
+      const refreshPasted = Promise.allSettled(
+        mineAddedPRs.prs.map((p) => api.getPullRequest(p.owner, p.repo, p.number, { fresh: true }).then((meta) => ({ p, meta }))),
+      ).then((results) => {
+        for (const r of results) {
+          if (r.status === 'fulfilled') {
+            const { p, meta } = r.value;
+            mineAddedPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt });
+          }
+        }
+      });
+      await Promise.all([refreshAuthored, refreshPasted]);
     } else if (tab === 'team') {
       await teamPRs.fetch();
     } else {
       await oncallPRs.fetch();
     }
     setRefreshing(false);
-  }, [tab, myPRs, minePRs, teamPRs, oncallPRs, refreshing]);
+  }, [tab, myPRs, minePRs, mineAddedPRs, teamPRs, oncallPRs, refreshing]);
 
   const untouchedCount = (list: TrackedPR[]) => list.filter((p) => p.status === 'untouched').length;
 
@@ -307,7 +358,7 @@ export function App() {
             className="refresh-button"
             onClick={refreshAll}
             disabled={refreshing}
-            title={tab === 'my' ? 'Refetch metadata for every tracked PR' : 'Refetch the team PR list'}
+            title={tab === 'my' ? 'Refetch metadata for every tracked PR' : tab === 'mine' ? 'Refetch your authored PRs' : tab === 'team' ? 'Refetch the team PR list' : 'Refetch the on-call list'}
           >
             {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
@@ -319,7 +370,7 @@ export function App() {
         tabs={[
           { id: 'my', label: 'Added PRs', badge: untouchedCount(myPRs.prs) || null },
           ...(APP_CONFIG.myPRsAuthor
-            ? [{ id: 'mine' as const, label: 'My PRs', badge: minePRs.hasLoaded ? (minePRs.prs.length || null) : null }]
+            ? [{ id: 'mine' as const, label: 'My PRs', badge: combinedMinePRs.length || null }]
             : []),
           { id: 'team', label: 'Team PRs', badge: teamPRs.hasLoaded ? (untouchedCount(teamPRs.prs) || null) : null },
           { id: 'oncall', label: `Oncall (${APP_CONFIG.oncallLabel})`, badge: oncallPRs.hasLoaded ? (untouchedCount(oncallPRs.prs) || null) : null },
@@ -406,6 +457,8 @@ export function App() {
               onDismiss={minePRs.dismissError}
             />
           )}
+          <AddPRBar onAdd={handleAddMine} />
+          {addError && <ErrorToast message={addError} onDismiss={() => setAddError(null)} />}
         </>
       )}
       {tab === 'team' && (
@@ -444,22 +497,41 @@ export function App() {
 
       {authRequired && <AuthRequiredBanner onDismiss={() => setAuthRequired(false)} />}
 
-      {tab === 'my' && (
-        <BulkActionsBar
-          selectedCount={selectedKeys.size}
-          totalVisible={visiblePRs.length}
-          allSelected={visiblePRs.length > 0 && visiblePRs.every((p) => selectedKeys.has(prKey(p)))}
-          onSelectAll={selectAllVisible}
-          onClear={clearSelection}
-          onDelete={deleteSelected}
-        />
-      )}
+      {/* Bulk-delete bar — shown on the Added tab (everything is selectable) and on
+          the My PRs tab (only pasted entries are selectable). */}
+      {(tab === 'my' || tab === 'mine') && (() => {
+        const isSelectable = tab === 'my'
+          ? () => true
+          : (id: Identity) => mineAddedPRs.prs.some((p) => same(p, id));
+        const selectableVisible = visiblePRs.filter((p) => isSelectable({ owner: p.owner, repo: p.repo, number: p.number }));
+        if (selectableVisible.length === 0) return null;
+        return (
+          <BulkActionsBar
+            selectedCount={selectedKeys.size}
+            totalVisible={selectableVisible.length}
+            allSelected={selectableVisible.length > 0 && selectableVisible.every((p) => selectedKeys.has(prKey(p)))}
+            onSelectAll={() => setSelectedKeys(new Set(selectableVisible.map(prKey)))}
+            onClear={clearSelection}
+            onDelete={deleteSelected}
+          />
+        );
+      })()}
 
       <PRList
         prs={activePRs}
         mode={mode}
         onOpen={setCurrent}
-        {...(tab === 'my' ? { selection: { selectedKeys, onToggle: toggleSelect } } : {})}
+        {...(tab === 'my'
+          ? { selection: { selectedKeys, onToggle: toggleSelect } }
+          : tab === 'mine'
+          ? {
+              selection: {
+                selectedKeys,
+                onToggle: toggleSelect,
+                isSelectable: (id) => mineAddedPRs.prs.some((p) => same(p, id)),
+              },
+            }
+          : {})}
       />
 
       {current && (() => {
