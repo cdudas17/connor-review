@@ -36,6 +36,12 @@ export function PRList({ prs, mode, onOpen, selection }: Props) {
   if (filtered.length === 0) {
     return <p className="empty">No PRs to review.</p>;
   }
+  // When any row in the list is selectable, every row needs the 3-column grid
+  // template so columns line up — non-selectable rows render an empty cell in
+  // the checkbox slot.
+  const anySelectable = selection
+    ? filtered.some((p) => selection.isSelectable?.({ owner: p.owner, repo: p.repo, number: p.number }) ?? true)
+    : false;
   return (
     <ul className="pr-list">
       {filtered.map((p) => {
@@ -47,10 +53,10 @@ export function PRList({ prs, mode, onOpen, selection }: Props) {
         return (
           <li
             key={key}
-            className={`pr-row${rowSelectable ? ' pr-row-selectable' : ''}${selected ? ' pr-row-selected' : ''}`}
+            className={`pr-row${anySelectable ? ' pr-row-selectable' : ''}${selected ? ' pr-row-selected' : ''}`}
             onClick={() => onOpen(id)}
           >
-            {rowSelectable && selection && (
+            {anySelectable && (rowSelectable && selection ? (
               <label className="pr-row-checkbox" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
@@ -59,8 +65,9 @@ export function PRList({ prs, mode, onOpen, selection }: Props) {
                   aria-label={`Select ${p.title}`}
                 />
               </label>
-            )}
-            {!rowSelectable && selection && <span className="pr-row-checkbox-spacer" aria-hidden="true" />}
+            ) : (
+              <span className="pr-row-checkbox-spacer" aria-hidden="true" />
+            ))}
             <span className="pr-text">
               <span className="pr-title-row">
                 <span className="pr-title">{p.title}</span>
