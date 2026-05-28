@@ -194,8 +194,11 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .ci-pending { color: #d29922; }
 .ci-expected { color: #8b949e; }
 
-.pr-header-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.pr-header-title h2 { margin: 0; }
+/* Reserve space on the right for the absolutely-positioned drawer-close button so
+   long titles wrap to a new line instead of running underneath it. */
+.pr-header { padding-right: 40px; }
+.pr-header-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.pr-header-title h2 { margin: 0; word-break: break-word; overflow-wrap: anywhere; min-width: 0; }
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(13, 17, 23, 0.35); z-index: 10; cursor: pointer; }
 
 /* Floating notes pencil — always on screen, above the drawer. */
