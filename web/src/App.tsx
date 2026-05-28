@@ -379,12 +379,23 @@ export function App() {
         onChange={setTab}
       />
 
-      {tab === 'my' && (
-        <>
-          <AddPRBar onAdd={handleAdd} />
-          {addError && <ErrorToast message={addError} onDismiss={() => setAddError(null)} />}
-        </>
-      )}
+      {tab === 'my' && (() => {
+        const approvedCount = myPRs.prs.filter((p) => p.ghStatus === 'approved').length;
+        const removeApproved = () => {
+          if (approvedCount === 0) return;
+          const ok = window.confirm(`Remove ${approvedCount} approved PR${approvedCount === 1 ? '' : 's'} from the Added list? (This only removes them from this app — it doesn't affect the PR on GitHub.)`);
+          if (!ok) return;
+          for (const p of myPRs.prs.filter((pr) => pr.ghStatus === 'approved')) {
+            myPRs.remove({ owner: p.owner, repo: p.repo, number: p.number });
+          }
+        };
+        return (
+          <>
+            <AddPRBar onAdd={handleAdd} onRemoveApproved={removeApproved} approvedCount={approvedCount} />
+            {addError && <ErrorToast message={addError} onDismiss={() => setAddError(null)} />}
+          </>
+        );
+      })()}
       {tab === 'oncall' && (
         <>
           {APP_CONFIG.oncallLinks.length > 0 && (

@@ -3,9 +3,14 @@ import { parsePRUrls, type ParsedPR } from '../lib/parsePRUrl.js';
 
 interface Props {
   onAdd: (prs: ParsedPR[]) => void;
+  /** When set, renders a "Remove approved" button next to Add. Click bulk-removes
+   *  approved PRs from the calling list. */
+  onRemoveApproved?: () => void;
+  /** Number of approved PRs in the calling list. Drives the button label and disabled state. */
+  approvedCount?: number;
 }
 
-export function AddPRBar({ onAdd }: Props) {
+export function AddPRBar({ onAdd, onRemoveApproved, approvedCount = 0 }: Props) {
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +49,17 @@ export function AddPRBar({ onAdd }: Props) {
         <button type="button" onClick={submit}>
           {preview.prs.length > 1 ? `Add ${preview.prs.length} PRs` : 'Add'}
         </button>
+        {onRemoveApproved && (
+          <button
+            type="button"
+            className="add-pr-bar-remove-approved"
+            onClick={onRemoveApproved}
+            disabled={approvedCount === 0}
+            title="Remove every approved PR from this list"
+          >
+            Remove approved{approvedCount > 0 ? ` (${approvedCount})` : ''}
+          </button>
+        )}
         {value.trim() !== '' && (
           <p className="add-pr-bar-hint">
             {preview.prs.length === 0
