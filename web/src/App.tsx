@@ -37,7 +37,7 @@ export function App() {
     repo: APP_CONFIG.teamRepo,
     path: APP_CONFIG.teamYmlPath,
   });
-  const minePRs = useAuthoredPRs(APP_CONFIG.myPRsAuthor, { autoRefreshMs: 60 * 1000 });
+  const minePRs = useAuthoredPRs(APP_CONFIG.myPRsAuthor, { autoRefreshMs: 5 * 60 * 1000 });
   // Separate tracked-PR bucket scoped to the My PRs tab — PRs the user pastes
   // here are kept distinct from the Added PRs tab.
   const mineAddedPRs = useTrackedPRs({ storageKey: 'connor-review.mineAddedPRs.v1' });
@@ -441,7 +441,7 @@ export function App() {
           {minePRs.lastFetchedAt && (
             <p className="tab-context">
               <span className="tab-context-freshness">
-                Open PRs authored by <code>{APP_CONFIG.myPRsAuthor}</code> · auto-refreshes every minute · last updated {new Date(minePRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
+                Open PRs authored by <code>{APP_CONFIG.myPRsAuthor}</code> · auto-refreshes every 5 minutes · last updated {new Date(minePRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
                 {minePRs.loading && <span className="loading-spinner" aria-label="Refreshing" />}
               </span>
             </p>
