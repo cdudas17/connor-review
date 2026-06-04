@@ -40,11 +40,11 @@ function describeApiError(err: ApiCallError, what: string): string {
 
 export function App() {
   const myPRs = useTrackedPRs();
-  // Auto-fetch team PRs on app launch and every 1 minute while the tab is visible.
-  // 2 API calls per refresh × 60 refreshes/hour = ~120 calls/hr, still well under
-  // GitHub's 5,000/hour authenticated rate limit.
+  // Auto-fetch team PRs on app launch and every 90s while the tab is visible.
+  // Slower than 60s gives GitHub's secondary rate limiter more headroom; the
+  // server-side 30s TTL cache absorbs any racing manual refreshes.
   const teamPRs = useTeamPRs({
-    autoRefreshMs: 60 * 1000,
+    autoRefreshMs: 90 * 1000,
     repo: APP_CONFIG.teamRepo,
     path: APP_CONFIG.teamYmlPath,
   });
