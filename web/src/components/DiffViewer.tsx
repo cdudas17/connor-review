@@ -87,7 +87,9 @@ function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, 
           {t.comments.map((c) => (
             <div key={c.id} className="thread-message">
               <div className="thread-message-author"><Avatar url={c.authorAvatarUrl} login={c.authorLogin} /><strong>{c.authorLogin ?? '?'}</strong></div>
-              <p>{c.body}</p>
+              {c.bodyHtml
+                ? <div className="markdown-body thread-message-body" dangerouslySetInnerHTML={{ __html: c.bodyHtml }} />
+                : <p>{c.body}</p>}
             </div>
           ))}
           <div className="thread-reply">

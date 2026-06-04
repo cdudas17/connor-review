@@ -71,7 +71,9 @@ function ConversationCard({ thread, onReply }: CardProps) {
                 <strong>{c.authorLogin ?? '?'}</strong>
                 <time>{formatTimeAgo(c.createdAt)}</time>
               </header>
-              <p>{c.body}</p>
+              {c.bodyHtml
+                ? <div className="markdown-body conversation-message-body" dangerouslySetInnerHTML={{ __html: c.bodyHtml }} />
+                : <p>{c.body}</p>}
             </div>
           ))}
           <div className="conversation-reply">

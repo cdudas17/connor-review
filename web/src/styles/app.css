@@ -268,6 +268,11 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .markdown-body ul ul, .markdown-body ul ol, .markdown-body ol ol, .markdown-body ol ul { margin: 4px 0; }
 .markdown-body code, .markdown-body tt { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-size: 85%; padding: 0.2em 0.4em; background: rgba(110, 118, 129, 0.4); border-radius: 6px; }
 .markdown-body pre { padding: 16px; overflow: auto; line-height: 1.45; background: rgba(110, 118, 129, 0.15); border-radius: 6px; }
+/* Tighter spacing when markdown is used inside a comment card. */
+.conversation-message-body > *:last-child,
+.thread-message-body > *:last-child { margin-bottom: 0; }
+.conversation-message-body pre,
+.thread-message-body pre { padding: 10px 12px; margin: 6px 0; }
 .markdown-body pre code { padding: 0; background: transparent; font-size: 85%; border-radius: 0; }
 .markdown-body blockquote { padding: 0 1em; color: var(--muted); border-left: 0.25em solid var(--border); }
 .markdown-body hr { height: 1px; border: 0; background: var(--border); margin: 24px 0; }

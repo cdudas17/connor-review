@@ -58,6 +58,7 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
                 id
                 author { login avatarUrl }
                 body
+                bodyHTML
                 createdAt
                 diffHunk
               }

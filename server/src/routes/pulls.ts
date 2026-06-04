@@ -58,7 +58,7 @@ interface ReviewThread {
   isOutdated: boolean;
   path: string;
   line: number | null;
-  comments: Array<{ id: string; authorLogin: string | null; authorAvatarUrl: string | null; body: string; createdAt: string; diffHunk: string | null }>;
+  comments: Array<{ id: string; authorLogin: string | null; authorAvatarUrl: string | null; body: string; bodyHtml: string; createdAt: string; diffHunk: string | null }>;
 }
 
 interface CreateReviewBody {
@@ -175,6 +175,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
           id: string;
           author?: { login?: string; avatarUrl?: string };
           body: string;
+          bodyHTML?: string;
           createdAt: string;
           diffHunk?: string;
         }>;
@@ -190,6 +191,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
         authorLogin: c.author?.login ?? null,
         authorAvatarUrl: c.author?.avatarUrl ?? null,
         body: c.body,
+        bodyHtml: c.bodyHTML ?? '',
         createdAt: c.createdAt,
         diffHunk: c.diffHunk ?? null,
       })),
