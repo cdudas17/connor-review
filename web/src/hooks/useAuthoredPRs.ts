@@ -53,7 +53,7 @@ export function useAuthoredPRs(author: string, opts: Options = {}) {
   // Same rate-limit pause pattern as useTeamPRs.
   const rateLimitedUntilRef = useRef<number>(0);
 
-  const fetch = useCallback(async () => {
+  const fetch = useCallback(async (fetchOpts?: { fresh?: boolean }) => {
     if (!author) {
       setState((s) => ({ ...s, loading: false, hasLoaded: true, lastFetchedAt: Date.now() }));
       return;
@@ -62,7 +62,7 @@ export function useAuthoredPRs(author: string, opts: Options = {}) {
     loadingRef.current = true;
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const { prs } = await api.getAuthoredPRs(author);
+      const { prs } = await api.getAuthoredPRs(author, { fresh: fetchOpts?.fresh });
       const tracked: TrackedPR[] = prs.map((p: TeamPR) => ({
         owner: p.owner,
         repo: p.repo,

@@ -64,18 +64,23 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
-  getTeamPRs(opts?: { repo?: string; path?: string }): Promise<{ members: string[]; prs: TeamPR[] }> {
+  getTeamPRs(opts?: { repo?: string; path?: string; fresh?: boolean }): Promise<{ members: string[]; prs: TeamPR[] }> {
     const qs = new URLSearchParams();
     if (opts?.repo) qs.set('repo', opts.repo);
     if (opts?.path) qs.set('path', opts.path);
+    if (opts?.fresh) qs.set('fresh', '1');
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
     return call(`/api/team/prs${suffix}`);
   },
-  getLabeledPRs(label = 'needs-review'): Promise<{ label: string; prs: TeamPR[] }> {
-    return call(`/api/labeled-prs?label=${encodeURIComponent(label)}`);
+  getLabeledPRs(label = 'needs-review', opts?: { fresh?: boolean }): Promise<{ label: string; prs: TeamPR[] }> {
+    const qs = new URLSearchParams({ label });
+    if (opts?.fresh) qs.set('fresh', '1');
+    return call(`/api/labeled-prs?${qs.toString()}`);
   },
-  getAuthoredPRs(author: string): Promise<{ author: string; prs: TeamPR[] }> {
-    return call(`/api/authored-prs?author=${encodeURIComponent(author)}`);
+  getAuthoredPRs(author: string, opts?: { fresh?: boolean }): Promise<{ author: string; prs: TeamPR[] }> {
+    const qs = new URLSearchParams({ author });
+    if (opts?.fresh) qs.set('fresh', '1');
+    return call(`/api/authored-prs?${qs.toString()}`);
   },
   getFileContent(owner: string, repo: string, number: number, path: string, ref: string): Promise<string> {
     const qs = new URLSearchParams({ path, ref });

@@ -337,7 +337,7 @@ export function App() {
     } else if (tab === 'mine') {
       // Refresh both lists: re-search authored PRs AND re-fetch meta for any
       // manually-pasted PRs (these don't auto-refresh on their own).
-      const refreshAuthored = minePRs.fetch();
+      const refreshAuthored = minePRs.fetch({ fresh: true });
       const refreshPasted = Promise.allSettled(
         mineAddedPRs.prs.map((p) => api.getPullRequest(p.owner, p.repo, p.number, { fresh: true }).then((meta) => ({ p, meta }))),
       ).then((results) => {
@@ -350,9 +350,9 @@ export function App() {
       });
       await Promise.all([refreshAuthored, refreshPasted]);
     } else if (tab === 'team') {
-      await teamPRs.fetch();
+      await teamPRs.fetch({ fresh: true });
     } else {
-      await oncallPRs.fetch();
+      await oncallPRs.fetch({ fresh: true });
     }
     setRefreshing(false);
   }, [tab, myPRs, minePRs, mineAddedPRs, teamPRs, oncallPRs, refreshing]);
@@ -425,7 +425,7 @@ export function App() {
               <button
                 type="button"
                 className="btn-primary oncall-fetch-button"
-                onClick={oncallPRs.fetch}
+                onClick={() => oncallPRs.fetch({ fresh: true })}
                 disabled={oncallPRs.loading}
               >
                 {oncallPRs.loading ? 'Loading…' : `Load ${APP_CONFIG.oncallLabel} PRs`}
@@ -438,7 +438,7 @@ export function App() {
                   {oncallPRs.prs.length} PRs · last loaded {oncallPRs.lastFetchedAt ? new Date(oncallPRs.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '—'}
                   {oncallPRs.loading && <span className="loading-spinner" aria-label="Refreshing" />}
                   {' · '}
-                  <button type="button" className="link-button" onClick={oncallPRs.fetch} disabled={oncallPRs.loading}>Refresh now</button>
+                  <button type="button" className="link-button" onClick={() => oncallPRs.fetch({ fresh: true })} disabled={oncallPRs.loading}>Refresh now</button>
                 </span>
               </p>
               <OncallStateFilter

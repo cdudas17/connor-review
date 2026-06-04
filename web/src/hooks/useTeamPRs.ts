@@ -64,7 +64,7 @@ export function useTeamPRs(opts: Options = {}) {
   // timestamp. Manual fetch() calls bypass it.
   const rateLimitedUntilRef = useRef<number>(0);
 
-  const fetch = useCallback(async () => {
+  const fetch = useCallback(async (fetchOpts?: { fresh?: boolean }) => {
     if (!isConfigured) {
       // No team file configured — nothing to fetch. Mark loaded so the UI doesn't spin.
       setState((s) => ({ ...s, loading: false, hasLoaded: true, lastFetchedAt: Date.now() }));
@@ -74,7 +74,7 @@ export function useTeamPRs(opts: Options = {}) {
     loadingRef.current = true;
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const { prs, members } = await api.getTeamPRs({ repo, path });
+      const { prs, members } = await api.getTeamPRs({ repo, path, fresh: fetchOpts?.fresh });
       const tracked: TrackedPR[] = prs.map((p: TeamPR) => ({
         owner: p.owner,
         repo: p.repo,

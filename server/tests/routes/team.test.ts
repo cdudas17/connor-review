@@ -13,6 +13,7 @@ vi.mock('../../src/lib/ghExec.js', () => {
 });
 
 import { ghExec } from '../../src/lib/ghExec.js';
+import { __resetTeamRouteCaches } from '../../src/routes/team.js';
 const mocked = ghExec as unknown as ReturnType<typeof vi.fn>;
 
 const TALENT_YML = `name: Talent
@@ -68,7 +69,10 @@ const SEARCH_RESPONSE = JSON.stringify({
 });
 
 describe('team routes', () => {
-  beforeEach(() => mocked.mockReset());
+  beforeEach(() => {
+    mocked.mockReset();
+    __resetTeamRouteCaches();
+  });
 
   it('GET /api/team/prs returns 400 when repo + path are not provided', async () => {
     const app = await buildServer();

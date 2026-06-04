@@ -18,13 +18,13 @@ export const TEAM_PR_SEARCH_QUERY = /* GraphQL */ `
           headRefOid
           createdAt
           updatedAt
-          labels(first: 50) { nodes { name color } }
+          labels(first: 10) { nodes { name color } }
           commits(last: 1) {
             nodes {
               commit {
                 statusCheckRollup {
                   state
-                  contexts(first: 100) {
+                  contexts(first: 20) {
                     nodes {
                       __typename
                       ... on StatusContext { context state targetUrl }

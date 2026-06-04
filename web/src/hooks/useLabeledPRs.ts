@@ -42,12 +42,12 @@ export function useLabeledPRs(label = 'needs-review') {
 
   useEffect(() => { saveStatuses(statuses); }, [statuses]);
 
-  const fetch = useCallback(async () => {
+  const fetch = useCallback(async (fetchOpts?: { fresh?: boolean }) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const { prs } = await api.getLabeledPRs(label);
+      const { prs } = await api.getLabeledPRs(label, { fresh: fetchOpts?.fresh });
       const tracked: TrackedPR[] = prs.map((p: TeamPR) => ({
         owner: p.owner,
         repo: p.repo,
