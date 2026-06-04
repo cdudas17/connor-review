@@ -27,6 +27,17 @@ interface Identity { owner: string; repo: string; number: number; }
 function same(a: Identity, b: Identity) { return a.owner === b.owner && a.repo === b.repo && a.number === b.number; }
 function prKey(id: Identity) { return `${id.owner}/${id.repo}#${id.number}`; }
 
+/**
+ * Friendlier message when the API error is a rate-limit response from GitHub.
+ * Otherwise just returns the raw API message.
+ */
+function describeApiError(err: ApiCallError, what: string): string {
+  if (err.code === 'RATE_LIMITED' || err.status === 429) {
+    return `${what}: hit GitHub's rate limit. Auto-refresh paused for 10 minutes; manual refresh still works.`;
+  }
+  return `${what}: ${err.message}`;
+}
+
 export function App() {
   const myPRs = useTrackedPRs();
   // Auto-fetch team PRs on app launch and every 1 minute while the tab is visible.
@@ -441,7 +452,7 @@ export function App() {
           )}
           {oncallPRs.error && !oncallPRs.errorDismissed && (
             <ErrorToast
-              message={`Failed to load ${APP_CONFIG.oncallLabel} PRs: ${oncallPRs.error.message}`}
+              message={describeApiError(oncallPRs.error, `Failed to load ${APP_CONFIG.oncallLabel} PRs`)}
               onDismiss={oncallPRs.dismissError}
             />
           )}
@@ -464,7 +475,7 @@ export function App() {
           )}
           {minePRs.error && !minePRs.errorDismissed && (
             <ErrorToast
-              message={`Failed to load my PRs: ${minePRs.error.message}`}
+              message={describeApiError(minePRs.error, 'Failed to load my PRs')}
               onDismiss={minePRs.dismissError}
             />
           )}
@@ -489,7 +500,7 @@ export function App() {
           )}
           {teamPRs.error && !teamPRs.errorDismissed && (
             <ErrorToast
-              message={`Failed to load team PRs: ${teamPRs.error.message}`}
+              message={describeApiError(teamPRs.error, 'Failed to load team PRs')}
               onDismiss={teamPRs.dismissError}
             />
           )}

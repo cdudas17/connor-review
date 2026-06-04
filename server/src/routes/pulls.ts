@@ -210,7 +210,10 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       return;
     }
     if (err instanceof GhCliError) {
-      const status = err.code === 'AUTH_REQUIRED' ? 401 : err.code === 'GH_API_ERROR' ? 502 : 500;
+      const status = err.code === 'AUTH_REQUIRED' ? 401
+        : err.code === 'RATE_LIMITED' ? 429
+        : err.code === 'GH_API_ERROR' ? 502
+        : 500;
       reply.code(status).send({ code: err.code, message: err.message, stderr: err.stderr });
       return;
     }

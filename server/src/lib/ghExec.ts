@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 
-export type GhErrorCode = 'AUTH_REQUIRED' | 'GH_API_ERROR' | 'GH_CLI_FAILED';
+export type GhErrorCode = 'AUTH_REQUIRED' | 'RATE_LIMITED' | 'GH_API_ERROR' | 'GH_CLI_FAILED';
 
 export class GhCliError extends Error {
   override readonly name = 'GhCliError';
@@ -15,9 +15,17 @@ export class GhCliError extends Error {
 
 const AUTH_PATTERNS = [/gh auth login/i, /not authenticated/i, /no token/i];
 const GRAPHQL_PATTERNS = [/graphql error/i, /^\s*\{[\s\S]*"errors"/i];
+const RATE_LIMIT_PATTERNS = [
+  /secondary rate limit/i,
+  /primary rate limit/i,
+  /API rate limit exceeded/i,
+  /\bHTTP 403\b/,            // gh reports rate-limited responses as HTTP 403
+  /\babuse detection/i,       // older "abuse rate limit" wording
+];
 
 function classify(stderr: string): GhErrorCode {
   if (AUTH_PATTERNS.some((r) => r.test(stderr))) return 'AUTH_REQUIRED';
+  if (RATE_LIMIT_PATTERNS.some((r) => r.test(stderr))) return 'RATE_LIMITED';
   if (GRAPHQL_PATTERNS.some((r) => r.test(stderr))) return 'GH_API_ERROR';
   return 'GH_CLI_FAILED';
 }
@@ -54,6 +62,9 @@ const TRANSIENT_PATTERNS = [
   /TLS connection/i,
   /timed? out/i,
   /timeout exceeded/i,
+  /unexpected end of JSON input/i,   // gh got a truncated response mid-stream
+  /unexpected EOF/i,                  // sometimes printed instead
+  /EOF\b/,                            // catch-all for shorter "EOF" messages
 ];
 
 function isTransient(stderr: string): boolean {

@@ -60,6 +60,10 @@ export function useTeamPRs(opts: Options = {}) {
 
   useEffect(() => { saveStatuses(statuses); }, [statuses]);
 
+  // If we hit GitHub's secondary rate limit, pause auto-refresh until this
+  // timestamp. Manual fetch() calls bypass it.
+  const rateLimitedUntilRef = useRef<number>(0);
+
   const fetch = useCallback(async () => {
     if (!isConfigured) {
       // No team file configured — nothing to fetch. Mark loaded so the UI doesn't spin.
@@ -88,8 +92,15 @@ export function useTeamPRs(opts: Options = {}) {
       // Newest PRs first.
       tracked.sort((a, b) => b.addedAt - a.addedAt);
       setState({ prs: tracked, members, loading: false, error: null, errorDismissed: false, hasLoaded: true, lastFetchedAt: Date.now() });
+      rateLimitedUntilRef.current = 0;
     } catch (e) {
-      setState((s) => ({ ...s, loading: false, error: e as ApiCallError, errorDismissed: false, hasLoaded: true, lastFetchedAt: Date.now() }));
+      const err = e as ApiCallError;
+      // If GitHub is rate-limiting us, pause auto-refresh for 10 minutes — hammering
+      // it during a secondary rate limit just extends the cooldown.
+      if (err.code === 'RATE_LIMITED' || err.status === 429) {
+        rateLimitedUntilRef.current = Date.now() + 10 * 60 * 1000;
+      }
+      setState((s) => ({ ...s, loading: false, error: err, errorDismissed: false, hasLoaded: true, lastFetchedAt: Date.now() }));
     } finally {
       loadingRef.current = false;
     }
@@ -108,10 +119,12 @@ export function useTeamPRs(opts: Options = {}) {
     fetchRef.current();
     const id = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      if (Date.now() < rateLimitedUntilRef.current) return; // GitHub said back off
       fetchRef.current();
     }, autoRefreshMs);
     const onVis = () => {
       if (document.visibilityState !== 'visible') return;
+      if (Date.now() < rateLimitedUntilRef.current) return;
       const last = lastFetchedAtRef.current;
       if (!last || Date.now() - last >= autoRefreshMs) fetchRef.current();
     };

@@ -50,6 +50,9 @@ export function useAuthoredPRs(author: string, opts: Options = {}) {
 
   useEffect(() => { saveStatuses(statuses); }, [statuses]);
 
+  // Same rate-limit pause pattern as useTeamPRs.
+  const rateLimitedUntilRef = useRef<number>(0);
+
   const fetch = useCallback(async () => {
     if (!author) {
       setState((s) => ({ ...s, loading: false, hasLoaded: true, lastFetchedAt: Date.now() }));
@@ -77,8 +80,13 @@ export function useAuthoredPRs(author: string, opts: Options = {}) {
       }));
       tracked.sort((a, b) => b.addedAt - a.addedAt);
       setState({ prs: tracked, loading: false, error: null, errorDismissed: false, hasLoaded: true, lastFetchedAt: Date.now() });
+      rateLimitedUntilRef.current = 0;
     } catch (e) {
-      setState((s) => ({ ...s, loading: false, error: e as ApiCallError, errorDismissed: false, hasLoaded: true, lastFetchedAt: Date.now() }));
+      const err = e as ApiCallError;
+      if (err.code === 'RATE_LIMITED' || err.status === 429) {
+        rateLimitedUntilRef.current = Date.now() + 10 * 60 * 1000;
+      }
+      setState((s) => ({ ...s, loading: false, error: err, errorDismissed: false, hasLoaded: true, lastFetchedAt: Date.now() }));
     } finally {
       loadingRef.current = false;
     }
@@ -107,10 +115,12 @@ export function useAuthoredPRs(author: string, opts: Options = {}) {
     fetchRef.current();
     const id = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      if (Date.now() < rateLimitedUntilRef.current) return; // GitHub said back off
       fetchRef.current();
     }, autoRefreshMs);
     const onVis = () => {
       if (document.visibilityState !== 'visible') return;
+      if (Date.now() < rateLimitedUntilRef.current) return;
       const last = lastFetchedAtRef.current;
       if (!last || Date.now() - last >= autoRefreshMs) fetchRef.current();
     };
