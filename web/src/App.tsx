@@ -409,15 +409,42 @@ export function App() {
       })()}
       {tab === 'oncall' && (
         <>
-          {APP_CONFIG.oncallLinks.length > 0 && (
-            <p className="oncall-external-links">
-              {APP_CONFIG.oncallLinks.map((link) => (
-                <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer">
-                  {link.label}
-                </a>
-              ))}
-            </p>
-          )}
+          {APP_CONFIG.oncallLinks.length > 0 && (() => {
+            // Render ungrouped links first, then each named group as its own row.
+            const ungrouped = APP_CONFIG.oncallLinks.filter((l) => !l.group);
+            const groups = new Map<string, typeof APP_CONFIG.oncallLinks>();
+            for (const l of APP_CONFIG.oncallLinks) {
+              if (!l.group) continue;
+              const arr = groups.get(l.group) ?? [];
+              arr.push(l);
+              groups.set(l.group, arr);
+            }
+            return (
+              <>
+                {ungrouped.length > 0 && (
+                  <p className="oncall-external-links">
+                    {ungrouped.map((link) => (
+                      <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer">
+                        {link.label}
+                      </a>
+                    ))}
+                  </p>
+                )}
+                {[...groups.entries()].map(([name, links]) => (
+                  <div key={name} className="oncall-link-group">
+                    <span className="oncall-link-group-label">{name}</span>
+                    <p className="oncall-external-links">
+                      {links.map((link) => (
+                        <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer">
+                          {link.label}
+                        </a>
+                      ))}
+                    </p>
+                  </div>
+                ))}
+              </>
+            );
+          })()}
           {!oncallPRs.hasLoaded ? (
             <div className="oncall-empty">
               <p>Pull all open, non-draft, non-approved PRs labeled <code>{APP_CONFIG.oncallLabel}</code>.</p>

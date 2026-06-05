@@ -13,6 +13,8 @@ export interface ExternalLink {
   label: string;
   /** Absolute URL — opens in a new tab. */
   url: string;
+  /** Optional group name. Links sharing a group render together in their own row, after the ungrouped ones. */
+  group?: string;
 }
 
 export interface AppConfig {
