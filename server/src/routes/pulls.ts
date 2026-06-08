@@ -292,8 +292,10 @@ export async function registerPullsRoutes(app: FastifyInstance) {
 
     const variables: Record<string, unknown> = {
       pullRequestId: meta.id,
-      event: req.body.event,
     };
+    // PullRequestReviewEvent enum only accepts APPROVE/REQUEST_CHANGES/COMMENT/DISMISS.
+    // Omit `event` entirely to create a PENDING (draft) review.
+    if (req.body.event !== 'PENDING') variables.event = req.body.event;
     if (req.body.body) variables.body = req.body.body;
     if (req.body.threads?.length) {
       variables.threads = req.body.threads.map(toThreadVariable);

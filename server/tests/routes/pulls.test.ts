@@ -146,6 +146,12 @@ describe('pulls routes', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ id: 'R_pending', state: 'PENDING' });
+    // PullRequestReviewEvent! enum rejects 'PENDING' — the variable must be omitted
+    // entirely to create a draft review.
+    const lastCallOpts = mocked.mock.calls.at(-1)![1] as { input?: string } | undefined;
+    const sentBody = JSON.parse(lastCallOpts!.input!);
+    expect(sentBody.variables.event).toBeUndefined();
+    expect('event' in sentBody.variables).toBe(false);
     await app.close();
   });
 
