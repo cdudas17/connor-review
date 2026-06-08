@@ -305,9 +305,23 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       const out = await ghExec(['api', 'graphql', '--input', '-'], {
         input: JSON.stringify({ query: ADD_PULL_REQUEST_REVIEW_MUTATION, variables }),
       });
-      const parsed = JSON.parse(out) as { data?: { addPullRequestReview?: { pullRequestReview?: { id: string; state: string } } } };
+      const parsed = JSON.parse(out) as {
+        data?: { addPullRequestReview?: { pullRequestReview?: { id: string; state: string } } };
+        errors?: Array<{ message?: string; type?: string }>;
+      };
       const review = parsed.data?.addPullRequestReview?.pullRequestReview;
-      if (!review) throw new Error('Review creation returned no review');
+      if (!review) {
+        // Surface any GraphQL errors carried in the response. gh exits non-zero on most
+        // GraphQL errors (caught earlier), but occasionally returns data=null + errors=[]
+        // on a 2xx response. Without this the user just sees an opaque "no review".
+        const detail = (parsed.errors ?? [])
+          .map((e) => e.message)
+          .filter(Boolean)
+          .join('; ');
+        throw new Error(detail
+          ? `Review creation failed: ${detail}`
+          : 'Review creation returned no review (response was empty)');
+      }
       return review;
     } catch (err) {
       // Race: another process started a pending review between our meta fetch and the

@@ -145,7 +145,10 @@ export function ReviewDrawer(props: Props) {
     if (reviewIdForSubmit) onPendingReviewChange(target, null);
     onAdvance(target, newStatus);
 
-    const verb = event === 'APPROVE' ? 'Approved' : event === 'REQUEST_CHANGES' ? 'Requested changes on' : 'Commented on';
+    const pastTenseVerb = event === 'APPROVE' ? 'Approved' : event === 'REQUEST_CHANGES' ? 'Requested changes on' : 'Commented on';
+    // Base-form verb for the "Failed to ..." error path. Lowercasing the past-tense
+    // verb produces "Failed to commented on" which is ungrammatical.
+    const baseVerb = event === 'APPROVE' ? 'approve' : event === 'REQUEST_CHANGES' ? 'request changes on' : 'comment on';
     const prRef = `${target.owner}/${target.repo}#${target.number}`;
 
     (async () => {
@@ -155,13 +158,13 @@ export function ReviewDrawer(props: Props) {
         } else {
           await api.createReview(target.owner, target.repo, target.number, { event, body });
         }
-        onToast('success', `${verb} ${prRef}`);
+        onToast('success', `${pastTenseVerb} ${prRef}`);
       } catch (e) {
         // Revert the local status so the PR stays in the queue for retry.
         onSetStatus(target, 'untouched');
         // If we cleared a pending review id optimistically, restore it.
         if (reviewIdForSubmit) onPendingReviewChange(target, reviewIdForSubmit);
-        onToast('error', `Failed to ${verb.toLowerCase()} ${prRef}: ${(e as Error).message}`);
+        onToast('error', `Failed to ${baseVerb} ${prRef}: ${(e as Error).message}`);
       }
     })();
   };
