@@ -80,7 +80,13 @@ export function PRList({ prs, mode, onOpen, selection }: Props) {
             <span className="pr-badges">
               <CiBadge status={p.ciStatus} url={p.ciUrl} />
               <GhStatusBadge status={p.ghStatus} />
-              <StatusBadge status={p.status} />
+              {/* If GitHub already reports the PR as approved, the local
+                  "Untouched" badge is contradictory noise — hide it. The user
+                  can still see local statuses they set themselves (Reviewed,
+                  Approved) so explicit local intent isn't hidden. */}
+              {!(p.ghStatus === 'approved' && p.status === 'untouched') && (
+                <StatusBadge status={p.status} />
+              )}
             </span>
           </li>
         );
