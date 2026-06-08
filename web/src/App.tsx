@@ -40,11 +40,13 @@ function describeApiError(err: ApiCallError, what: string): string {
 
 export function App() {
   const myPRs = useTrackedPRs();
-  // Auto-fetch team PRs on app launch and every 90s while the tab is visible.
-  // Slower than 60s gives GitHub's secondary rate limiter more headroom; the
-  // server-side 30s TTL cache absorbs any racing manual refreshes.
+  // Auto-fetch team PRs on app launch and every 5 minutes while the tab is visible.
+  // The paginated search can hit GraphQL multiple times per refresh once the team
+  // has >100 open PRs, so we keep the interval generous to stay well under the
+  // secondary rate limit. The server-side 30s TTL cache absorbs racing refreshes
+  // and manual Refresh always bypasses it.
   const teamPRs = useTeamPRs({
-    autoRefreshMs: 90 * 1000,
+    autoRefreshMs: 5 * 60 * 1000,
     repo: APP_CONFIG.teamRepo,
     path: APP_CONFIG.teamYmlPath,
   });
