@@ -266,33 +266,64 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     Body: CreateReviewBody;
   }>('/api/pulls/:owner/:repo/:number/reviews', async (req) => {
     const params = parsePullParams(req.params);
-    const cached = metaCache.get(metaKey(params));
-    // Always refresh meta when creating a PENDING review — `viewerPendingReviewId` can
-    // shift if the user just submitted/started a review elsewhere.
-    const meta = req.body.event === 'PENDING'
-      ? await fetchMeta(params.owner, params.repo, params.number)
-      : (cached ?? (await fetchMeta(params.owner, params.repo, params.number)));
+    // GitHub allows only one pending review per (user, PR), so we need an accurate
+    // view of `viewerPendingReviewId` before deciding to create vs. submit. The cached
+    // meta can be stale (the user may have a leftover pending review from a previous
+    // session or from github.com), which used to cause the second "Comment" click to
+    // hard-fail. Refresh once up front — cheap and avoids the round-trip-to-failure.
+    const meta = await fetchMeta(params.owner, params.repo, params.number);
     metaCache.set(metaKey(params), meta);
 
-    // If the viewer already has a pending review on this PR and we're being asked to
-    // start a new pending review, attach the threads to the existing review instead.
-    if (req.body.event === 'PENDING' && meta.viewerPendingReviewId) {
-      const reviewId = meta.viewerPendingReviewId;
+    // Attach any inline threads in `req.body.threads` to the given review.
+    const attachThreads = async (reviewId: string, prId: string) => {
       for (const t of req.body.threads ?? []) {
         const tv = toThreadVariable(t);
         await ghExec(['api', 'graphql', '--input', '-'], {
           input: JSON.stringify({
             query: ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION,
-            variables: { ...tv, pullRequestId: meta.id, pullRequestReviewId: reviewId },
+            variables: { ...tv, pullRequestId: prId, pullRequestReviewId: reviewId },
           }),
         });
       }
-      return { id: reviewId, state: 'PENDING' };
+    };
+
+    // Submit (publish) an existing pending review with the requested event + body.
+    const submitPending = async (reviewId: string) => {
+      const variables: Record<string, unknown> = {
+        pullRequestReviewId: reviewId,
+        event: req.body.event,
+      };
+      if (req.body.body) variables.body = req.body.body;
+      const out = await ghExec(['api', 'graphql', '--input', '-'], {
+        input: JSON.stringify({ query: SUBMIT_PULL_REQUEST_REVIEW_MUTATION, variables }),
+      });
+      const parsed = JSON.parse(out) as {
+        data?: { submitPullRequestReview?: { pullRequestReview?: { id: string; state: string } } };
+        errors?: Array<{ message?: string }>;
+      };
+      const review = parsed.data?.submitPullRequestReview?.pullRequestReview;
+      if (!review) {
+        const detail = (parsed.errors ?? []).map((e) => e.message).filter(Boolean).join('; ');
+        throw new Error(detail ? `Review submit failed: ${detail}` : 'Review submit returned no review');
+      }
+      return review;
+    };
+
+    // Case 1: pending review exists. Attach any new threads to it, then either keep
+    // it pending (event=PENDING) or publish it (event=COMMENT/APPROVE/REQUEST_CHANGES).
+    // This is what GitHub itself does — clicking Comment with a draft review publishes
+    // the draft rather than creating a parallel one.
+    if (meta.viewerPendingReviewId) {
+      const reviewId = meta.viewerPendingReviewId;
+      await attachThreads(reviewId, meta.id);
+      if (req.body.event === 'PENDING') {
+        return { id: reviewId, state: 'PENDING' };
+      }
+      return await submitPending(reviewId);
     }
 
-    const variables: Record<string, unknown> = {
-      pullRequestId: meta.id,
-    };
+    // Case 2: no pending review — create a fresh one.
+    const variables: Record<string, unknown> = { pullRequestId: meta.id };
     // PullRequestReviewEvent enum only accepts APPROVE/REQUEST_CHANGES/COMMENT/DISMISS.
     // Omit `event` entirely to create a PENDING (draft) review.
     if (req.body.event !== 'PENDING') variables.event = req.body.event;
@@ -311,36 +342,25 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       };
       const review = parsed.data?.addPullRequestReview?.pullRequestReview;
       if (!review) {
-        // Surface any GraphQL errors carried in the response. gh exits non-zero on most
-        // GraphQL errors (caught earlier), but occasionally returns data=null + errors=[]
-        // on a 2xx response. Without this the user just sees an opaque "no review".
-        const detail = (parsed.errors ?? [])
-          .map((e) => e.message)
-          .filter(Boolean)
-          .join('; ');
+        const detail = (parsed.errors ?? []).map((e) => e.message).filter(Boolean).join('; ');
         throw new Error(detail
           ? `Review creation failed: ${detail}`
           : 'Review creation returned no review (response was empty)');
       }
       return review;
     } catch (err) {
-      // Race: another process started a pending review between our meta fetch and the
-      // mutation. Re-fetch and attach threads to the now-existing pending review.
+      // Last-ditch race recovery: a pending review appeared between our meta fetch and
+      // the create mutation. Attach threads to it and either keep pending or publish.
       const isOnePendingErr = err instanceof GhCliError && /one pending review/i.test(err.stderr);
-      if (req.body.event === 'PENDING' && isOnePendingErr) {
+      if (isOnePendingErr) {
         const fresh = await fetchMeta(params.owner, params.repo, params.number);
         metaCache.set(metaKey(params), fresh);
         if (fresh.viewerPendingReviewId) {
-          for (const t of req.body.threads ?? []) {
-            const tv = toThreadVariable(t);
-            await ghExec(['api', 'graphql', '--input', '-'], {
-              input: JSON.stringify({
-                query: ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION,
-                variables: { ...tv, pullRequestId: fresh.id, pullRequestReviewId: fresh.viewerPendingReviewId },
-              }),
-            });
+          await attachThreads(fresh.viewerPendingReviewId, fresh.id);
+          if (req.body.event === 'PENDING') {
+            return { id: fresh.viewerPendingReviewId, state: 'PENDING' };
           }
-          return { id: fresh.viewerPendingReviewId, state: 'PENDING' };
+          return await submitPending(fresh.viewerPendingReviewId);
         }
       }
       throw err;

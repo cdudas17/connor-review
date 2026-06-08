@@ -135,6 +135,32 @@ describe('pulls routes', () => {
     await app.close();
   });
 
+  it('POST /reviews with event=COMMENT and an existing pending review submits the pending review (no parallel create)', async () => {
+    // Scenario: user has a leftover pending review (e.g. from a prior "Add to review")
+    // and clicks the top-level Comment button. GitHub rejects parallel reviews, so we
+    // should submit the pending one with the user's body text instead.
+    const metaWithPending = JSON.parse(PR_GRAPHQL_RESPONSE);
+    metaWithPending.data.repository.pullRequest.viewerLatestReview = { id: 'R_pending', state: 'PENDING' };
+    mocked.mockResolvedValueOnce(JSON.stringify(metaWithPending));
+    mocked.mockResolvedValueOnce(JSON.stringify({ data: { submitPullRequestReview: { pullRequestReview: { id: 'R_pending', state: 'COMMENTED' } } } }));
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/reviews',
+      payload: { event: 'COMMENT', body: 'nits in line' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ id: 'R_pending', state: 'COMMENTED' });
+    // Confirm we hit submitPullRequestReview, not addPullRequestReview.
+    expect(mocked).toHaveBeenCalledTimes(2);
+    const lastInput = JSON.parse((mocked.mock.calls.at(-1)![1] as { input?: string }).input!);
+    expect(lastInput.query).toMatch(/submitPullRequestReview/);
+    expect(lastInput.variables.pullRequestReviewId).toBe('R_pending');
+    expect(lastInput.variables.event).toBe('COMMENT');
+    expect(lastInput.variables.body).toBe('nits in line');
+    await app.close();
+  });
+
   it('POST /reviews with event=PENDING creates a pending review', async () => {
     mocked.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
     mocked.mockResolvedValueOnce(JSON.stringify({ data: { addPullRequestReview: { pullRequestReview: { id: 'R_pending', state: 'PENDING' } } } }));
