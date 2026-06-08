@@ -96,39 +96,63 @@ async function _fetchTalentMembersFresh(repo: string, path: string): Promise<str
   return members.filter((m) => typeof m === 'string' && m.length > 0);
 }
 
+/** GitHub search caps `first` at 100. Active teams routinely exceed that, so we
+ * paginate. 5 pages = 500 PRs — well above any realistic open-PR backlog for
+ * one team, but bounded so a misconfigured query doesn't loop forever. */
+const MAX_SEARCH_PAGES = 5;
+
+interface SearchNode {
+  id: string;
+  number: number;
+  title: string;
+  url: string;
+  author?: { login?: string };
+  repository?: { owner?: { login?: string }; name?: string };
+  isDraft: boolean;
+  state: 'OPEN' | 'CLOSED' | 'MERGED';
+  merged: boolean;
+  reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+  baseRefName: string;
+  headRefName: string;
+  headRefOid: string;
+  createdAt?: string;
+  updatedAt: string;
+  labels?: { nodes?: Array<{ name?: string; color?: string }> };
+  commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string; contexts?: { nodes?: Array<{ __typename?: string; context?: string; name?: string; targetUrl?: string | null; detailsUrl?: string | null; state?: string; status?: string; conclusion?: string | null }> } } } }> };
+}
+
+/** Walk paginated search results, concatenating up to MAX_SEARCH_PAGES pages. */
+async function searchAllPages(q: string): Promise<SearchNode[]> {
+  const all: SearchNode[] = [];
+  let after: string | null = null;
+  for (let page = 0; page < MAX_SEARCH_PAGES; page++) {
+    const variables: Record<string, unknown> = { q };
+    if (after) variables.after = after;
+    const out = await ghExec(['api', 'graphql', '--input', '-'], {
+      input: JSON.stringify({ query: TEAM_PR_SEARCH_QUERY, variables }),
+    });
+    const parsed = JSON.parse(out) as {
+      data?: {
+        search?: {
+          pageInfo?: { hasNextPage: boolean; endCursor: string | null };
+          nodes?: SearchNode[];
+        };
+      };
+    };
+    const nodes = parsed.data?.search?.nodes ?? [];
+    all.push(...nodes);
+    const pageInfo = parsed.data?.search?.pageInfo;
+    if (!pageInfo?.hasNextPage || !pageInfo.endCursor) break;
+    after = pageInfo.endCursor;
+  }
+  return all;
+}
+
 async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
   // is:pr is:open draft:false author:user1 author:user2 ...
   // Multiple author: qualifiers are OR'd by GitHub search.
   const q = ['is:pr', 'is:open', 'draft:false', ...members.map((m) => `author:${m}`)].join(' ');
-  const out = await ghExec(['api', 'graphql', '--input', '-'], {
-    input: JSON.stringify({ query: TEAM_PR_SEARCH_QUERY, variables: { q } }),
-  });
-  const parsed = JSON.parse(out) as {
-    data?: {
-      search?: {
-        nodes?: Array<{
-          id: string;
-          number: number;
-          title: string;
-          url: string;
-          author?: { login?: string };
-          repository?: { owner?: { login?: string }; name?: string };
-          isDraft: boolean;
-          state: 'OPEN' | 'CLOSED' | 'MERGED';
-          merged: boolean;
-          reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
-          baseRefName: string;
-          headRefName: string;
-          headRefOid: string;
-          createdAt?: string;
-          updatedAt: string;
-          labels?: { nodes?: Array<{ name?: string; color?: string }> };
-          commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string; contexts?: { nodes?: Array<{ __typename?: string; context?: string; name?: string; targetUrl?: string | null; detailsUrl?: string | null; state?: string; status?: string; conclusion?: string | null }> } } } }> };
-        }>;
-      };
-    };
-  };
-  const nodes = parsed.data?.search?.nodes ?? [];
+  const nodes = await searchAllPages(q);
   return nodes
     .filter((n) => n && n.id && !n.merged && n.state === 'OPEN' && !n.isDraft && n.reviewDecision !== 'APPROVED')
     .map((n) => ({
@@ -199,30 +223,7 @@ export async function registerTeamRoutes(app: FastifyInstance) {
         if (cached) return cached;
       }
       const q = ['is:pr', 'is:open', `author:${author}`].join(' ');
-      const out = await ghExec(['api', 'graphql', '--input', '-'], {
-        input: JSON.stringify({ query: TEAM_PR_SEARCH_QUERY, variables: { q } }),
-      });
-      type AuthoredNode = {
-        id?: string;
-        number?: number;
-        title?: string;
-        url?: string;
-        author?: { login?: string };
-        repository?: { owner?: { login?: string }; name?: string };
-        isDraft?: boolean;
-        state?: 'OPEN' | 'CLOSED' | 'MERGED';
-        merged?: boolean;
-        reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
-        baseRefName?: string;
-        headRefName?: string;
-        headRefOid?: string;
-        createdAt?: string;
-        updatedAt?: string;
-        labels?: { nodes?: Array<{ name?: string; color?: string }> };
-        commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string; contexts?: { nodes?: Array<{ __typename?: string; context?: string; name?: string; targetUrl?: string | null; detailsUrl?: string | null; state?: string; status?: string; conclusion?: string | null }> } } } }> };
-      };
-      const parsed = JSON.parse(out) as { data?: { search?: { nodes?: AuthoredNode[] } } };
-      const nodes = (parsed.data?.search?.nodes ?? []) as AuthoredNode[];
+      const nodes = await searchAllPages(q);
       const prs: TeamPR[] = nodes
         // Keep drafts and approved-but-unmerged — author still owns the next move.
         .filter((n) => n && n.id && !n.merged && n.state === 'OPEN')
@@ -267,30 +268,7 @@ export async function registerTeamRoutes(app: FastifyInstance) {
       }
       // No draft filter — caller filters drafts vs ready-for-review client-side.
       const q = ['is:pr', 'is:open', `label:"${label}"`].join(' ');
-      const out = await ghExec(['api', 'graphql', '--input', '-'], {
-        input: JSON.stringify({ query: TEAM_PR_SEARCH_QUERY, variables: { q } }),
-      });
-      type LabelSearchNode = {
-        id?: string;
-        number?: number;
-        title?: string;
-        url?: string;
-        author?: { login?: string };
-        repository?: { owner?: { login?: string }; name?: string };
-        isDraft?: boolean;
-        state?: 'OPEN' | 'CLOSED' | 'MERGED';
-        merged?: boolean;
-        reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
-        baseRefName?: string;
-        headRefName?: string;
-        headRefOid?: string;
-        createdAt?: string;
-        updatedAt?: string;
-        labels?: { nodes?: Array<{ name?: string; color?: string }> };
-        commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string; contexts?: { nodes?: Array<{ __typename?: string; context?: string; name?: string; targetUrl?: string | null; detailsUrl?: string | null; state?: string; status?: string; conclusion?: string | null }> } } } }> };
-      };
-      const parsed = JSON.parse(out) as { data?: { search?: { nodes?: LabelSearchNode[] } } };
-      const nodes = (parsed.data?.search?.nodes ?? []) as LabelSearchNode[];
+      const nodes = await searchAllPages(q);
       const prs: TeamPR[] = nodes
         // Keep drafts for the oncall workflow — they are the ones that need triaging.
         .filter((n) => n && n.id && !n.merged && n.state === 'OPEN' && n.reviewDecision !== 'APPROVED')

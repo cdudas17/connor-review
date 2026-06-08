@@ -109,6 +109,49 @@ describe('team routes', () => {
     await app.close();
   });
 
+  it('paginates the search when GitHub reports hasNextPage (regression: team had >100 open PRs)', async () => {
+    mocked.mockResolvedValueOnce(Buffer.from(TALENT_YML).toString('base64'));
+    // First page: one PR + hasNextPage true
+    mocked.mockResolvedValueOnce(JSON.stringify({
+      data: {
+        search: {
+          pageInfo: { hasNextPage: true, endCursor: 'CURSOR_AAA' },
+          nodes: [
+            { id: 'PR_A', number: 200, title: 'page1', url: 'u', author: { login: 'alice' },
+              repository: { owner: { login: 'Gusto' }, name: 'zenpayroll' },
+              isDraft: false, state: 'OPEN', merged: false, reviewDecision: 'REVIEW_REQUIRED',
+              baseRefName: 'main', headRefName: 'b', headRefOid: 's1', updatedAt: 'x' },
+          ],
+        },
+      },
+    }));
+    // Second page: one PR + hasNextPage false. This is the one that used to be invisible.
+    mocked.mockResolvedValueOnce(JSON.stringify({
+      data: {
+        search: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [
+            { id: 'PR_B', number: 345306, title: 'older PR past row 100', url: 'u', author: { login: 'isab3l' },
+              repository: { owner: { login: 'Gusto' }, name: 'zenpayroll' },
+              isDraft: false, state: 'OPEN', merged: false, reviewDecision: 'REVIEW_REQUIRED',
+              baseRefName: 'main', headRefName: 'b', headRefOid: 's2', updatedAt: 'x' },
+          ],
+        },
+      },
+    }));
+    const app = await buildServer();
+    const res = await app.inject({ url: '/api/team/prs?repo=Gusto/zenpayroll&path=config/teams/people_os/talent.yml' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.prs.map((p: { number: number }) => p.number).sort()).toEqual([200, 345306]);
+
+    // Confirm the second search call passed the cursor.
+    const secondSearchCall = mocked.mock.calls[2][1] as { input?: string };
+    const secondBody = JSON.parse(secondSearchCall.input!);
+    expect(secondBody.variables.after).toBe('CURSOR_AAA');
+    await app.close();
+  });
+
   it('accepts custom repo and path query params', async () => {
     mocked.mockResolvedValueOnce(Buffer.from(TALENT_YML).toString('base64'));
     mocked.mockResolvedValueOnce(SEARCH_RESPONSE);

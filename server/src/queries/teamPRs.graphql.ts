@@ -1,6 +1,7 @@
 export const TEAM_PR_SEARCH_QUERY = /* GraphQL */ `
-  query TeamPRs($q: String!) {
-    search(query: $q, type: ISSUE, first: 100) {
+  query TeamPRs($q: String!, $after: String) {
+    search(query: $q, type: ISSUE, first: 100, after: $after) {
+      pageInfo { hasNextPage endCursor }
       nodes {
         ... on PullRequest {
           id
