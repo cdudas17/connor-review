@@ -35,4 +35,48 @@ describe('useNextPRPrefetch', () => {
     await new Promise((r) => setTimeout(r, 25));
     expect(calls).toEqual([]);
   });
+
+  it('routes local-source entries to /api/local/* and never asks GitHub for "local/<repo>"', async () => {
+    // Regression: a local entry has `source: 'local'`, owner: 'local', repo: 'web'.
+    // Hitting /api/pulls/local/web/... would 502 with "Could not resolve to a Repository
+    // with the name 'local/web'". The prefetch must use /api/local/meta + /api/local/diff.
+    const githubMetaHits: string[] = [];
+    const githubDiffHits: string[] = [];
+    const localMetaHits: URL[] = [];
+    const localDiffHits: URL[] = [];
+    server.use(
+      http.get('/api/pulls/:owner/:repo/:number', ({ params }) => {
+        githubMetaHits.push(String(params.owner));
+        return HttpResponse.json(META_FIXTURE_2);
+      }),
+      http.get('/api/pulls/:owner/:repo/:number/diff', ({ params }) => {
+        githubDiffHits.push(String(params.owner));
+        return HttpResponse.text(DIFF_FIXTURE);
+      }),
+      http.get('/api/local/meta', ({ request }) => { localMetaHits.push(new URL(request.url)); return HttpResponse.json({ ...META_FIXTURE_2, source: 'local', localRepo: 'web' }); }),
+      http.get('/api/local/diff', ({ request }) => { localDiffHits.push(new URL(request.url)); return HttpResponse.text(DIFF_FIXTURE); }),
+    );
+
+    const localPRs: TrackedPR[] = [
+      { owner: 'local', repo: 'web', number: 100, title: 'first local', authorLogin: 'me', status: 'untouched', ghStatus: null, ciStatus: null, ciUrl: null, labels: [], createdAt: null, addedAt: 1, source: 'local', branch: 'feature/foo', localPath: '/Users/me/web' },
+      { owner: 'local', repo: 'web', number: 101, title: 'second local', authorLogin: 'me', status: 'untouched', ghStatus: null, ciStatus: null, ciUrl: null, labels: [], createdAt: null, addedAt: 2, source: 'local', branch: 'feature/bar', localPath: '/Users/me/web' },
+    ];
+
+    renderHook(() => useNextPRPrefetch({
+      current: { owner: 'local', repo: 'web', number: 100, source: 'local', branch: 'feature/foo', localPath: '/Users/me/web' },
+      prs: localPRs,
+    }));
+
+    await waitFor(() => {
+      expect(localMetaHits.length).toBe(1);
+      expect(localDiffHits.length).toBe(1);
+    });
+    // Confirm we never asked GitHub for a repo called "local/<anything>".
+    expect(githubMetaHits).toEqual([]);
+    expect(githubDiffHits).toEqual([]);
+    // Confirm the local request carries the branch + path of the *next* entry, not the current.
+    expect(localMetaHits[0].searchParams.get('branch')).toBe('feature/bar');
+    expect(localMetaHits[0].searchParams.get('path')).toBe('/Users/me/web');
+    expect(localDiffHits[0].searchParams.get('branch')).toBe('feature/bar');
+  });
 });
