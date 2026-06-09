@@ -47,10 +47,13 @@ export function usePRDetails(id: Id | null): Result {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    const isLocal = id.source === 'local' && !!id.localPath && !!id.branch && !!id.localRepo;
+    // For local entries we use id.repo as the short repo name (App.tsx adds local PRs
+    // with owner='local', repo=<localRepos key>). Don't require id.localRepo — it's
+    // duplicative and most call sites that pass an Identity through don't set it.
+    const isLocal = id.source === 'local' && !!id.localPath && !!id.branch;
     const fetcher = isLocal
       ? Promise.all([
-          api.getLocalMeta(id.localRepo!, id.localPath!, id.branch!),
+          api.getLocalMeta(id.repo, id.localPath!, id.branch!),
           api.getLocalDiff(id.localPath!, id.branch!, { fresh: reloadKey > 0 }),
         ])
       : Promise.all([
