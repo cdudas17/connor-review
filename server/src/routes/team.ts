@@ -121,16 +121,31 @@ interface SearchNode {
   commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string; contexts?: { nodes?: Array<{ __typename?: string; context?: string; name?: string; targetUrl?: string | null; detailsUrl?: string | null; state?: string; status?: string; conclusion?: string | null }> } } } }> };
 }
 
-/** Walk paginated search results, concatenating up to MAX_SEARCH_PAGES pages. */
+/** Walk paginated search results, concatenating up to MAX_SEARCH_PAGES pages.
+ *
+ * If a follow-up page fails after the retries in ghExec are exhausted, return
+ * the pages we already have rather than throwing the whole list away — a
+ * partial team list is much more useful than an empty error toast. The first
+ * page failing is still a hard error, since the user has nothing to look at.
+ */
 async function searchAllPages(q: string): Promise<SearchNode[]> {
   const all: SearchNode[] = [];
   let after: string | null = null;
   for (let page = 0; page < MAX_SEARCH_PAGES; page++) {
     const variables: Record<string, unknown> = { q };
     if (after) variables.after = after;
-    const out = await ghExec(['api', 'graphql', '--input', '-'], {
-      input: JSON.stringify({ query: TEAM_PR_SEARCH_QUERY, variables }),
-    });
+    let out: string;
+    try {
+      out = await ghExec(['api', 'graphql', '--input', '-'], {
+        input: JSON.stringify({ query: TEAM_PR_SEARCH_QUERY, variables }),
+      });
+    } catch (err) {
+      if (page === 0) throw err;
+      // Mid-pagination failure → return what we have. Log for debugging; surface
+      // a one-line warning so the dev console hints at "results may be partial".
+      console.warn(`[team-prs] page ${page + 1} fetch failed, returning ${all.length} partial results:`, (err as Error).message);
+      break;
+    }
     const parsed = JSON.parse(out) as {
       data?: {
         search?: {

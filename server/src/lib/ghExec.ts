@@ -51,7 +51,10 @@ export interface GhExecOptions {
 }
 
 // Retry settings for transient upstream errors. Backoff is exponential with jitter.
-const MAX_ATTEMPTS = 4;
+// 6 attempts ≈ 400/800/1600/3200/6400 ms = ~12s worst-case retry window, which is
+// the right tradeoff for paginated requests (one transient failure mid-pagination
+// otherwise tanks the whole multi-page fetch).
+const MAX_ATTEMPTS = 6;
 const BASE_DELAY_MS = 400;
 const TRANSIENT_PATTERNS = [
   /\bHTTP 5\d\d\b/i,           // 500, 502, 503, 504
