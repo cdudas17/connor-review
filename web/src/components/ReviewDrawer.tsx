@@ -9,6 +9,7 @@ import { ErrorToast } from './ErrorToast.js';
 import { usePRDetails } from '../hooks/usePRDetails.js';
 import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
 import { api } from '../lib/api.js';
+import { maybeAutoLabelOnReview } from '../lib/autoLabel.js';
 import type { CiStatus, GhStatus, PRStatus, PullRequestMeta, ReviewEvent, StagedInlineComment, TrackedPR } from '../types.js';
 
 interface Identity {
@@ -81,8 +82,10 @@ export function ReviewDrawer(props: Props) {
       event: 'COMMENT',
       threads: [c],
     });
+    // Visible-feedback event → run auto-label rules. Best-effort, never throws.
+    void maybeAutoLabelOnReview(current, meta?.authorLogin, { onToast });
     reload();
-  }, [current, reload]);
+  }, [current, reload, meta?.authorLogin, onToast]);
 
   const addToReview = useCallback(async (c: StagedInlineComment) => {
     if (!current) return;
@@ -101,8 +104,10 @@ export function ReviewDrawer(props: Props) {
   const reply = useCallback(async (threadId: string, body: string) => {
     if (!current) return;
     await api.replyToThread(current.owner, current.repo, current.number, threadId, body);
+    // Visible-feedback event → run auto-label rules.
+    void maybeAutoLabelOnReview(current, meta?.authorLogin, { onToast });
     reload();
-  }, [current, reload]);
+  }, [current, reload, meta?.authorLogin, onToast]);
 
   const markReady = useCallback(async () => {
     if (!current) return;
@@ -200,6 +205,8 @@ export function ReviewDrawer(props: Props) {
           await api.createReview(target.owner, target.repo, target.number, { event, body });
         }
         onToast('success', `${pastTenseVerb} ${prRef}`);
+        // Visible-feedback event → run auto-label rules (best-effort, runs alongside the success toast).
+        void maybeAutoLabelOnReview(target, meta.authorLogin, { onToast });
       } catch (e) {
         // Revert the local status so the PR stays in the queue for retry.
         onSetStatus(target, 'untouched');

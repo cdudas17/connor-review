@@ -235,6 +235,36 @@ describe('pulls routes', () => {
     await app.close();
   });
 
+  it('POST /labels attaches labels via the REST issues API', async () => {
+    mocked.mockResolvedValueOnce(JSON.stringify([{ name: 'Comments left by reviewer' }]));
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/labels',
+      payload: { labels: ['Comments left by reviewer'] },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ok).toBe(true);
+    const callArgs = mocked.mock.calls[0][0] as string[];
+    expect(callArgs).toContain('repos/Gusto/zenpayroll/issues/1/labels');
+    expect(callArgs).toContain('POST');
+    const callOpts = mocked.mock.calls[0][1] as { input?: string } | undefined;
+    expect(JSON.parse(callOpts!.input!)).toEqual({ labels: ['Comments left by reviewer'] });
+    await app.close();
+  });
+
+  it('POST /labels returns 400 when labels is empty', async () => {
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/labels',
+      payload: { labels: [] },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('BAD_PARAMS');
+    await app.close();
+  });
+
   it('POST /threads/:id/reply calls the reply mutation', async () => {
     mocked.mockResolvedValueOnce(JSON.stringify({ data: { addPullRequestReviewThreadReply: { comment: { id: 'C_1', body: 'ack' } } } }));
     const app = await buildServer();

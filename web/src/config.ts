@@ -34,6 +34,15 @@ export interface AppConfig {
    * Server receives the path as a query param and validates it's a git repo before shelling out.
    */
   localRepos: Record<string, string>;
+  /**
+   * Auto-apply labels when you leave visible feedback on a PR authored by a specific user.
+   * Keys are GitHub logins; values are the labels to add. Fired after a successful Comment,
+   * Approve, Request changes, standalone inline comment, thread reply, or submit-pending.
+   * (Not fired for staged/pending reviews — only when something becomes visible upstream.)
+   * Best-effort: failure to add a label only toasts; it doesn't undo the user's action.
+   * Example: { newtonry: ['Comments left by reviewer'] }
+   */
+  autoLabelOnReview: Record<string, string[]>;
 }
 
 const DEFAULTS: AppConfig = {
@@ -43,6 +52,7 @@ const DEFAULTS: AppConfig = {
   oncallLinks: [],
   myPRsAuthor: '',
   localRepos: {},
+  autoLabelOnReview: {},
 };
 
 // Vite's import.meta.glob lets us optionally pull in config.local.ts if it

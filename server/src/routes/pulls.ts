@@ -454,6 +454,39 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     return JSON.parse(out);
   });
 
+  // Attach one or more labels to the PR. Idempotent — re-adding an existing label
+  // is a no-op upstream. Backed by REST (POST /repos/{o}/{r}/issues/{n}/labels)
+  // which conveniently accepts label *names* and doesn't require resolving label IDs.
+  app.post<{
+    Params: { owner: string; repo: string; number: string };
+    Body: { labels?: string[] };
+  }>('/api/pulls/:owner/:repo/:number/labels', async (req, reply) => {
+    const params = parsePullParams(req.params);
+    const labels = (req.body?.labels ?? []).filter((l) => typeof l === 'string' && l.trim().length > 0);
+    if (labels.length === 0) {
+      reply.code(400).send({ code: 'BAD_PARAMS', message: 'labels must be a non-empty string[]' });
+      return;
+    }
+    const out = await ghExec([
+      'api',
+      `repos/${params.owner}/${params.repo}/issues/${params.number}/labels`,
+      '--method', 'POST',
+      '--input', '-',
+    ], { input: JSON.stringify({ labels }) });
+    // Refresh cached labels best-effort so the drawer/list shows them on next fetch.
+    const cached = metaCache.get(metaKey(params));
+    if (cached) {
+      // The REST response is an array of label objects; we don't need to fully merge,
+      // just bust the cache so a follow-up GET refetches fresh state.
+      metaCache.set(metaKey(params), { ...cached, labels: [...(cached.labels ?? []), ...labels.filter((l) => !cached.labels.some((c) => c.name === l)).map((l) => ({ name: l, color: '888888' }))] });
+    }
+    try {
+      return { ok: true, labels: JSON.parse(out) };
+    } catch {
+      return { ok: true };
+    }
+  });
+
   // Flip a draft PR to ready-for-review. Invalidates the cached meta so the
   // next /api/pulls/... fetch reflects the new state.
   app.post<{ Params: { owner: string; repo: string; number: string } }>(

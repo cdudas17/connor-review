@@ -103,6 +103,14 @@ export const api = {
   markReadyForReview(owner: string, repo: string, number: number): Promise<{ id: string; isDraft: boolean }> {
     return call(`/api/pulls/${owner}/${repo}/${number}/ready-for-review`, { method: 'POST' });
   },
+  /** Attach one or more labels to a PR. Idempotent — adding existing labels is a no-op. */
+  addLabels(owner: string, repo: string, number: number, labels: string[]): Promise<{ ok: boolean }> {
+    return call(`/api/pulls/${owner}/${repo}/${number}/labels`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ labels }),
+    });
+  },
   replyToThread(owner: string, repo: string, number: number, threadId: string, body: string) {
     return call(`/api/pulls/${owner}/${repo}/${number}/threads/${threadId}/reply`, {
       method: 'POST',

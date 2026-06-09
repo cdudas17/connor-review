@@ -32,4 +32,12 @@ export const APP_CONFIG: Partial<AppConfig> = {
     // zenpayroll: '/Users/you/workspace/zenpayroll',
     // web:        '/Users/you/workspace/web',
   },
+
+  // Auto-apply labels when you leave visible feedback on a PR by a specific user.
+  // Keys are GitHub logins; values are label names. Fires after Comment / Approve /
+  // Request changes / inline comment / thread reply / submit-pending. Best-effort —
+  // a labeling failure only toasts, it doesn't undo your action.
+  autoLabelOnReview: {
+    // someuser: ['Comments left by reviewer'],
+  },
 };
