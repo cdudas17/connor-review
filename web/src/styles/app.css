@@ -119,6 +119,9 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .add-pr-bar textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; font: inherit; resize: vertical; min-height: 38px; box-sizing: border-box; }
 .add-pr-bar-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .add-pr-bar-remove-approved { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); color: var(--muted); cursor: pointer; font: inherit; }
+.add-local-branch-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.add-local-branch-row select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); color: inherit; font: inherit; }
+.add-local-branch-row input { flex: 1 1 320px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; font: inherit; }
 .add-pr-bar-remove-approved:hover:not(:disabled) { background: var(--border-muted); color: var(--fg); }
 .add-pr-bar-remove-approved:disabled { opacity: 0.4; cursor: not-allowed; }
 .add-pr-bar-hint { color: var(--muted); font-size: 0.85rem; margin: 0; }

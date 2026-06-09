@@ -28,6 +28,12 @@ export interface AppConfig {
   oncallLinks: ExternalLink[];
   /** GitHub login whose authored PRs populate the My PRs tab. Empty disables the tab. */
   myPRsAuthor: string;
+  /**
+   * Map of short repo names → absolute paths to local git checkouts that drive the Local tab.
+   * Empty disables the Local tab. Example: { zenpayroll: '/Users/.../zenpayroll' }.
+   * Server receives the path as a query param and validates it's a git repo before shelling out.
+   */
+  localRepos: Record<string, string>;
 }
 
 const DEFAULTS: AppConfig = {
@@ -36,6 +42,7 @@ const DEFAULTS: AppConfig = {
   oncallLabel: 'needs-review',
   oncallLinks: [],
   myPRsAuthor: '',
+  localRepos: {},
 };
 
 // Vite's import.meta.glob lets us optionally pull in config.local.ts if it

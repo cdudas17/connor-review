@@ -5,7 +5,14 @@ import { CiBadge } from './CiBadge.js';
 import { LabelChips } from './LabelChips.js';
 import type { FilterMode } from './FilterToggle.js';
 
-interface Identity { owner: string; repo: string; number: number; }
+interface Identity {
+  owner: string;
+  repo: string;
+  number: number;
+  source?: 'github' | 'local';
+  branch?: string;
+  localPath?: string;
+}
 function prKey(id: Identity) { return `${id.owner}/${id.repo}#${id.number}`; }
 
 function formatOpenedAt(iso: string | null): string | null {
@@ -45,7 +52,16 @@ export function PRList({ prs, mode, onOpen, selection }: Props) {
   return (
     <ul className="pr-list">
       {filtered.map((p) => {
-        const id = { owner: p.owner, repo: p.repo, number: p.number };
+        // Carry the source-tagging fields through so the drawer can route local
+        // entries to /api/local/* instead of GitHub.
+        const id: Identity = {
+          owner: p.owner,
+          repo: p.repo,
+          number: p.number,
+          source: p.source,
+          branch: p.branch,
+          localPath: p.localPath,
+        };
         const key = prKey(id);
         const rowSelectable = selection ? (selection.isSelectable?.(id) ?? true) : false;
         const selected = selection?.selectedKeys.has(key) ?? false;

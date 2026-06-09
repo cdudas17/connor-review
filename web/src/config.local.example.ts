@@ -24,4 +24,12 @@ export const APP_CONFIG: Partial<AppConfig> = {
   // Your GitHub login. Powers the "My PRs" tab (your own open PRs, drafts
   // included). Leave empty to hide the tab.
   myPRsAuthor: 'your-gh-username',
+
+  // Local git checkouts that should power the "Local" tab. Short name → absolute
+  // path. Each path must be a directory with a `.git` subdir. Diff is always
+  // against the checkout's local `main`. Leave empty / omit to hide the tab.
+  localRepos: {
+    // zenpayroll: '/Users/you/workspace/zenpayroll',
+    // web:        '/Users/you/workspace/web',
+  },
 };

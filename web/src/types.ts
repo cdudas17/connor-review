@@ -26,7 +26,7 @@ export interface TrackedPR {
   title: string;
   authorLogin: string | null;
   status: PRStatus;
-  /** GitHub-side status (Draft/Open/Approved/etc.). null until meta is fetched. */
+  /** GitHub-side status (Draft/Open/Approved/etc.). null until meta is fetched. null for local entries. */
   ghStatus: GhStatus | null;
   /** Status check rollup from GitHub (covers Buildkite + any other CI). null when unknown / no checks. */
   ciStatus: CiStatus;
@@ -39,6 +39,12 @@ export interface TrackedPR {
   /** ISO-8601 timestamp of when the PR was opened on GitHub. null until meta is fetched. */
   createdAt: string | null;
   addedAt: number;
+  /** Discriminator for entries that aren't GitHub PRs. Defaults to 'github' for back-compat. */
+  source?: 'github' | 'local';
+  /** For local entries: the branch name (the synthetic `number` is derived from it). */
+  branch?: string;
+  /** For local entries: the absolute path to the working tree. */
+  localPath?: string;
 }
 
 export interface PullRequestMeta {
@@ -65,6 +71,10 @@ export interface PullRequestMeta {
   headSha: string;
   url: string;
   reviewThreads: ReviewThread[];
+  /** Discriminator. Defaults to 'github' when omitted. */
+  source?: 'github' | 'local';
+  /** For local entries: the configured repo name (matches the AppConfig.localRepos key). */
+  localRepo?: string;
 }
 
 export interface ReviewThread {

@@ -86,6 +86,20 @@ export const api = {
     const qs = new URLSearchParams({ path, ref });
     return call(`/api/pulls/${owner}/${repo}/${number}/files/content?${qs.toString()}`);
   },
+  // ----- Local-branch endpoints (Local tab) -----
+  getLocalMeta(repoName: string, localPath: string, branch: string): Promise<PullRequestMeta> {
+    const qs = new URLSearchParams({ repo: repoName, path: localPath, branch });
+    return call(`/api/local/meta?${qs.toString()}`);
+  },
+  getLocalDiff(localPath: string, branch: string, opts?: { fresh?: boolean }): Promise<string> {
+    const qs = new URLSearchParams({ path: localPath, branch });
+    if (opts?.fresh) qs.set('fresh', '1');
+    return call(`/api/local/diff?${qs.toString()}`);
+  },
+  getLocalFileContent(localPath: string, file: string, ref: string): Promise<string> {
+    const qs = new URLSearchParams({ path: localPath, file, ref });
+    return call(`/api/local/files/content?${qs.toString()}`);
+  },
   markReadyForReview(owner: string, repo: string, number: number): Promise<{ id: string; isDraft: boolean }> {
     return call(`/api/pulls/${owner}/${repo}/${number}/ready-for-review`, { method: 'POST' });
   },

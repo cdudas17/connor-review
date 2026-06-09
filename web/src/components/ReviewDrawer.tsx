@@ -4,14 +4,29 @@ import { PRDescription } from './PRDescription.js';
 import { ReviewSummaryList } from './ReviewSummaryList.js';
 import { ConversationsList } from './ConversationsList.js';
 import { DiffViewer } from './DiffViewer.js';
-import { ReviewFooter } from './ReviewFooter.js';
+import { ReviewFooter, LocalReviewFooter } from './ReviewFooter.js';
 import { ErrorToast } from './ErrorToast.js';
 import { usePRDetails } from '../hooks/usePRDetails.js';
 import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
 import { api } from '../lib/api.js';
 import type { CiStatus, GhStatus, PRStatus, PullRequestMeta, ReviewEvent, StagedInlineComment, TrackedPR } from '../types.js';
 
-interface Identity { owner: string; repo: string; number: number; }
+interface Identity {
+  owner: string;
+  repo: string;
+  number: number;
+  /** Discriminator for non-GitHub entries; defaults to 'github' when omitted. */
+  source?: 'github' | 'local';
+  /** For local entries: branch name. */
+  branch?: string;
+  /** For local entries: absolute path to the git checkout. */
+  localPath?: string;
+  /** For local entries: config short-name (matches AppConfig.localRepos key). */
+  localRepo?: string;
+}
+
+const noopAsync = async (_c: StagedInlineComment): Promise<void> => { /* local entries can't post inline comments */ };
+const noopReply = async (_threadId: string, _body: string): Promise<void> => { /* local entries have no threads */ };
 
 interface Props {
   current: Identity | null;
@@ -177,35 +192,58 @@ export function ReviewDrawer(props: Props) {
       <aside className="drawer" aria-label="Review drawer" ref={drawerRef}>
         <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
         {loading && <span className="drawer-refresh-indicator" aria-label="Refreshing"><span className="loading-spinner" /></span>}
+      {/* Local-branch entries have no GitHub server-of-record for reviews/comments,
+          so all review-action surfaces (summary list, conversations, footer
+          publish buttons, inline comment composer) are hidden. The diff itself
+          + file list + nav stay because that's what the user actually wants. */}
       <PRHeader meta={meta} latestGhStatus={latestGhStatus} latestCiStatus={latestCiStatus} latestCiUrl={latestCiUrl} />
-      <PRDescription bodyHtml={meta.bodyHtml} />
-      <ReviewSummaryList reviews={meta.reviews ?? []} />
-      <ConversationsList threads={meta.reviewThreads} onReply={reply} />
+      {meta.source !== 'local' && <PRDescription bodyHtml={meta.bodyHtml} />}
+      {meta.source !== 'local' && <ReviewSummaryList reviews={meta.reviews ?? []} />}
+      {meta.source !== 'local' && <ConversationsList threads={meta.reviewThreads} onReply={reply} />}
       <DiffViewer
         diff={diff}
-        threads={meta.reviewThreads}
-        hasPendingReview={pendingReviewId != null}
-        pr={{ owner: current.owner, repo: current.repo, number: current.number, baseRef: meta.baseRefName }}
+        threads={meta.source === 'local' ? [] : meta.reviewThreads}
+        hasPendingReview={meta.source !== 'local' && pendingReviewId != null}
+        pr={{
+          owner: current.owner,
+          repo: current.repo,
+          number: current.number,
+          baseRef: meta.baseRefName,
+          source: meta.source ?? 'github',
+          localPath: current.localPath,
+        }}
         viewedPaths={viewedPaths}
         onViewedChange={onViewedChange}
-        onCommitComment={commitStandaloneComment}
-        onAddToReview={addToReview}
-        onReply={reply}
+        onCommitComment={meta.source === 'local' ? noopAsync : commitStandaloneComment}
+        onAddToReview={meta.source === 'local' ? noopAsync : addToReview}
+        onReply={meta.source === 'local' ? noopReply : reply}
+        commentsEnabled={meta.source !== 'local'}
       />
-      <ReviewFooter
-        summary={summary}
-        onSummaryChange={setSummary}
-        onSubmit={submitReview}
-        onReviewed={doNext}
-        onPrev={onNavigatePrev}
-        onNextPR={onNavigateNext}
-        canSubmit={canSubmit}
-        canReviewed={canNext}
-        canPrev={canNavigatePrev && canNext}
-        canNextPR={canNavigateNext && canNext}
-        finishLabel={pendingReviewId ? 'Finish your review' : null}
-        onMarkReady={meta.isDraft ? markReady : undefined}
-      />
+      {meta.source === 'local' ? (
+        <LocalReviewFooter
+          onReviewed={doNext}
+          onPrev={onNavigatePrev}
+          onNextPR={onNavigateNext}
+          canReviewed={canNext}
+          canPrev={canNavigatePrev && canNext}
+          canNextPR={canNavigateNext && canNext}
+        />
+      ) : (
+        <ReviewFooter
+          summary={summary}
+          onSummaryChange={setSummary}
+          onSubmit={submitReview}
+          onReviewed={doNext}
+          onPrev={onNavigatePrev}
+          onNextPR={onNavigateNext}
+          canSubmit={canSubmit}
+          canReviewed={canNext}
+          canPrev={canNavigatePrev && canNext}
+          canNextPR={canNavigateNext && canNext}
+          finishLabel={pendingReviewId ? 'Finish your review' : null}
+          onMarkReady={meta.isDraft ? markReady : undefined}
+        />
+      )}
       {error && <ErrorToast message={error.message} onDismiss={() => { /* user can reload */ }} />}
       </aside>
     </>

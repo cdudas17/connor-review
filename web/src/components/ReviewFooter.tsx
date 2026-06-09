@@ -37,6 +37,36 @@ function ChevronRightIcon() {
   );
 }
 
+/** Stripped-down footer for local-branch entries: just "Reviewed" + prev/next nav,
+ * no review-publish surface (Approve / Comment / Request changes / Mark ready), since
+ * there's no GitHub PR to publish against. */
+export function LocalReviewFooter({
+  onReviewed, onPrev, onNextPR, canReviewed, canPrev, canNextPR,
+}: {
+  onReviewed: () => void;
+  onPrev: () => void;
+  onNextPR: () => void;
+  canReviewed: boolean;
+  canPrev: boolean;
+  canNextPR: boolean;
+}) {
+  return (
+    <footer className="review-footer">
+      <div className="review-footer-actions">
+        <button type="button" disabled={!canReviewed} onClick={onReviewed}>Reviewed</button>
+        <div className="review-footer-nav">
+          <button type="button" className="review-footer-arrow" disabled={!canPrev} onClick={onPrev} aria-label="Previous PR" title="Previous PR">
+            <ChevronLeftIcon />
+          </button>
+          <button type="button" className="review-footer-arrow" disabled={!canNextPR} onClick={onNextPR} aria-label="Next PR" title="Next PR">
+            <ChevronRightIcon />
+          </button>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 export function ReviewFooter({
   summary, onSummaryChange, onSubmit, onReviewed, onPrev, onNextPR,
   canSubmit, canReviewed, canPrev, canNextPR, finishLabel, onMarkReady,

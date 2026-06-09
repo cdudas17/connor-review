@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AddPRBar } from './components/AddPRBar.js';
+import { AddLocalBranchBar } from './components/AddLocalBranchBar.js';
 import { PRList } from './components/PRList.js';
 import { FilterToggle, type FilterMode } from './components/FilterToggle.js';
 import { ReviewDrawer } from './components/ReviewDrawer.js';
@@ -23,7 +24,16 @@ import { computeGhStatus } from './lib/ghStatus.js';
 import { APP_CONFIG } from './config.js';
 import type { PRStatus, PullRequestMeta, TrackedPR } from './types.js';
 
-interface Identity { owner: string; repo: string; number: number; }
+interface Identity {
+  owner: string;
+  repo: string;
+  number: number;
+  /** Optional local-source plumbing — present only for Local tab entries. */
+  source?: 'github' | 'local';
+  branch?: string;
+  localPath?: string;
+  localRepo?: string;
+}
 function same(a: Identity, b: Identity) { return a.owner === b.owner && a.repo === b.repo && a.number === b.number; }
 function prKey(id: Identity) { return `${id.owner}/${id.repo}#${id.number}`; }
 
@@ -55,6 +65,11 @@ export function App() {
   // here are kept distinct from the Added PRs tab.
   const mineAddedPRs = useTrackedPRs({ storageKey: 'connor-review.mineAddedPRs.v1' });
   const oncallPRs = useLabeledPRs(APP_CONFIG.oncallLabel);
+  // Local-branch entries: stable identity is `owner='local', repo=<configured name>,
+  // number=<stable hash of branch>`. Stored separately so they don't mix with the
+  // Added PRs list. Source-tagged when added (see addLocalBranch below).
+  const localPRs = useTrackedPRs({ storageKey: 'connor-review.localBranches.v1' });
+  const localRepoNames = useMemo(() => Object.keys(APP_CONFIG.localRepos ?? {}), []);
   const [tab, setTab] = useState<TabId>('my');
   const [mode, setMode] = useState<FilterMode>('all');
   const [current, setCurrent] = useState<Identity | null>(null);
@@ -153,6 +168,7 @@ export function App() {
     tab === 'my' ? myPRs.prs
     : tab === 'mine' ? combinedMinePRs
     : tab === 'team' ? filteredTeamPRs
+    : tab === 'local' ? localPRs.prs
     : filteredOncallPRs;
   // For setStatus on the My PRs tab, route to whichever underlying list owns
   // the PR: authored ones go to the authored hook, pasted ones to the tracked
@@ -166,6 +182,7 @@ export function App() {
     tab === 'my' ? myPRs.setStatus
     : tab === 'mine' ? setMineStatus
     : tab === 'team' ? teamPRs.setStatus
+    : tab === 'local' ? localPRs.setStatus
     : oncallPRs.setStatus;
 
   const teamPRCountByMember = useMemo(() => {
@@ -353,11 +370,23 @@ export function App() {
       await Promise.all([refreshAuthored, refreshPasted]);
     } else if (tab === 'team') {
       await teamPRs.fetch({ fresh: true });
+    } else if (tab === 'local') {
+      // Re-fetch meta for each local branch so its title + head SHA refresh.
+      // The diff endpoint keys by head SHA so it'll naturally bust the cache.
+      await Promise.allSettled(
+        localPRs.prs.map(async (p) => {
+          if (!p.localPath || !p.branch) return;
+          try {
+            const meta = await api.getLocalMeta(p.repo, p.localPath, p.branch);
+            localPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, createdAt: meta.createdAt });
+          } catch { /* leave stale title — UI still works */ }
+        }),
+      );
     } else {
       await oncallPRs.fetch({ fresh: true });
     }
     setRefreshing(false);
-  }, [tab, myPRs, minePRs, mineAddedPRs, teamPRs, oncallPRs, refreshing]);
+  }, [tab, myPRs, minePRs, mineAddedPRs, teamPRs, oncallPRs, localPRs, refreshing]);
 
   const untouchedCount = (list: TrackedPR[]) => list.filter((p) => p.status === 'untouched').length;
 
@@ -387,6 +416,9 @@ export function App() {
             : []),
           { id: 'team', label: 'Team PRs', badge: teamPRs.hasLoaded ? (untouchedCount(teamPRs.prs) || null) : null },
           { id: 'oncall', label: `Oncall (${APP_CONFIG.oncallLabel})`, badge: oncallPRs.hasLoaded ? (untouchedCount(oncallPRs.prs) || null) : null },
+          ...(localRepoNames.length > 0
+            ? [{ id: 'local' as const, label: 'Local', badge: untouchedCount(localPRs.prs) || null }]
+            : []),
         ]}
         active={tab}
         onChange={setTab}
@@ -546,6 +578,47 @@ export function App() {
         </>
       )}
 
+      {tab === 'local' && (
+        <>
+          <p className="tab-context">
+            <span className="tab-context-freshness">
+              Diff a local branch against your checkout's <code>main</code>. No comments / no review actions — just the diff viewer.
+            </span>
+          </p>
+          <AddLocalBranchBar
+            repos={localRepoNames}
+            onAdd={async (repoName, branch) => {
+              const path = APP_CONFIG.localRepos[repoName];
+              if (!path) {
+                addToast('error', `No path configured for "${repoName}"`);
+                return;
+              }
+              try {
+                const meta = await api.getLocalMeta(repoName, path, branch);
+                localPRs.add({
+                  owner: 'local',
+                  repo: repoName,
+                  number: meta.number,
+                  title: meta.title,
+                  authorLogin: meta.authorLogin,
+                  ghStatus: null,
+                  ciStatus: null,
+                  ciUrl: null,
+                  labels: [],
+                  createdAt: meta.createdAt,
+                  source: 'local',
+                  branch,
+                  localPath: path,
+                });
+              } catch (e) {
+                addToast('error', `Failed to add local branch: ${(e as Error).message}`);
+                throw e;
+              }
+            }}
+          />
+        </>
+      )}
+
       {authRequired && <AuthRequiredBanner onDismiss={() => setAuthRequired(false)} />}
 
       {/* Bulk-delete bar — shown on the Added tab (everything is selectable) and on
@@ -590,7 +663,14 @@ export function App() {
         const idx = activePRs.findIndex((p) => same(p, current));
         const prevPr = idx > 0 ? activePRs[idx - 1] : null;
         const nextPr = idx >= 0 && idx < activePRs.length - 1 ? activePRs[idx + 1] : null;
-        const toIdentity = (p: TrackedPR): Identity => ({ owner: p.owner, repo: p.repo, number: p.number });
+        const toIdentity = (p: TrackedPR): Identity => ({
+          owner: p.owner,
+          repo: p.repo,
+          number: p.number,
+          source: p.source,
+          branch: p.branch,
+          localPath: p.localPath,
+        });
         return (
           <ReviewDrawer
             current={current}

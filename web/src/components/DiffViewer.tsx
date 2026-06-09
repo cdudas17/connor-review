@@ -23,8 +23,11 @@ export interface DiffViewerProps {
   diff: string;
   threads: ReviewThread[];
   hasPendingReview: boolean;
-  /** PR identity + base ref needed to fetch file content for hunk expansion. */
-  pr: { owner: string; repo: string; number: number; baseRef: string };
+  /** PR identity + base ref needed to fetch file content for hunk expansion.
+   * For local entries, set `source: 'local'` and `localPath` so file-content
+   * Expand-context routes through /api/local/files/content (git show) instead
+   * of the GitHub Contents API. */
+  pr: { owner: string; repo: string; number: number; baseRef: string; source?: 'github' | 'local'; localPath?: string };
   /** Per-path "Viewed" state from App-level storage. */
   viewedPaths: Set<string>;
   onViewedChange: (path: string, viewed: boolean) => void;
@@ -34,6 +37,8 @@ export interface DiffViewerProps {
   onAddToReview: (c: StagedInlineComment) => Promise<void>;
   /** Post a reply on an existing thread. */
   onReply: (threadId: string, body: string) => Promise<void>;
+  /** When false, the gutter-drag inline composer is disabled (e.g. local-branch entries with nowhere to post). Defaults to true. */
+  commentsEnabled?: boolean;
 }
 
 type ChangeTone = 'add' | 'del' | 'normal';
@@ -192,11 +197,13 @@ function DiffFile({
   onCommitComment,
   onAddToReview,
   onReply,
+  commentsEnabled = true,
 }: {
   file: FileData;
   threads: ReviewThread[];
   hasPendingReview: boolean;
-  pr: { owner: string; repo: string; number: number; baseRef: string };
+  pr: { owner: string; repo: string; number: number; baseRef: string; source?: 'github' | 'local'; localPath?: string };
+  commentsEnabled?: boolean;
   viewed: boolean;
   onViewedChange: (path: string, viewed: boolean) => void;
   onCommitComment: (c: StagedInlineComment) => Promise<void>;
@@ -226,7 +233,10 @@ function DiffFile({
     if (sourceRef.current) return sourceRef.current;
     if (sourceFetching.current) return sourceFetching.current;
     const oldPath = file.oldPath && file.oldPath !== '/dev/null' ? file.oldPath : path;
-    sourceFetching.current = api.getFileContent(pr.owner, pr.repo, pr.number, oldPath, pr.baseRef)
+    const fetchPromise = pr.source === 'local' && pr.localPath
+      ? api.getLocalFileContent(pr.localPath, oldPath, pr.baseRef)
+      : api.getFileContent(pr.owner, pr.repo, pr.number, oldPath, pr.baseRef);
+    sourceFetching.current = fetchPromise
       .then((text) => {
         const lines = text.split('\n');
         if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
@@ -310,6 +320,7 @@ function DiffFile({
   }, [drag, anchors]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (!commentsEnabled) return; // local entries can't post — don't arm the composer
     if (view !== 'unified') return;
     if (!isGutter(e.target)) return;
     const idx = rowIndexFromTarget(e.target);
@@ -536,7 +547,7 @@ function makePseudoChangeForSide(_t: ReviewThread): ChangeData {
   return { type: 'insert', content: '', lineNumber: 0, isInsert: true } as unknown as ChangeData;
 }
 
-export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, onViewedChange, onCommitComment, onAddToReview, onReply }: DiffViewerProps) {
+export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, onViewedChange, onCommitComment, onAddToReview, onReply, commentsEnabled = true }: DiffViewerProps) {
   const files = useMemo(() => parseDiff(diff), [diff]);
 
   if (files.length === 0) {
@@ -559,6 +570,7 @@ export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, o
             onCommitComment={onCommitComment}
             onAddToReview={onAddToReview}
             onReply={onReply}
+            commentsEnabled={commentsEnabled}
           />
         );
       })}
