@@ -131,15 +131,41 @@ export function ReviewDrawer(props: Props) {
   }, [current?.owner, current?.repo, current?.number, meta?.headSha]);
 
   if (!current) return null;
-  // Only show the "Loading…" placeholder on the very first fetch (no data yet).
-  // On reloads after posting a comment/reply, keep the previous meta + diff rendered
-  // so the user's scroll position and thought process aren't interrupted; the new
-  // thread will pop in once the fetch resolves.
+  // First-fetch states. On reloads of an already-loaded PR (posting a comment etc.)
+  // we keep the previous meta + diff rendered so the user's scroll/thought process
+  // isn't interrupted.
+  //
+  // If a first fetch fails (e.g. branch removed locally, server can't read the path),
+  // surface the error here — otherwise the drawer would sit on "Loading…" forever.
   if (!meta || diff == null) {
+    if (error) {
+      return (
+        <>
+          <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
+          <aside className="drawer">
+            <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
+            <div className="drawer-error">
+              <h3>Couldn't load this PR</h3>
+              <p className="drawer-error-message">{error.message}</p>
+              <div className="drawer-error-actions">
+                <button type="button" onClick={reload}>Retry</button>
+                <button type="button" onClick={onClose}>Close</button>
+              </div>
+            </div>
+          </aside>
+        </>
+      );
+    }
     return (
       <>
         <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
-        <aside className="drawer"><p>Loading…</p></aside>
+        <aside className="drawer">
+          <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
+          <div className="drawer-loading" role="status" aria-live="polite">
+            <span className="loading-spinner drawer-loading-spinner" aria-hidden="true" />
+            <span className="drawer-loading-label">Loading diff…</span>
+          </div>
+        </aside>
       </>
     );
   }
