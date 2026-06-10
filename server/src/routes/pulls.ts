@@ -9,6 +9,7 @@ import { ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION } from '../queries/addPullReque
 import { ADD_PULL_REQUEST_REVIEW_THREAD_REPLY_MUTATION } from '../queries/addPullRequestReviewThreadReply.graphql.js';
 import { SUBMIT_PULL_REQUEST_REVIEW_MUTATION } from '../queries/submitPullRequestReview.graphql.js';
 import { MARK_READY_FOR_REVIEW_MUTATION } from '../queries/markReadyForReview.graphql.js';
+import { claudeExec, ClaudeCliError } from '../lib/claudeExec.js';
 
 type CiStatus = 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' | null;
 
@@ -484,6 +485,78 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       return { ok: true, labels: JSON.parse(out) };
     } catch {
       return { ok: true };
+    }
+  });
+
+  // Bounce the user's draft comment off the local `claude` CLI for feedback.
+  // Never publishes anything — purely a "what would Claude say to this?" loop.
+  // Context = PR title + author + full diff (truncated if huge) + optional line range.
+  app.post<{
+    Params: { owner: string; repo: string; number: string };
+    Body: {
+      draft?: string;
+      lineRange?: {
+        path: string;
+        startLine?: number;
+        endLine: number;
+        side: 'LEFT' | 'RIGHT';
+      };
+    };
+  }>('/api/pulls/:owner/:repo/:number/claude/ask', async (req, reply) => {
+    const params = parsePullParams(req.params);
+    const draft = (req.body?.draft ?? '').trim();
+    if (!draft) {
+      reply.code(400).send({ code: 'BAD_PARAMS', message: 'draft must be a non-empty string' });
+      return;
+    }
+
+    // Get meta (title + author) from cache if we can.
+    const meta = metaCache.get(metaKey(params)) ?? (await fetchMeta(params.owner, params.repo, params.number));
+    metaCache.set(metaKey(params), meta);
+
+    // Get the diff. Reuse the diff cache (keyed by head SHA).
+    const dkey = diffKey({ ...params, headSha: meta.headSha });
+    let diff = diffCache.get(dkey);
+    if (diff === undefined) {
+      diff = await ghExec(['pr', 'diff', String(params.number), '--repo', `${params.owner}/${params.repo}`]);
+      diffCache.set(dkey, diff);
+    }
+
+    // Truncate enormous diffs so we don't blow the model context. ~150k chars ≈ 40k tokens.
+    const DIFF_CHAR_BUDGET = 150_000;
+    const truncated = diff.length > DIFF_CHAR_BUDGET;
+    const diffForPrompt = truncated
+      ? diff.slice(0, DIFF_CHAR_BUDGET) + `\n\n[... diff truncated, original was ${diff.length} characters ...]`
+      : diff;
+
+    const lineRangeBlock = req.body.lineRange
+      ? `\nThe user is commenting on ${req.body.lineRange.path} ${req.body.lineRange.startLine != null && req.body.lineRange.startLine !== req.body.lineRange.endLine ? `lines ${req.body.lineRange.startLine}–${req.body.lineRange.endLine}` : `line ${req.body.lineRange.endLine}`} (${req.body.lineRange.side === 'LEFT' ? 'old/deleted side' : 'new/added side'}).\n`
+      : '';
+
+    const prompt = [
+      `You're helping the user review GitHub PR "${meta.title}" by @${meta.authorLogin ?? 'unknown'} on ${params.owner}/${params.repo}.`,
+      '',
+      'Full unified diff:',
+      '```diff',
+      diffForPrompt,
+      '```',
+      lineRangeBlock,
+      "User's draft comment:",
+      '> ' + draft.replace(/\n/g, '\n> '),
+      '',
+      'Respond as a thoughtful, concise code reviewer would — engage with the user\'s point, flag anything they may have missed, suggest follow-ups when useful. Do not pretend to be the PR author. Keep the response focused and well under 400 words unless the question genuinely demands more.',
+    ].join('\n');
+
+    try {
+      const response = await claudeExec(prompt);
+      return { response: response.trim(), truncatedDiff: truncated };
+    } catch (e) {
+      if (e instanceof ClaudeCliError) {
+        const status = e.code === 'CLAUDE_NOT_INSTALLED' ? 502 : e.code === 'TIMEOUT' ? 504 : 500;
+        reply.code(status).send({ code: e.code, message: e.message, stderr: e.stderr });
+        return;
+      }
+      throw e;
     }
   });
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ReviewEvent } from '../types.js';
 import { EmojiTextarea } from './EmojiTextarea.js';
+import { ClaudeResponseCard, type ClaudeResponseState } from './ClaudeResponseCard.js';
 
 interface Props {
   summary: string;
@@ -20,6 +21,10 @@ interface Props {
   finishLabel?: string | null;
   /** When provided, a "Mark ready for review" button renders alongside the other actions. */
   onMarkReady?: () => Promise<void>;
+  /** When provided, an "Ask Claude" button renders + the response card shows the parent's state. */
+  onAskClaude?: () => void;
+  claudeState?: ClaudeResponseState | null;
+  onDismissClaude?: () => void;
 }
 
 function ChevronLeftIcon() {
@@ -70,8 +75,10 @@ export function LocalReviewFooter({
 export function ReviewFooter({
   summary, onSummaryChange, onSubmit, onReviewed, onPrev, onNextPR,
   canSubmit, canReviewed, canPrev, canNextPR, finishLabel, onMarkReady,
+  onAskClaude, claudeState, onDismissClaude,
 }: Props) {
   const [markingReady, setMarkingReady] = useState(false);
+  const canAskClaude = !!onAskClaude && summary.trim().length > 0 && !claudeState?.loading;
   return (
     <footer className="review-footer">
       {finishLabel && <h4 className="review-footer-heading">{finishLabel}</h4>}
@@ -81,10 +88,22 @@ export function ReviewFooter({
         value={summary}
         onChange={(e) => onSummaryChange(e.target.value)}
       />
+      <ClaudeResponseCard state={claudeState ?? null} onDismiss={onDismissClaude} />
       <div className="review-footer-actions">
         <button type="button" className="btn-primary" disabled={!canSubmit} onClick={() => onSubmit('APPROVE')}>Approve</button>
         <button type="button" disabled={!canSubmit} onClick={() => onSubmit('REQUEST_CHANGES')}>Request changes</button>
         <button type="button" disabled={!canSubmit} onClick={() => onSubmit('COMMENT')}>Comment</button>
+        {onAskClaude && (
+          <button
+            type="button"
+            className="btn-ask-claude"
+            disabled={!canAskClaude}
+            onClick={onAskClaude}
+            title="Send your draft to your local `claude` CLI and see what it says — doesn't post to GitHub"
+          >
+            {claudeState?.loading ? 'Asking…' : 'Ask Claude'}
+          </button>
+        )}
         <button type="button" disabled={!canReviewed} onClick={onReviewed}>Reviewed</button>
         {onMarkReady && (
           <button

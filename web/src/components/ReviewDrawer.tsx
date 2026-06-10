@@ -10,6 +10,7 @@ import { usePRDetails } from '../hooks/usePRDetails.js';
 import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
 import { api } from '../lib/api.js';
 import { maybeAutoLabelOnReview } from '../lib/autoLabel.js';
+import type { ClaudeResponseState } from './ClaudeResponseCard.js';
 import type { CiStatus, GhStatus, PRStatus, PullRequestMeta, ReviewEvent, StagedInlineComment, TrackedPR } from '../types.js';
 
 interface Identity {
@@ -59,6 +60,10 @@ export function ReviewDrawer(props: Props) {
   const { current, prs, pendingReviewId, latestGhStatus, latestCiStatus, latestCiUrl, viewedPaths, onViewedChange, onPendingReviewChange, onMetaLoaded, onAdvance, onNavigatePrev, onNavigateNext, canNavigatePrev, canNavigateNext, onToast, onSetStatus, onClose } = props;
   const { meta, diff, loading, error, reload } = usePRDetails(current);
   const [summary, setSummary] = useState('');
+  // Footer Ask-Claude state. Independent of submit/publish flow — local-only.
+  const [summaryClaude, setSummaryClaude] = useState<ClaudeResponseState | null>(null);
+  // Token to ignore stale Claude responses if the user clicks twice in a row.
+  const claudeReqTokenRef = useRef(0);
   const drawerRef = useRef<HTMLElement | null>(null);
 
   useNextPRPrefetch({ current, prs });
@@ -72,6 +77,30 @@ export function ReviewDrawer(props: Props) {
 
   // Reset summary draft when switching PRs.
   // (Per-PR persistence of summary across drawer close/reopen is intentional and lives in App.)
+
+  // Clear Claude response state when the PR changes — a response from PR #1
+  // shouldn't dangle into PR #2.
+  useEffect(() => {
+    setSummaryClaude(null);
+  }, [current?.owner, current?.repo, current?.number]);
+
+  const askClaudeForSummary = useCallback(() => {
+    if (!current) return;
+    const draft = summary.trim();
+    if (!draft) return;
+    const token = ++claudeReqTokenRef.current;
+    setSummaryClaude({ loading: true });
+    (async () => {
+      try {
+        const res = await api.askClaude(current.owner, current.repo, current.number, { draft });
+        if (claudeReqTokenRef.current !== token) return; // a newer ask superseded us
+        setSummaryClaude({ loading: false, body: res.response, truncatedDiff: res.truncatedDiff });
+      } catch (e) {
+        if (claudeReqTokenRef.current !== token) return;
+        setSummaryClaude({ loading: false, error: (e as Error).message });
+      }
+    })();
+  }, [current, summary]);
 
   const commitStandaloneComment = useCallback(async (c: StagedInlineComment) => {
     if (!current) return;
@@ -251,6 +280,7 @@ export function ReviewDrawer(props: Props) {
         onAddToReview={meta.source === 'local' ? noopAsync : addToReview}
         onReply={meta.source === 'local' ? noopReply : reply}
         commentsEnabled={meta.source !== 'local'}
+        onAskClaude={meta.source === 'local' ? undefined : (args) => api.askClaude(current.owner, current.repo, current.number, args)}
       />
       {meta.source === 'local' ? (
         <LocalReviewFooter
@@ -275,6 +305,9 @@ export function ReviewDrawer(props: Props) {
           canNextPR={canNavigateNext && canNext}
           finishLabel={pendingReviewId ? 'Finish your review' : null}
           onMarkReady={meta.isDraft ? markReady : undefined}
+          onAskClaude={askClaudeForSummary}
+          claudeState={summaryClaude}
+          onDismissClaude={() => setSummaryClaude(null)}
         />
       )}
       {error && <ErrorToast message={error.message} onDismiss={() => { /* user can reload */ }} />}

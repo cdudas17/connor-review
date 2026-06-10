@@ -103,6 +103,22 @@ export const api = {
   markReadyForReview(owner: string, repo: string, number: number): Promise<{ id: string; isDraft: boolean }> {
     return call(`/api/pulls/${owner}/${repo}/${number}/ready-for-review`, { method: 'POST' });
   },
+  /** Bounce the user's draft comment off the local `claude` CLI for feedback. Never posts to GitHub. */
+  askClaude(
+    owner: string,
+    repo: string,
+    number: number,
+    body: {
+      draft: string;
+      lineRange?: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' };
+    },
+  ): Promise<{ response: string; truncatedDiff?: boolean }> {
+    return call(`/api/pulls/${owner}/${repo}/${number}/claude/ask`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
   /** Attach one or more labels to a PR. Idempotent — adding existing labels is a no-op. */
   addLabels(owner: string, repo: string, number: number, labels: string[]): Promise<{ ok: boolean }> {
     return call(`/api/pulls/${owner}/${repo}/${number}/labels`, {

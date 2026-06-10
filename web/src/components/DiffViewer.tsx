@@ -18,6 +18,7 @@ import { api } from '../lib/api.js';
 import { EmojiTextarea } from './EmojiTextarea.js';
 import { Avatar } from './Avatar.js';
 import type { ReviewThread, StagedInlineComment } from '../types.js';
+import { ClaudeResponseCard, type ClaudeResponseState } from './ClaudeResponseCard.js';
 
 export interface DiffViewerProps {
   diff: string;
@@ -39,6 +40,12 @@ export interface DiffViewerProps {
   onReply: (threadId: string, body: string) => Promise<void>;
   /** When false, the gutter-drag inline composer is disabled (e.g. local-branch entries with nowhere to post). Defaults to true. */
   commentsEnabled?: boolean;
+  /** When provided, the inline composer renders an "Ask Claude" button next to Comment/Add to review.
+   * Calls back with the draft body + the file path / line range so the server can scope context. */
+  onAskClaude?: (args: {
+    draft: string;
+    lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' };
+  }) => Promise<{ response: string; truncatedDiff?: boolean }>;
 }
 
 type ChangeTone = 'add' | 'del' | 'normal';
@@ -198,7 +205,12 @@ function DiffFile({
   onAddToReview,
   onReply,
   commentsEnabled = true,
+  onAskClaude,
 }: {
+  onAskClaude?: (args: {
+    draft: string;
+    lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' };
+  }) => Promise<{ response: string; truncatedDiff?: boolean }>;
   file: FileData;
   threads: ReviewThread[];
   hasPendingReview: boolean;
@@ -268,6 +280,14 @@ function DiffFile({
   const [editorBody, setEditorBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Per-editor Claude state — cleared whenever the editor closes/reopens (via the
+  // useEffect below). Token guards against stale responses if the user asks twice.
+  const [editorClaude, setEditorClaude] = useState<ClaudeResponseState | null>(null);
+  const editorClaudeTokenRef = useRef(0);
+  useEffect(() => {
+    // editor closed → drop any lingering response.
+    if (!editor) setEditorClaude(null);
+  }, [editor?.anchorKey]);
   const [replyState, setReplyState] = useState<{ threadId: string; body: string } | null>(null);
   const [replyBusy, setReplyBusy] = useState(false);
 
@@ -336,6 +356,31 @@ function DiffFile({
     if (idx == null || idx < 0) return;
     if (idx !== drag.endIdx) setDrag({ ...drag, endIdx: idx });
   };
+
+  function askEditorClaude() {
+    if (!editor || !onAskClaude) return;
+    const draft = editorBody.trim();
+    if (!draft) return;
+    const token = ++editorClaudeTokenRef.current;
+    setEditorClaude({ loading: true });
+    onAskClaude({
+      draft,
+      lineRange: {
+        path,
+        endLine: editor.line,
+        startLine: editor.startLine,
+        side: editor.side,
+      },
+    })
+      .then((res) => {
+        if (editorClaudeTokenRef.current !== token) return;
+        setEditorClaude({ loading: false, body: res.response, truncatedDiff: res.truncatedDiff });
+      })
+      .catch((e) => {
+        if (editorClaudeTokenRef.current !== token) return;
+        setEditorClaude({ loading: false, error: (e as Error).message });
+      });
+  }
 
   async function postEditor(target: 'standalone' | 'review') {
     if (!editor || editorBody.trim() === '') return;
@@ -425,12 +470,27 @@ function DiffFile({
             autoFocus
           />
           {error && <p className="inline-editor-error">{error}</p>}
+          <ClaudeResponseCard
+            state={editorClaude}
+            onDismiss={() => setEditorClaude(null)}
+          />
           <div className="inline-editor-actions">
             <button type="button" className="btn-secondary" disabled={busy} onClick={() => { setEditor(null); setEditorBody(''); setError(null); }}>Cancel</button>
             <button type="button" className="btn-secondary" disabled={busy || editorBody.trim() === ''} onClick={() => postEditor('standalone')}>Comment</button>
             <button type="button" className="btn-primary" disabled={busy || editorBody.trim() === ''} onClick={() => postEditor('review')}>
               {hasPendingReview ? 'Add review comment' : 'Start a review'}
             </button>
+            {onAskClaude && (
+              <button
+                type="button"
+                className="btn-ask-claude"
+                disabled={busy || editorBody.trim() === '' || editorClaude?.loading}
+                onClick={askEditorClaude}
+                title="Send your draft + this line range to your local `claude` CLI"
+              >
+                {editorClaude?.loading ? 'Asking…' : 'Ask Claude'}
+              </button>
+            )}
           </div>
         </div>
       </>
@@ -547,7 +607,7 @@ function makePseudoChangeForSide(_t: ReviewThread): ChangeData {
   return { type: 'insert', content: '', lineNumber: 0, isInsert: true } as unknown as ChangeData;
 }
 
-export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, onViewedChange, onCommitComment, onAddToReview, onReply, commentsEnabled = true }: DiffViewerProps) {
+export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, onViewedChange, onCommitComment, onAddToReview, onReply, commentsEnabled = true, onAskClaude }: DiffViewerProps) {
   const files = useMemo(() => parseDiff(diff), [diff]);
 
   if (files.length === 0) {
@@ -571,6 +631,7 @@ export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, o
             onAddToReview={onAddToReview}
             onReply={onReply}
             commentsEnabled={commentsEnabled}
+            onAskClaude={onAskClaude}
           />
         );
       })}
