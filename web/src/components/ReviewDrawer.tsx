@@ -224,8 +224,13 @@ export function ReviewDrawer(props: Props) {
           await api.createReview(target.owner, target.repo, target.number, { event, body });
         }
         onToast('success', `${pastTenseVerb} ${prRef}`);
-        // Visible-feedback event → run auto-label rules (best-effort, runs alongside the success toast).
-        void maybeAutoLabelOnReview(target, meta.authorLogin, { onToast });
+        // Auto-label rules fire on actual feedback events only. APPROVE is not
+        // "comments left" — it's the opposite — so we skip the rule there. The
+        // standalone-comment + thread-reply paths above always trigger, since
+        // those are always real comments.
+        if (event !== 'APPROVE') {
+          void maybeAutoLabelOnReview(target, meta.authorLogin, { onToast });
+        }
       } catch (e) {
         // Revert the local status so the PR stays in the queue for retry.
         onSetStatus(target, 'untouched');
