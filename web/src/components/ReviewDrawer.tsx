@@ -261,7 +261,13 @@ export function ReviewDrawer(props: Props) {
       <PRHeader meta={meta} latestGhStatus={latestGhStatus} latestCiStatus={latestCiStatus} latestCiUrl={latestCiUrl} />
       {meta.source !== 'local' && <PRDescription bodyHtml={meta.bodyHtml} />}
       {meta.source !== 'local' && <ReviewSummaryList reviews={meta.reviews ?? []} />}
-      {meta.source !== 'local' && <ConversationsList threads={meta.reviewThreads} onReply={reply} />}
+      {meta.source !== 'local' && (
+        <ConversationsList
+          threads={meta.reviewThreads}
+          onReply={reply}
+          onAskClaude={(args) => api.askClaude(current.owner, current.repo, current.number, args)}
+        />
+      )}
       <DiffViewer
         diff={diff}
         threads={meta.source === 'local' ? [] : meta.reviewThreads}

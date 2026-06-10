@@ -1,12 +1,18 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ReviewThread } from '../types.js';
 import { DiffHunkSnippet } from './DiffHunkSnippet.js';
 import { EmojiTextarea } from './EmojiTextarea.js';
 import { Avatar } from './Avatar.js';
+import { ClaudeResponseCard, type ClaudeResponseState } from './ClaudeResponseCard.js';
 
 interface Props {
   threads: ReviewThread[];
   onReply: (threadId: string, body: string) => Promise<void>;
+  /** Same signature as the diff composer's onAskClaude — sends draft + thread line range. */
+  onAskClaude?: (args: {
+    draft: string;
+    lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' };
+  }) => Promise<{ response: string; truncatedDiff?: boolean }>;
 }
 
 function formatTimeAgo(iso: string): string {
@@ -26,13 +32,39 @@ function formatTimeAgo(iso: string): string {
 interface CardProps {
   thread: ReviewThread;
   onReply: (threadId: string, body: string) => Promise<void>;
+  onAskClaude?: Props['onAskClaude'];
 }
 
-function ConversationCard({ thread, onReply }: CardProps) {
+function ConversationCard({ thread, onReply, onAskClaude }: CardProps) {
   const [open, setOpen] = useState(true);
   const [reply, setReply] = useState('');
   const [replying, setReplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [claude, setClaude] = useState<ClaudeResponseState | null>(null);
+  const claudeTokenRef = useRef(0);
+
+  const askClaude = () => {
+    if (!onAskClaude || reply.trim() === '') return;
+    const token = ++claudeTokenRef.current;
+    setClaude({ loading: true });
+    onAskClaude({
+      draft: reply.trim(),
+      lineRange: {
+        path: thread.path,
+        endLine: thread.line ?? 0,
+        startLine: thread.startLine ?? undefined,
+        side: thread.diffSide ?? 'RIGHT',
+      },
+    })
+      .then((res) => {
+        if (claudeTokenRef.current !== token) return;
+        setClaude({ loading: false, body: res.response, truncatedDiff: res.truncatedDiff });
+      })
+      .catch((e) => {
+        if (claudeTokenRef.current !== token) return;
+        setClaude({ loading: false, error: (e as Error).message });
+      });
+  };
 
   const first = thread.comments[0];
 
@@ -84,10 +116,22 @@ function ConversationCard({ thread, onReply }: CardProps) {
               disabled={replying}
             />
             {error && <p className="conversation-reply-error">{error}</p>}
+            <ClaudeResponseCard state={claude} onDismiss={() => setClaude(null)} />
             <div className="conversation-reply-actions">
               <button type="button" className="btn-primary" disabled={replying || reply.trim() === ''} onClick={submit}>
                 {replying ? 'Replying…' : 'Reply'}
               </button>
+              {onAskClaude && (
+                <button
+                  type="button"
+                  className="btn-ask-claude"
+                  disabled={reply.trim() === '' || claude?.loading}
+                  onClick={askClaude}
+                  title="Send your draft reply + this thread's line range to your local `claude` CLI"
+                >
+                  {claude?.loading ? 'Asking…' : 'Ask Claude'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -96,7 +140,7 @@ function ConversationCard({ thread, onReply }: CardProps) {
   );
 }
 
-export function ConversationsList({ threads, onReply }: Props) {
+export function ConversationsList({ threads, onReply, onAskClaude }: Props) {
   const [sectionOpen, setSectionOpen] = useState(true);
   const active = threads.filter((t) => !t.isResolved);
   if (active.length === 0) return null;
@@ -110,7 +154,7 @@ export function ConversationsList({ threads, onReply }: Props) {
       </header>
       {sectionOpen && (
         <div className="conversations-list">
-          {active.map((t) => <ConversationCard key={t.id} thread={t} onReply={onReply} />)}
+          {active.map((t) => <ConversationCard key={t.id} thread={t} onReply={onReply} onAskClaude={onAskClaude} />)}
         </div>
       )}
     </section>
