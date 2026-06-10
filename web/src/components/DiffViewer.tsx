@@ -41,11 +41,17 @@ export interface DiffViewerProps {
   /** When false, the gutter-drag inline composer is disabled (e.g. local-branch entries with nowhere to post). Defaults to true. */
   commentsEnabled?: boolean;
   /** When provided, the inline composer renders an "Ask Claude" button next to Comment/Add to review.
-   * Calls back with the draft body + the file path / line range so the server can scope context. */
+   * Calls back with the draft body + the file path / line range so the server can scope context.
+   * This one is ephemeral — the composer itself is ephemeral. */
   onAskClaude?: (args: {
     draft: string;
     lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' };
   }) => Promise<{ response: string; truncatedDiff?: boolean }>;
+  /** Per-thread Claude state lookup. Owned at App level + persisted; used by InlineThreadCard. */
+  threadClaudeStateFor?: (threadId: string) => ClaudeResponseState | null;
+  /** Ask Claude for an InlineThreadCard reply. App-owned handler — survives drawer close. */
+  onAskThreadClaude?: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
+  onDismissThreadClaude?: (threadId: string) => void;
 }
 
 type ChangeTone = 'add' | 'del' | 'normal';
@@ -73,42 +79,27 @@ interface InlineThreadCardProps {
   replyBusy: boolean;
   onReply: (threadId: string, body: string) => Promise<void>;
   setReplyBusy: (b: boolean) => void;
-  /** Same shape as the new-comment composer's onAskClaude — sends draft + line range. */
-  onAskClaude?: (args: {
-    draft: string;
-    lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' };
-  }) => Promise<{ response: string; truncatedDiff?: boolean }>;
+  /** Per-thread Claude state (owned at App level, persisted across drawer close). */
+  claudeState: ClaudeResponseState | null;
+  /** Ask Claude for a specific thread reply — App's handler will toast if drawer is closed. */
+  onAskClaude?: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
+  onDismissClaude?: (threadId: string) => void;
 }
 
-function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, setReplyBusy, onReply, onAskClaude }: InlineThreadCardProps) {
+function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, setReplyBusy, onReply, claudeState, onAskClaude, onDismissClaude }: InlineThreadCardProps) {
   const [open, setOpen] = useState(true);
-  const [claude, setClaude] = useState<ClaudeResponseState | null>(null);
-  const claudeTokenRef = useRef(0);
   const t = thread;
   const summaryAuthor = t.comments[0]?.authorLogin ?? '?';
   const count = t.comments.length;
   const replyDraft = replyState?.threadId === t.id ? replyState.body.trim() : '';
   const askClaude = () => {
     if (!onAskClaude || !replyDraft) return;
-    const token = ++claudeTokenRef.current;
-    setClaude({ loading: true });
-    onAskClaude({
-      draft: replyDraft,
-      lineRange: {
-        path: t.path,
-        endLine: t.line ?? 0,
-        startLine: t.startLine ?? undefined,
-        side: t.diffSide ?? 'RIGHT',
-      },
-    })
-      .then((res) => {
-        if (claudeTokenRef.current !== token) return;
-        setClaude({ loading: false, body: res.response, truncatedDiff: res.truncatedDiff });
-      })
-      .catch((e) => {
-        if (claudeTokenRef.current !== token) return;
-        setClaude({ loading: false, error: (e as Error).message });
-      });
+    onAskClaude(t.id, replyDraft, {
+      path: t.path,
+      endLine: t.line ?? 0,
+      startLine: t.startLine ?? undefined,
+      side: t.diffSide ?? 'RIGHT',
+    });
   };
   return (
     <article className={`thread-card thread-card-tone-${tone}${open ? '' : ' thread-card-collapsed'}`}>
@@ -140,7 +131,10 @@ function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, 
               value={replyState?.threadId === t.id ? replyState.body : ''}
               onChange={(e) => setReplyState({ threadId: t.id, body: e.target.value })}
             />
-            <ClaudeResponseCard state={claude} onDismiss={() => setClaude(null)} />
+            <ClaudeResponseCard
+              state={claudeState}
+              onDismiss={onDismissClaude ? () => onDismissClaude(t.id) : undefined}
+            />
             <div className="thread-reply-actions">
               <button
                 type="button"
@@ -158,11 +152,11 @@ function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, 
                 <button
                   type="button"
                   className="btn-ask-claude"
-                  disabled={!replyDraft || claude?.loading}
+                  disabled={!replyDraft || claudeState?.loading}
                   onClick={askClaude}
                   title="Send your draft reply + this thread's line range to your local `claude` CLI"
                 >
-                  {claude?.loading ? 'Asking…' : 'Ask Claude'}
+                  {claudeState?.loading ? 'Asking…' : 'Ask Claude'}
                 </button>
               )}
             </div>
@@ -248,11 +242,17 @@ function DiffFile({
   onReply,
   commentsEnabled = true,
   onAskClaude,
+  threadClaudeStateFor,
+  onAskThreadClaude,
+  onDismissThreadClaude,
 }: {
   onAskClaude?: (args: {
     draft: string;
     lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' };
   }) => Promise<{ response: string; truncatedDiff?: boolean }>;
+  threadClaudeStateFor?: (threadId: string) => ClaudeResponseState | null;
+  onAskThreadClaude?: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
+  onDismissThreadClaude?: (threadId: string) => void;
   file: FileData;
   threads: ReviewThread[];
   hasPendingReview: boolean;
@@ -492,7 +492,9 @@ function DiffFile({
             replyBusy={replyBusy}
             setReplyBusy={setReplyBusy}
             onReply={onReply}
-            onAskClaude={onAskClaude}
+            claudeState={threadClaudeStateFor?.(t.id) ?? null}
+            onAskClaude={onAskThreadClaude}
+            onDismissClaude={onDismissThreadClaude}
           />
         ))}
       </div>
@@ -650,7 +652,7 @@ function makePseudoChangeForSide(_t: ReviewThread): ChangeData {
   return { type: 'insert', content: '', lineNumber: 0, isInsert: true } as unknown as ChangeData;
 }
 
-export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, onViewedChange, onCommitComment, onAddToReview, onReply, commentsEnabled = true, onAskClaude }: DiffViewerProps) {
+export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, onViewedChange, onCommitComment, onAddToReview, onReply, commentsEnabled = true, onAskClaude, threadClaudeStateFor, onAskThreadClaude, onDismissThreadClaude }: DiffViewerProps) {
   const files = useMemo(() => parseDiff(diff), [diff]);
 
   if (files.length === 0) {
@@ -675,6 +677,9 @@ export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, o
             onReply={onReply}
             commentsEnabled={commentsEnabled}
             onAskClaude={onAskClaude}
+            threadClaudeStateFor={threadClaudeStateFor}
+            onAskThreadClaude={onAskThreadClaude}
+            onDismissThreadClaude={onDismissThreadClaude}
           />
         );
       })}

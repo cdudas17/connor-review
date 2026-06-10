@@ -14,6 +14,7 @@ import { NotesFab } from './components/NotesFab.js';
 import { ToastStack } from './components/ToastStack.js';
 import { useToasts } from './hooks/useToasts.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
+import { useClaudeResponses } from './hooks/useClaudeResponses.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
 import { useLabeledPRs } from './hooks/useLabeledPRs.js';
 import { useAuthoredPRs } from './hooks/useAuthoredPRs.js';
@@ -78,6 +79,12 @@ export function App() {
   const [pendingReviews, setPendingReviews] = useState<Record<string, string>>({});
   const viewedPaths = useViewedPaths();
   const { toasts, addToast, dismissToast } = useToasts();
+  // Claude responses live at App level so they survive drawer close + PR nav
+  // (summary card per PR, thread reply cards per PR + threadId, both persisted
+  // to localStorage). When an in-flight request resolves after the drawer's no
+  // longer on that PR, the hook fires a toast.
+  const currentPRKey = useMemo(() => (current ? prKey(current) : null), [current]);
+  const claudeResponses = useClaudeResponses({ onToast: addToast, currentPRKey });
   const [refreshing, setRefreshing] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [memberFilter, setMemberFilter] = useState<Set<string> | null>(null);
@@ -691,6 +698,12 @@ export function App() {
             onToast={addToast}
             onSetStatus={activeSetStatus}
             onClose={() => setCurrent(null)}
+            summaryClaudeState={claudeResponses.summaryFor(current)}
+            threadClaudeState={(threadId) => claudeResponses.threadFor(current, threadId)}
+            onAskSummaryClaude={(draft) => claudeResponses.askSummary(current, draft.trim())}
+            onAskThreadClaude={(threadId, draft, lineRange) => claudeResponses.askThread(current, threadId, draft, lineRange)}
+            onDismissSummaryClaude={() => claudeResponses.dismissSummary(current)}
+            onDismissThreadClaude={(threadId) => claudeResponses.dismissThread(current, threadId)}
           />
         );
       })()}
