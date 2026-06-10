@@ -12,6 +12,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "dompurify": "^3.4.9",
+    "marked": "^18.0.5",
     "node-emoji": "^2.2.0",
     "react": "^18.3.1",
     "react-diff-view": "^3.2.1",
@@ -21,6 +23,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",
+    "@types/dompurify": "^3.0.5",
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",

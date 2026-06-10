@@ -1,3 +1,6 @@
+import { useMemo } from 'react';
+import { renderMarkdown } from '../lib/markdown.js';
+
 export interface ClaudeResponseState {
   loading: boolean;
   /** Claude's response body (markdown). Present once the request resolves. */
@@ -21,6 +24,9 @@ interface Props {
  * it would require pulling in a markdown lib + sanitizer. Plain text reads fine
  * for code-review feedback; can upgrade later if it becomes annoying. */
 export function ClaudeResponseCard({ state, onDismiss }: Props) {
+  // Memo: marked + DOMPurify is cheap but Claude responses can be a few KB;
+  // re-running on every parent render adds up across multiple cards.
+  const html = useMemo(() => (state?.body ? renderMarkdown(state.body) : ''), [state?.body]);
   if (!state) return null;
   return (
     <div className="claude-response-card" role="region" aria-label="Claude response">
@@ -41,7 +47,7 @@ export function ClaudeResponseCard({ state, onDismiss }: Props) {
         <p className="claude-response-error">{state.error}</p>
       )}
       {state.body && !state.error && (
-        <pre className="claude-response-body">{state.body}</pre>
+        <div className="markdown-body claude-response-body" dangerouslySetInnerHTML={{ __html: html }} />
       )}
       {state.truncatedDiff && state.body && !state.error && (
         <p className="claude-response-note">Diff was truncated for the prompt; Claude saw only the first portion.</p>

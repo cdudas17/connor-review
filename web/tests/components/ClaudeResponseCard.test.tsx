@@ -22,6 +22,28 @@ describe('ClaudeResponseCard', () => {
     expect(screen.getByText(/consider the null path/i)).toBeInTheDocument();
   });
 
+  it('renders markdown formatting (bold, inline code, lists) — not literal asterisks/backticks', () => {
+    const md = [
+      'A few **bold** thoughts about `<hr />`:',
+      '',
+      '- one',
+      '- two',
+    ].join('\n');
+    const { container } = render(<ClaudeResponseCard state={{ loading: false, body: md }} />);
+    // Marked + DOMPurify should produce real <strong>, <code>, <ul><li> elements.
+    expect(container.querySelector('.claude-response-body strong')?.textContent).toBe('bold');
+    expect(container.querySelector('.claude-response-body code')?.textContent).toBe('<hr />');
+    expect(container.querySelectorAll('.claude-response-body ul li')).toHaveLength(2);
+    // And no literal markdown leakage into the rendered text.
+    expect(container.querySelector('.claude-response-body')?.textContent).not.toContain('**');
+  });
+
+  it('sanitizes injected <script> tags from Claude output', () => {
+    const md = 'before<script>window.__pwned = 1</script>after';
+    const { container } = render(<ClaudeResponseCard state={{ loading: false, body: md }} />);
+    expect(container.querySelector('.claude-response-body script')).toBeNull();
+  });
+
   it('renders an error message instead of a body on failure', () => {
     render(<ClaudeResponseCard state={{ loading: false, error: 'claude CLI not found' }} />);
     expect(screen.getByText(/claude cli not found/i)).toBeInTheDocument();
