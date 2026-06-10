@@ -106,6 +106,49 @@ function toThreadVariable(c: {
   return t;
 }
 
+interface GraphQLError {
+  message?: string;
+  type?: string;
+  path?: Array<string | number>;
+  locations?: Array<{ line: number; column: number }>;
+  extensions?: Record<string, unknown>;
+}
+interface GraphQLResp<T> {
+  data?: T;
+  errors?: GraphQLError[];
+}
+
+/** When a GraphQL mutation returns `data.<root>: null` we need to surface what
+ * GitHub actually said so the user (and us) can debug. GitHub sometimes returns
+ * `data: null, errors: [...]`, sometimes `data: { x: null }, errors: [...]`,
+ * occasionally just `data: { x: null }` with no errors at all. This helper
+ * builds the richest message it can from whatever's present in the response,
+ * and logs the raw payload to the server console for the silent cases. */
+function graphqlReturnedNullError(
+  what: string,
+  rawResponse: string,
+  parsed: GraphQLResp<unknown>,
+  extra?: { variables?: Record<string, unknown> },
+): Error {
+  const errs = parsed.errors ?? [];
+  if (errs.length > 0) {
+    const lines = errs.map((e) => {
+      const path = e.path ? ` (at ${e.path.join('.')})` : '';
+      const type = e.type ? ` [${e.type}]` : '';
+      return `${e.message ?? '<no message>'}${type}${path}`;
+    });
+    return new Error(`${what} failed: ${lines.join('; ')}`);
+  }
+  // No GraphQL errors but no payload either — log the raw response so we can
+  // see what GitHub actually returned, and include a snippet in the user-facing
+  // error.
+  // eslint-disable-next-line no-console
+  console.warn(`[${what}] returned no review and no errors. Raw response:`, rawResponse.slice(0, 4000), 'extra:', extra);
+  const snippet = rawResponse.length > 600 ? rawResponse.slice(0, 600) + '…' : rawResponse;
+  const variablesNote = extra?.variables ? ` (variables: ${JSON.stringify(extra.variables)})` : '';
+  return new Error(`${what} returned no review and no errors${variablesNote}. Raw GitHub response: ${snippet}`);
+}
+
 function metaKey(p: { owner: string; repo: string; number: number }) {
   return `${p.owner}/${p.repo}#${p.number}`;
 }
@@ -298,14 +341,10 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       const out = await ghExec(['api', 'graphql', '--input', '-'], {
         input: JSON.stringify({ query: SUBMIT_PULL_REQUEST_REVIEW_MUTATION, variables }),
       });
-      const parsed = JSON.parse(out) as {
-        data?: { submitPullRequestReview?: { pullRequestReview?: { id: string; state: string } } };
-        errors?: Array<{ message?: string }>;
-      };
+      const parsed = JSON.parse(out) as GraphQLResp<{ submitPullRequestReview?: { pullRequestReview?: { id: string; state: string } } }>;
       const review = parsed.data?.submitPullRequestReview?.pullRequestReview;
       if (!review) {
-        const detail = (parsed.errors ?? []).map((e) => e.message).filter(Boolean).join('; ');
-        throw new Error(detail ? `Review submit failed: ${detail}` : 'Review submit returned no review');
+        throw graphqlReturnedNullError('Review submit', out, parsed);
       }
       return review;
     };
@@ -337,16 +376,17 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       const out = await ghExec(['api', 'graphql', '--input', '-'], {
         input: JSON.stringify({ query: ADD_PULL_REQUEST_REVIEW_MUTATION, variables }),
       });
-      const parsed = JSON.parse(out) as {
-        data?: { addPullRequestReview?: { pullRequestReview?: { id: string; state: string } } };
-        errors?: Array<{ message?: string; type?: string }>;
-      };
+      const parsed = JSON.parse(out) as GraphQLResp<{ addPullRequestReview?: { pullRequestReview?: { id: string; state: string } } }>;
       const review = parsed.data?.addPullRequestReview?.pullRequestReview;
       if (!review) {
-        const detail = (parsed.errors ?? []).map((e) => e.message).filter(Boolean).join('; ');
-        throw new Error(detail
-          ? `Review creation failed: ${detail}`
-          : 'Review creation returned no review (response was empty)');
+        throw graphqlReturnedNullError('Review creation', out, parsed, {
+          variables: {
+            pullRequestId: meta.id,
+            event: variables.event,
+            threadCount: (variables.threads as unknown[] | undefined)?.length ?? 0,
+            threadPaths: ((variables.threads as Array<{ path?: string }> | undefined) ?? []).map((t) => t.path).join(', '),
+          },
+        });
       }
       return review;
     } catch (err) {

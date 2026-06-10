@@ -113,6 +113,55 @@ describe('pulls routes', () => {
     await app.close();
   });
 
+  it('POST /reviews surfaces a useful error when addPullRequestReview returns data=null+errors=[]', async () => {
+    // Regression: previously we threw "Review creation returned no review (response was empty)"
+    // and ate everything else. Now we should include the raw response + thread context so
+    // diagnosing 'addPullRequestReview returned null' cases (often: invalid LEFT-side multi-line
+    // ranges) is possible.
+    mocked.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
+    mocked.mockResolvedValueOnce(JSON.stringify({ data: { addPullRequestReview: null } }));
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/reviews',
+      payload: {
+        event: 'COMMENT',
+        threads: [{ path: 'app/widget.rb', line: 130, side: 'LEFT', startLine: 113, startSide: 'LEFT', body: 'this whole block' }],
+      },
+    });
+    expect(res.statusCode).toBe(500);
+    const body = res.json();
+    expect(body.message).toContain('Raw GitHub response');
+    expect(body.message).toContain('"addPullRequestReview":null');
+    // Variable summary helps when the bug is a bad thread payload.
+    expect(body.message).toContain('threadCount');
+    expect(body.message).toContain('app/widget.rb');
+    await app.close();
+  });
+
+  it('POST /reviews surfaces GraphQL errors verbatim (with path/type when present)', async () => {
+    mocked.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
+    mocked.mockResolvedValueOnce(JSON.stringify({
+      data: { addPullRequestReview: null },
+      errors: [
+        { message: 'pullRequestReviewThread.line must be within the diff', type: 'UNPROCESSABLE', path: ['addPullRequestReview', 'threads', 0, 'line'] },
+      ],
+    }));
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/reviews',
+      payload: { event: 'COMMENT', threads: [{ path: 'x', line: 9999, side: 'LEFT', body: 'q' }] },
+    });
+    expect(res.statusCode).toBe(500);
+    const msg = res.json().message;
+    expect(msg).toContain('Review creation failed');
+    expect(msg).toContain('pullRequestReviewThread.line must be within the diff');
+    expect(msg).toContain('UNPROCESSABLE');
+    expect(msg).toContain('addPullRequestReview.threads.0.line');
+    await app.close();
+  });
+
   it('POST /reviews with event=PENDING reuses an existing pending review (no double-create)', async () => {
     // Meta lookup says the viewer already has a pending review.
     const metaWithPending = JSON.parse(PR_GRAPHQL_RESPONSE);
