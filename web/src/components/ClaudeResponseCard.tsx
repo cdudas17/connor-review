@@ -9,6 +9,10 @@ export interface ClaudeResponseState {
   error?: string;
   /** True if the server warned the diff was truncated for the prompt. */
   truncatedDiff?: boolean;
+  /** Epoch millis when this entry settled. Persisted, used by the sweeper to
+   * drop entries older than ~30 days. Not set on `loading: true` entries (those
+   * aren't persisted anyway). */
+  savedAt?: number;
 }
 
 interface Props {

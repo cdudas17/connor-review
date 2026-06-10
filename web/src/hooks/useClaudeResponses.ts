@@ -8,6 +8,14 @@ interface LineRange { path: string; startLine?: number; endLine: number; side: '
 const SUMMARY_STORAGE_KEY = 'connor-review.claudeSummary.v1';
 const THREAD_STORAGE_KEY = 'connor-review.claudeThread.v1';
 
+/** Drop persisted responses older than this on hook mount. 30 days is generous
+ * enough that you can pick up where you left off after a long break, while
+ * still preventing unbounded localStorage growth. */
+const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+/** Hard cap per bucket. With ~2KB per response and a 5MB quota, this gives ~10x
+ * headroom even at the upper end. Eviction is LRU by `savedAt`. */
+const MAX_ENTRIES = 200;
+
 function prKey(p: PRTarget): string { return `${p.owner}/${p.repo}#${p.number}`; }
 function threadKey(p: PRTarget, threadId: string): string { return `${prKey(p)}::${threadId}`; }
 
@@ -35,6 +43,31 @@ function persistStore(key: string, store: Record<string, ClaudeResponseState>) {
   } catch { /* quota — ignore */ }
 }
 
+/** Strip entries older than MAX_AGE_MS and LRU-evict down to MAX_ENTRIES.
+ * Returns the cleaned store; pure (no localStorage side effect). */
+function sweepStore(store: Record<string, ClaudeResponseState>, now: number): Record<string, ClaudeResponseState> {
+  const cutoff = now - MAX_AGE_MS;
+  // First pass: drop too-old. Anything without a savedAt is treated as freshly
+  // saved at the cutoff so old un-stamped entries don't all get wiped on the
+  // first run — they'll get a real timestamp on the next ask.
+  const fresh: Array<[string, ClaudeResponseState & { savedAt?: number }]> = [];
+  for (const [k, v] of Object.entries(store)) {
+    const savedAt = (v as ClaudeResponseState & { savedAt?: number }).savedAt;
+    if (savedAt != null && savedAt < cutoff) continue;
+    fresh.push([k, v]);
+  }
+  // Second pass: cap at MAX_ENTRIES. Sort by savedAt asc and drop oldest.
+  if (fresh.length <= MAX_ENTRIES) {
+    return Object.fromEntries(fresh);
+  }
+  fresh.sort((a, b) => {
+    const aT = a[1].savedAt ?? 0;
+    const bT = b[1].savedAt ?? 0;
+    return aT - bT;
+  });
+  return Object.fromEntries(fresh.slice(fresh.length - MAX_ENTRIES));
+}
+
 interface Options {
   /** App's toast callback. Fired only when a response lands while the drawer is NOT on the asking PR. */
   onToast: (kind: 'success' | 'error' | 'info', message: string) => void;
@@ -57,8 +90,10 @@ interface Options {
  * drawer always shows whatever's currently stored. */
 export function useClaudeResponses(opts: Options) {
   const { onToast, currentPRKey } = opts;
-  const [summary, setSummary] = useState<Record<string, ClaudeResponseState>>(() => loadStore(SUMMARY_STORAGE_KEY));
-  const [threads, setThreads] = useState<Record<string, ClaudeResponseState>>(() => loadStore(THREAD_STORAGE_KEY));
+  // Sweep on mount: drop entries past MAX_AGE_MS, cap at MAX_ENTRIES (LRU by
+  // savedAt). Pure function so it's also straightforward to unit-test directly.
+  const [summary, setSummary] = useState<Record<string, ClaudeResponseState>>(() => sweepStore(loadStore(SUMMARY_STORAGE_KEY), Date.now()));
+  const [threads, setThreads] = useState<Record<string, ClaudeResponseState>>(() => sweepStore(loadStore(THREAD_STORAGE_KEY), Date.now()));
 
   // Per-key token: lets us discard a stale resolution if the user fires a second
   // ask on the same key before the first settles.
@@ -80,7 +115,7 @@ export function useClaudeResponses(opts: Options) {
     api.askClaude(target.owner, target.repo, target.number, { draft })
       .then((res) => {
         if (tokensRef.current.get(`summary::${key}`) !== token) return;
-        setSummary((s) => ({ ...s, [key]: { loading: false, body: res.response, truncatedDiff: res.truncatedDiff } }));
+        setSummary((s) => ({ ...s, [key]: { loading: false, body: res.response, truncatedDiff: res.truncatedDiff, savedAt: Date.now() } }));
         if (currentPRKeyRef.current !== key) {
           onToast('info', `Claude answered on ${key} — reopen to see it`);
         }
@@ -88,7 +123,7 @@ export function useClaudeResponses(opts: Options) {
       .catch((e) => {
         if (tokensRef.current.get(`summary::${key}`) !== token) return;
         const msg = (e as ApiCallError | Error).message;
-        setSummary((s) => ({ ...s, [key]: { loading: false, error: msg } }));
+        setSummary((s) => ({ ...s, [key]: { loading: false, error: msg, savedAt: Date.now() } }));
         if (currentPRKeyRef.current !== key) {
           onToast('error', `Claude failed for ${key}: ${msg}`);
         }
@@ -104,7 +139,7 @@ export function useClaudeResponses(opts: Options) {
     api.askClaude(target.owner, target.repo, target.number, { draft, lineRange })
       .then((res) => {
         if (tokensRef.current.get(`thread::${key}`) !== token) return;
-        setThreads((s) => ({ ...s, [key]: { loading: false, body: res.response, truncatedDiff: res.truncatedDiff } }));
+        setThreads((s) => ({ ...s, [key]: { loading: false, body: res.response, truncatedDiff: res.truncatedDiff, savedAt: Date.now() } }));
         if (currentPRKeyRef.current !== prRef) {
           onToast('info', `Claude answered a thread on ${prRef} — reopen to see it`);
         }
@@ -112,7 +147,7 @@ export function useClaudeResponses(opts: Options) {
       .catch((e) => {
         if (tokensRef.current.get(`thread::${key}`) !== token) return;
         const msg = (e as ApiCallError | Error).message;
-        setThreads((s) => ({ ...s, [key]: { loading: false, error: msg } }));
+        setThreads((s) => ({ ...s, [key]: { loading: false, error: msg, savedAt: Date.now() } }));
         if (currentPRKeyRef.current !== prRef) {
           onToast('error', `Claude (thread) failed on ${prRef}: ${msg}`);
         }
@@ -133,11 +168,33 @@ export function useClaudeResponses(opts: Options) {
     setThreads((s) => { const next = { ...s }; delete next[key]; return next; });
   }, []);
 
+  /** Drop every Claude entry tied to a PR — summary + all thread replies for that PR.
+   * Used when the user deletes a PR from a tracked list so we don't carry stale
+   * Claude state around for PRs they're no longer following. */
+  const dismissAllForPR = useCallback((target: PRTarget) => {
+    const sKey = prKey(target);
+    const tPrefix = `${sKey}::`;
+    // Bump tokens for any in-flight requests so their resolutions get dropped.
+    tokensRef.current.set(`summary::${sKey}`, (tokensRef.current.get(`summary::${sKey}`) ?? 0) + 1);
+    setSummary((s) => { const next = { ...s }; delete next[sKey]; return next; });
+    setThreads((s) => {
+      const next: Record<string, ClaudeResponseState> = {};
+      for (const [k, v] of Object.entries(s)) {
+        if (k.startsWith(tPrefix)) {
+          tokensRef.current.set(`thread::${k}`, (tokensRef.current.get(`thread::${k}`) ?? 0) + 1);
+          continue;
+        }
+        next[k] = v;
+      }
+      return next;
+    });
+  }, []);
+
   /** Pick out the state slice relevant to a single PR. */
   const summaryFor = useCallback((target: PRTarget): ClaudeResponseState | null => summary[prKey(target)] ?? null, [summary]);
   const threadFor = useCallback((target: PRTarget, threadId: string): ClaudeResponseState | null => threads[threadKey(target, threadId)] ?? null, [threads]);
 
-  return { summaryFor, threadFor, askSummary, askThread, dismissSummary, dismissThread };
+  return { summaryFor, threadFor, askSummary, askThread, dismissSummary, dismissThread, dismissAllForPR };
 }
 
 /** Test-only: clear both storage buckets. Exported so tests don't leak across runs. */

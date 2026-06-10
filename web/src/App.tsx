@@ -244,12 +244,15 @@ export function App() {
     const removeFn = tab === 'mine' ? mineAddedPRs.remove : myPRs.remove;
     for (const p of activePRs) {
       if (selectedKeys.has(prKey(p))) {
-        removeFn({ owner: p.owner, repo: p.repo, number: p.number });
+        const id = { owner: p.owner, repo: p.repo, number: p.number };
+        removeFn(id);
+        // Drop any Claude state tied to the deleted PR so we don't carry orphans.
+        claudeResponses.dismissAllForPR(id);
       }
     }
     setSelectedKeys(new Set());
     if (current && selectedKeys.has(prKey(current))) setCurrent(null);
-  }, [selectedKeys, activePRs, myPRs, mineAddedPRs, tab, current]);
+  }, [selectedKeys, activePRs, myPRs, mineAddedPRs, tab, current, claudeResponses]);
 
   /**
    * Optimistically add a batch of PRs to `target` (one of the tracked-PR hooks),

@@ -145,3 +145,66 @@ describe('useClaudeResponses — thread reply cards', () => {
     expect(result.current.threadFor(TARGET, 'THREAD_43')).toBeNull();
   });
 });
+
+describe('useClaudeResponses — cleanup', () => {
+  it('sweeps entries older than 30 days on mount', () => {
+    const ancient = Date.now() - (40 * 24 * 60 * 60 * 1000); // 40 days ago
+    const recent = Date.now() - (5 * 24 * 60 * 60 * 1000);   // 5 days ago
+    localStorage.setItem('connor-review.claudeSummary.v1', JSON.stringify({
+      'old/repo#1': { loading: false, body: 'gone', savedAt: ancient },
+      'new/repo#2': { loading: false, body: 'kept', savedAt: recent },
+    }));
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: null }));
+    expect(result.current.summaryFor({ owner: 'old', repo: 'repo', number: 1 })).toBeNull();
+    expect(result.current.summaryFor({ owner: 'new', repo: 'repo', number: 2 })?.body).toBe('kept');
+  });
+
+  it('keeps un-timestamped legacy entries (gives them a grace pass on first run)', () => {
+    // Entries persisted before savedAt was added shouldn't all get nuked on the
+    // first sweep — they have no timestamp.
+    localStorage.setItem('connor-review.claudeSummary.v1', JSON.stringify({
+      'legacy/repo#1': { loading: false, body: 'no timestamp' },
+    }));
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: null }));
+    expect(result.current.summaryFor({ owner: 'legacy', repo: 'repo', number: 1 })?.body).toBe('no timestamp');
+  });
+
+  it('LRU-caps the summary bucket to MAX_ENTRIES on mount', () => {
+    // 250 entries with strictly increasing savedAt → keep the 200 most recent.
+    const baseTs = Date.now() - (1000 * 60 * 60); // 1h ago, well under the age cutoff
+    const entries: Record<string, { loading: boolean; body: string; savedAt: number }> = {};
+    for (let i = 0; i < 250; i++) {
+      entries[`org/repo#${i}`] = { loading: false, body: `r${i}`, savedAt: baseTs + i };
+    }
+    localStorage.setItem('connor-review.claudeSummary.v1', JSON.stringify(entries));
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: null }));
+    // The 50 oldest entries (0–49) should be gone; the 200 newest (50–249) should remain.
+    expect(result.current.summaryFor({ owner: 'org', repo: 'repo', number: 49 })).toBeNull();
+    expect(result.current.summaryFor({ owner: 'org', repo: 'repo', number: 50 })?.body).toBe('r50');
+    expect(result.current.summaryFor({ owner: 'org', repo: 'repo', number: 249 })?.body).toBe('r249');
+  });
+
+  it('dismissAllForPR drops summary + every thread entry for that PR', async () => {
+    server.use(
+      http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'ok' })),
+    );
+    const otherTarget = { owner: 'Gusto', repo: 'zenpayroll', number: 999 };
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
+    act(() => { result.current.askSummary(TARGET, 'q1'); });
+    act(() => { result.current.askThread(TARGET, 'TH1', 'q2', { path: 'a', endLine: 1, side: 'RIGHT' }); });
+    act(() => { result.current.askThread(TARGET, 'TH2', 'q3', { path: 'a', endLine: 2, side: 'RIGHT' }); });
+    act(() => { result.current.askSummary(otherTarget, 'q4'); });
+    await waitFor(() => {
+      expect(result.current.summaryFor(TARGET)?.body).toBe('ok');
+      expect(result.current.threadFor(TARGET, 'TH1')?.body).toBe('ok');
+      expect(result.current.threadFor(TARGET, 'TH2')?.body).toBe('ok');
+      expect(result.current.summaryFor(otherTarget)?.body).toBe('ok');
+    });
+    act(() => { result.current.dismissAllForPR(TARGET); });
+    expect(result.current.summaryFor(TARGET)).toBeNull();
+    expect(result.current.threadFor(TARGET, 'TH1')).toBeNull();
+    expect(result.current.threadFor(TARGET, 'TH2')).toBeNull();
+    // Other PR's entries are untouched.
+    expect(result.current.summaryFor(otherTarget)?.body).toBe('ok');
+  });
+});
