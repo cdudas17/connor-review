@@ -251,7 +251,23 @@ export function ReviewDrawer(props: Props) {
       <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
       <aside className="drawer" aria-label="Review drawer" ref={drawerRef}>
         <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
-        {loading && <span className="drawer-refresh-indicator" aria-label="Refreshing"><span className="loading-spinner" /></span>}
+        <button
+          type="button"
+          className="drawer-refresh"
+          onClick={() => reload()}
+          disabled={loading}
+          aria-label="Refresh this PR's diff + threads"
+          title="Refresh this PR's diff + threads"
+        >
+          {loading ? (
+            <span className="loading-spinner drawer-refresh-spinner" aria-hidden="true" />
+          ) : (
+            // Circular arrow icon — small SVG, no external dep.
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M8 3V1L4.5 4 8 7V5a3 3 0 1 1-3 3H3.5a4.5 4.5 0 1 0 4.5-4.5V3z"/>
+            </svg>
+          )}
+        </button>
       {/* Local-branch entries have no GitHub server-of-record for reviews/comments,
           so all review-action surfaces (summary list, conversations, footer
           publish buttons, inline comment composer) are hidden. The diff itself

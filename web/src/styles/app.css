@@ -295,6 +295,11 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 70vw; min-width: 720px; background: var(--bg); border-left: 1px solid var(--border); box-shadow: -8px 0 32px rgba(0,0,0,0.18); overflow: auto; padding: 16px 24px 120px; z-index: 11; }
 .drawer-close { position: absolute; top: 12px; right: 16px; font-size: 1.4rem; background: transparent; border: none; cursor: pointer; }
 .drawer-refresh-indicator { position: absolute; top: 18px; right: 48px; display: inline-flex; align-items: center; color: var(--muted); }
+/* Per-PR refresh button (top-right of drawer, just left of the close ×). */
+.drawer-refresh { position: absolute; top: 14px; right: 50px; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); cursor: pointer; }
+.drawer-refresh:hover:not(:disabled) { background: var(--bg-subtle); color: var(--fg); }
+.drawer-refresh:disabled { opacity: 0.6; cursor: default; }
+.drawer-refresh-spinner { width: 12px; height: 12px; border-width: 1.5px; margin: 0; }
 .pr-header h2 { margin-bottom: 4px; }
 .pr-header-meta { color: var(--muted); font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .pr-link-copy { display: inline-flex; align-items: center; justify-content: center; padding: 2px; margin-left: 2px; border: none; background: transparent; color: var(--muted); cursor: pointer; border-radius: 4px; transition: color 80ms, background-color 80ms; }
