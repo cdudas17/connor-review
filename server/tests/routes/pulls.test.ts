@@ -314,6 +314,25 @@ describe('pulls routes', () => {
     await app.close();
   });
 
+  it('POST /labels with mode=replace uses PUT (sets labels, drops the rest)', async () => {
+    mocked.mockResolvedValueOnce(JSON.stringify([{ name: 'Comments left by reviewer' }]));
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/labels',
+      payload: { labels: ['Comments left by reviewer'], mode: 'replace' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().mode).toBe('replace');
+    const callArgs = mocked.mock.calls[0][0] as string[];
+    // The gh shellout swaps POST for PUT — that's the only way to drop
+    // everything else GitHub already had on the PR.
+    expect(callArgs).toContain('PUT');
+    expect(callArgs).not.toContain('POST');
+    expect(callArgs).toContain('repos/Gusto/zenpayroll/issues/1/labels');
+    await app.close();
+  });
+
   it('POST /threads/:id/reply calls the reply mutation', async () => {
     mocked.mockResolvedValueOnce(JSON.stringify({ data: { addPullRequestReviewThreadReply: { comment: { id: 'C_1', body: 'ack' } } } }));
     const app = await buildServer();

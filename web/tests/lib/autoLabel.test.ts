@@ -16,17 +16,20 @@ describe('maybeAutoLabelOnReview', () => {
     (APP_CONFIG as { autoLabelOnReview: Record<string, string[]> }).autoLabelOnReview = originalRules;
   });
 
-  it('fires POST /labels with the configured labels when author matches', async () => {
-    let captured: { labels?: string[] } | null = null;
+  it('fires POST /labels with mode=replace so other labels are dropped', async () => {
+    let captured: { labels?: string[]; mode?: string } | null = null;
     server.use(
       http.post('/api/pulls/Gusto/zenpayroll/1/labels', async ({ request }) => {
-        captured = await request.json() as { labels?: string[] };
-        return HttpResponse.json({ ok: true });
+        captured = await request.json() as { labels?: string[]; mode?: string };
+        return HttpResponse.json({ ok: true, mode: 'replace' });
       }),
     );
     await maybeAutoLabelOnReview({ owner: 'Gusto', repo: 'zenpayroll', number: 1 }, 'newtonry');
     expect(captured).not.toBeNull();
     expect(captured!.labels).toEqual(['Comments left by reviewer']);
+    // Replace mode (= GitHub PUT under the hood) is critical — without it,
+    // existing labels on the PR would stick around.
+    expect(captured!.mode).toBe('replace');
   });
 
   it('does nothing when author does not match any rule', async () => {

@@ -124,12 +124,14 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
-  /** Attach one or more labels to a PR. Idempotent — adding existing labels is a no-op. */
-  addLabels(owner: string, repo: string, number: number, labels: string[]): Promise<{ ok: boolean }> {
+  /** Attach (or replace) labels on a PR.
+   *  - mode='add' (default): append; existing labels stay.
+   *  - mode='replace': set the label list to exactly `labels`; drops everything else. */
+  addLabels(owner: string, repo: string, number: number, labels: string[], opts?: { mode?: 'add' | 'replace' }): Promise<{ ok: boolean }> {
     return call(`/api/pulls/${owner}/${repo}/${number}/labels`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ labels }),
+      body: JSON.stringify({ labels, mode: opts?.mode ?? 'add' }),
     });
   },
   replyToThread(owner: string, repo: string, number: number, threadId: string, body: string) {
