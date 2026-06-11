@@ -80,9 +80,17 @@ export function useLabeledPRs(label = 'needs-review') {
     }));
   }, []);
 
+  /** Patch a single PR in-place — same shape/intent as useTrackedPRs.update. */
+  const update = useCallback((id: Identity, patch: Partial<TrackedPR>) => {
+    setState((s) => ({
+      ...s,
+      prs: s.prs.map((p) => (p.owner === id.owner && p.repo === id.repo && p.number === id.number ? { ...p, ...patch } : p)),
+    }));
+  }, []);
+
   const dismissError = useCallback(() => {
     setState((s) => ({ ...s, errorDismissed: true }));
   }, []);
 
-  return { ...state, fetch, setStatus, dismissError };
+  return { ...state, fetch, setStatus, dismissError, update };
 }

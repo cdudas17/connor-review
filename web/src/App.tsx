@@ -331,9 +331,27 @@ export function App() {
   const currentPendingReviewId = current ? (pendingReviews[prKey(current)] ?? null) : null;
 
   const handleMetaLoaded = useCallback((id: Identity, meta: PullRequestMeta) => {
-    if (tab === 'my') {
-      myPRs.update(id, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, createdAt: meta.createdAt });
-    }
+    // Push the freshest meta we got from the drawer fetch into whichever
+    // list-level store actually owns this PR. Previously this only updated the
+    // Added PRs list (`myPRs`); team/oncall/mine rows stayed stale until the
+    // next 5-minute auto-refresh — so a freshly-added auto-label, a new thread,
+    // or a CI flip wasn't visible in the row count or chips until you hit
+    // Refresh manually.
+    const patch = {
+      title: meta.title,
+      authorLogin: meta.authorLogin,
+      ghStatus: computeGhStatus(meta),
+      ciStatus: meta.ciStatus,
+      ciUrl: meta.ciUrl,
+      labels: meta.labels ?? [],
+      createdAt: meta.createdAt,
+    };
+    myPRs.update(id, patch);
+    mineAddedPRs.update(id, patch);
+    teamPRs.update(id, patch);
+    oncallPRs.update(id, patch);
+    minePRs.update(id, patch);
+
     // Reflect any server-side pending review state into the client so the UI knows
     // to show "Add review comment" / "Finish your review" instead of "Start a review".
     setPendingReviews((cur) => {
@@ -347,7 +365,7 @@ export function App() {
       }
       return cur;
     });
-  }, [tab, myPRs]);
+  }, [myPRs, mineAddedPRs, teamPRs, oncallPRs, minePRs]);
 
   const setPendingReview = useCallback((id: Identity, reviewId: string | null) => {
     setPendingReviews((cur) => {

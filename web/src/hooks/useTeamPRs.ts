@@ -147,5 +147,15 @@ export function useTeamPRs(opts: Options = {}) {
     }));
   }, []);
 
-  return { ...state, fetch, setStatus, dismissError };
+  /** Patch a single PR in-place — used by the drawer after a comment/review/etc.
+   * so the row reflects the latest labels / ghStatus / ciStatus without waiting
+   * for the next auto-refresh (which is 5 minutes away). */
+  const update = useCallback((id: Identity, patch: Partial<TrackedPR>) => {
+    setState((s) => ({
+      ...s,
+      prs: s.prs.map((p) => (p.owner === id.owner && p.repo === id.repo && p.number === id.number ? { ...p, ...patch } : p)),
+    }));
+  }, []);
+
+  return { ...state, fetch, setStatus, dismissError, update };
 }

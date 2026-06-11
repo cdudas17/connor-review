@@ -112,6 +112,18 @@ export function ReviewDrawer(props: Props) {
   const [summary, setSummary] = useState('');
   const drawerRef = useRef<HTMLElement | null>(null);
 
+  /** Fire `reload()` now, then again ~2s later. GitHub's GraphQL has
+   * read-after-write eventual consistency — sometimes the just-created review
+   * thread isn't in the next meta fetch even though the mutation succeeded.
+   * The second pass catches that case so the user doesn't have to manually
+   * click refresh. The fetch already passes `fresh: true` so the server cache
+   * is bypassed. */
+  const reloadWithCatchup = useCallback(() => {
+    reload();
+    const t = setTimeout(() => reload(), 2000);
+    return () => clearTimeout(t);
+  }, [reload]);
+
   useNextPRPrefetch({ current, prs });
 
   // When the drawer's PR changes (after Approve / Reviewed / nav arrows), reset
@@ -135,8 +147,8 @@ export function ReviewDrawer(props: Props) {
     });
     // Visible-feedback event → run auto-label rules. Best-effort, never throws.
     void maybeAutoLabelOnReview(current, meta?.authorLogin, { onToast });
-    reload();
-  }, [current, reload, meta?.authorLogin, onToast]);
+    reloadWithCatchup();
+  }, [current, reloadWithCatchup, meta?.authorLogin, onToast]);
 
   const addToReview = useCallback(async (c: StagedInlineComment) => {
     if (!current) return;
@@ -149,16 +161,16 @@ export function ReviewDrawer(props: Props) {
       });
       onPendingReviewChange(current, review.id);
     }
-    reload();
-  }, [current, pendingReviewId, onPendingReviewChange, reload]);
+    reloadWithCatchup();
+  }, [current, pendingReviewId, onPendingReviewChange, reloadWithCatchup]);
 
   const reply = useCallback(async (threadId: string, body: string) => {
     if (!current) return;
     await api.replyToThread(current.owner, current.repo, current.number, threadId, body);
     // Visible-feedback event → run auto-label rules.
     void maybeAutoLabelOnReview(current, meta?.authorLogin, { onToast });
-    reload();
-  }, [current, reload, meta?.authorLogin, onToast]);
+    reloadWithCatchup();
+  }, [current, reloadWithCatchup, meta?.authorLogin, onToast]);
 
   const markReady = useCallback(async () => {
     if (!current) return;

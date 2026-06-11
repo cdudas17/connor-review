@@ -100,6 +100,15 @@ export function useAuthoredPRs(author: string, opts: Options = {}) {
     }));
   }, []);
 
+  /** Patch a single PR in-place — used to bubble post-drawer-action meta updates
+   * into the row without waiting for the next auto-refresh. */
+  const update = useCallback((id: Identity, patch: Partial<TrackedPR>) => {
+    setState((s) => ({
+      ...s,
+      prs: s.prs.map((p) => (p.owner === id.owner && p.repo === id.repo && p.number === id.number ? { ...p, ...patch } : p)),
+    }));
+  }, []);
+
   const dismissError = useCallback(() => {
     setState((s) => ({ ...s, errorDismissed: true }));
   }, []);
@@ -131,5 +140,5 @@ export function useAuthoredPRs(author: string, opts: Options = {}) {
     };
   }, [autoRefreshMs]);
 
-  return { ...state, fetch, setStatus, dismissError };
+  return { ...state, fetch, setStatus, dismissError, update };
 }
