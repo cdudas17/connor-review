@@ -303,10 +303,7 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .drawer-refresh { position: absolute; top: 12px; right: 52px; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); cursor: pointer; }
 .drawer-refresh:hover:not(:disabled) { background: var(--bg-subtle); }
 .drawer-refresh:disabled { opacity: 0.5; cursor: default; }
-/* Force a usable icon size — lucide-react v1's `size` prop sets the inline
- * width/height but the icon's viewBox geometry can still render small at the
- * default 1em sizing inside our 28×28 button. Pin it to 18px. */
-.drawer-refresh svg { display: block; width: 18px; height: 18px; }
+.drawer-refresh svg { display: block; }
 .drawer-refresh-spinner { width: 16px; height: 16px; border-width: 2px; margin: 0; }
 .pr-header h2 { margin-bottom: 4px; }
 .pr-header-meta { color: var(--muted); font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }

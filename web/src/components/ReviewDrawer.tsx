@@ -5,7 +5,6 @@ import { ReviewSummaryList } from './ReviewSummaryList.js';
 import { ConversationsList } from './ConversationsList.js';
 import { DiffViewer } from './DiffViewer.js';
 import { ReviewFooter, LocalReviewFooter } from './ReviewFooter.js';
-import { RefreshCw } from 'lucide-react';
 import { ErrorToast } from './ErrorToast.js';
 import { usePRDetails } from '../hooks/usePRDetails.js';
 import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
@@ -263,7 +262,24 @@ export function ReviewDrawer(props: Props) {
           {loading ? (
             <span className="loading-spinner drawer-refresh-spinner" aria-hidden="true" />
           ) : (
-            <RefreshCw aria-hidden="true" />
+            // Heroicons "arrow-path" — inline so the SVG size is explicit and
+            // can't be miniaturized by a stale package or default attrs.
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+              <path d="M21 3v5h-5" />
+            </svg>
           )}
         </button>
       {/* Local-branch entries have no GitHub server-of-record for reviews/comments,
