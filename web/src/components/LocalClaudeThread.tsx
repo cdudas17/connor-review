@@ -72,9 +72,13 @@ export function LocalClaudeThread({ chat, anchor, onAsk, onDismiss }: Props) {
         ))}
       </ol>
       <div className="local-claude-thread-input">
+        {/* Inline-thread input has no Send button — Enter sends, Shift+Enter
+            inserts a newline. The composer-level entry point is the Ask Claude
+            button on the diff editor; once you're in the thread it's all
+            keyboard. */}
         <EmojiTextarea
           aria-label="Follow up with Claude on this line"
-          placeholder="Follow up with Claude… (Enter to send · Shift+Enter for newline)"
+          placeholder={isLoading ? 'Asking Claude…' : 'Follow up with Claude… (Enter to send · Shift+Enter for newline)'}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -85,16 +89,6 @@ export function LocalClaudeThread({ chat, anchor, onAsk, onDismiss }: Props) {
           }}
           disabled={isLoading}
         />
-        <div className="local-claude-thread-input-actions">
-          <button
-            type="button"
-            className="btn-ask-claude"
-            disabled={!canSend}
-            onClick={submit}
-          >
-            {isLoading ? 'Asking…' : 'Send'}
-          </button>
-        </div>
       </div>
     </article>
   );
