@@ -169,28 +169,34 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .local-claude-thread-input-actions { display: flex; justify-content: flex-end; padding: 0 12px; }
 
 /* Pinned multi-turn Claude chat panel — sits above the diff Conversations
- * section. Persisted per PR across drawer close + navigation. */
-.claude-chat-panel { margin: 12px 0; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; background: var(--bg-subtle); padding: 12px 14px; }
-.claude-chat-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+ * section. Persisted per PR across drawer close + navigation.
+ *
+ * Same full-width treatment as the inline LocalClaudeThread: the outer panel
+ * has no border/background/border-radius; each turn card is the visible
+ * content and reaches edge-to-edge with the drawer's content column. Per-turn
+ * accent stripe (3px on the left) — blue for Claude, grey for You. */
+.claude-chat-panel { margin: 12px 0; padding: 0; background: var(--bg); border: none; border-radius: 0; }
+.claude-chat-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 6px; }
 .claude-chat-header h3 { margin: 0; font-size: 0.95rem; color: var(--fg); }
 .claude-chat-count { color: var(--muted); font-weight: 400; font-size: 0.85rem; margin-left: 6px; }
 .claude-chat-clear { background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); padding: 4px 10px; font: inherit; cursor: pointer; font-size: 0.85rem; }
-.claude-chat-clear:hover { background: var(--bg); color: var(--fg); }
-.claude-chat-turns { list-style: none; padding: 0; margin: 0 0 10px; display: flex; flex-direction: column; gap: 10px; }
-.claude-chat-turn { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); }
-.claude-chat-turn-user { border-left: 3px solid var(--muted); }
-.claude-chat-turn-claude { border-left: 3px solid var(--accent); }
-.claude-chat-turn-header { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 4px; }
-.claude-chat-turn-body { color: var(--fg); margin: 0; }
+.claude-chat-clear:hover { background: var(--bg-subtle); color: var(--fg); }
+/* Turn cards: flush with the drawer column edges, just an 8px vertical gap between them. */
+.claude-chat-turns { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.claude-chat-turn { padding: 8px 14px; border-radius: 0; border: 0; background: var(--bg-subtle); border-left: 3px solid transparent; }
+.claude-chat-turn-user { border-left-color: var(--muted); }
+.claude-chat-turn-claude { border-left-color: var(--accent); }
+.claude-chat-turn-header { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+.claude-chat-turn-body { color: var(--fg); margin: 0; line-height: 1.5; }
 .claude-chat-turn-user-body { white-space: pre-wrap; word-break: break-word; }
 .claude-chat-turn-loading { display: flex; align-items: center; gap: 10px; color: var(--muted); padding: 4px 0; }
 .claude-chat-turn-error { color: var(--err, #cf6679); margin: 0; white-space: pre-wrap; }
 .claude-chat-turn-note { margin: 6px 0 0; color: var(--muted); font-size: 0.8rem; font-style: italic; }
-.claude-chat-input { display: flex; flex-direction: column; gap: 6px; }
-/* Match the "Leave a summary" textarea styling — same width, resize affordance, min-height. */
-.claude-chat-input textarea { width: 100%; min-height: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; font: inherit; resize: vertical; box-sizing: border-box; }
-.claude-chat-input textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
-.claude-chat-input-actions { display: flex; justify-content: flex-end; }
+/* Input: also flush. Textarea has top + bottom borders to separate it from the last turn. Send sits right-aligned with a small inset. */
+.claude-chat-input { padding: 8px 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.claude-chat-input textarea { width: 100%; min-height: 60px; padding: 8px 12px; border-top: 1px solid var(--border); border-left: 0; border-right: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: inherit; font: inherit; resize: vertical; box-sizing: border-box; }
+.claude-chat-input textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; border-color: transparent; }
+.claude-chat-input-actions { display: flex; justify-content: flex-end; padding: 0 12px; }
 
 /* Per-row Claude indicator on the PR list. */
 .claude-badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; background: transparent; font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1; }
