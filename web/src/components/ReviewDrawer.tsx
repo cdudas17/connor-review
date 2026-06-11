@@ -263,7 +263,7 @@ export function ReviewDrawer(props: Props) {
           {loading ? (
             <span className="loading-spinner drawer-refresh-spinner" aria-hidden="true" />
           ) : (
-            <RefreshCw size={18} aria-hidden="true" />
+            <RefreshCw aria-hidden="true" />
           )}
         </button>
       {/* Local-branch entries have no GitHub server-of-record for reviews/comments,
