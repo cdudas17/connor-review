@@ -68,6 +68,27 @@ describe('ClaudeChatPanel', () => {
     expect(textarea.value).toBe('');
   });
 
+  it('Enter submits, Shift+Enter inserts a newline', async () => {
+    const chat: ClaudeChat = {
+      savedAt: Date.now(),
+      turns: [
+        { role: 'user', body: 'q', ts: 1 },
+        { role: 'claude', body: 'A', ts: 2 },
+      ],
+    };
+    const onAsk = vi.fn();
+    render(<ClaudeChatPanel chat={chat} onAsk={onAsk} onClear={() => {}} />);
+    const textarea = screen.getByPlaceholderText(/follow up/i) as HTMLTextAreaElement;
+    // Shift+Enter → newline, no submit.
+    await userEvent.type(textarea, 'line 1{Shift>}{Enter}{/Shift}line 2');
+    expect(onAsk).not.toHaveBeenCalled();
+    expect(textarea.value).toBe('line 1\nline 2');
+    // Plain Enter → submit, input clears.
+    await userEvent.type(textarea, '{Enter}');
+    expect(onAsk).toHaveBeenCalledWith('line 1\nline 2');
+    expect(textarea.value).toBe('');
+  });
+
   it('Send is disabled while any turn is loading', () => {
     const chat: ClaudeChat = {
       savedAt: Date.now(),

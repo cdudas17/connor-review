@@ -22,6 +22,11 @@ export function ClaudeChatPanel({ chat, onAsk, onClear }: Props) {
   const isLoading = useMemo(() => chat?.turns.some((t) => t.loading) ?? false, [chat]);
   if (!chat || chat.turns.length === 0) return null;
   const canSend = !isLoading && draft.trim().length > 0;
+  const submit = () => {
+    if (!canSend) return;
+    onAsk(draft);
+    setDraft('');
+  };
   return (
     <section className="claude-chat-panel" aria-label="Claude chat">
       <header className="claude-chat-header">
@@ -60,9 +65,18 @@ export function ClaudeChatPanel({ chat, onAsk, onClear }: Props) {
       <div className="claude-chat-input">
         <EmojiTextarea
           aria-label="Reply to Claude"
-          placeholder="Follow up with Claude…"
+          placeholder="Follow up with Claude… (Enter to send · Shift+Enter for newline)"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter submits; Shift+Enter inserts a newline (default).
+            // EmojiTextarea consumes Enter when its suggestion popup is open
+            // so emoji shortcode autocomplete still works first.
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
           disabled={isLoading}
         />
         <div className="claude-chat-input-actions">
@@ -70,11 +84,7 @@ export function ClaudeChatPanel({ chat, onAsk, onClear }: Props) {
             type="button"
             className="btn-ask-claude"
             disabled={!canSend}
-            onClick={() => {
-              if (!canSend) return;
-              onAsk(draft);
-              setDraft('');
-            }}
+            onClick={submit}
           >
             {isLoading ? 'Asking…' : 'Send'}
           </button>
