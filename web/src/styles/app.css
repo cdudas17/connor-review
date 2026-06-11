@@ -295,15 +295,21 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 70vw; min-width: 720px; background: var(--bg); border-left: 1px solid var(--border); box-shadow: -8px 0 32px rgba(0,0,0,0.18); overflow: auto; padding: 16px 24px 120px; z-index: 11; }
 /* The close × and refresh both sit in the top-right corner, same visual weight,
  * with a small gap between. Both use the same hit-target size, same border,
- * same background. */
-.drawer-close { position: absolute; top: 12px; right: 16px; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.4rem; line-height: 1; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); cursor: pointer; }
-.drawer-close:hover { background: var(--bg-subtle); }
+ * same background.
+ *
+ * IMPORTANT: `.drawer button` higher up sets `padding: 6px 12px` and has
+ * specificity (0,1,1) — higher than `.drawer-close` / `.drawer-refresh`'s
+ * (0,1,0). We use `.drawer .drawer-close` / `.drawer .drawer-refresh` to
+ * out-rank it so our `padding: 0` actually applies (otherwise the 6×12 padding
+ * squishes the SVG inside the 28×28 box and the icon renders tiny). */
+.drawer .drawer-close { position: absolute; top: 12px; right: 16px; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.4rem; line-height: 1; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); cursor: pointer; }
+.drawer .drawer-close:hover { background: var(--bg-subtle); }
 .drawer-refresh-indicator { position: absolute; top: 18px; right: 60px; display: inline-flex; align-items: center; color: var(--muted); }
 /* Per-PR refresh button — sibling of the close ×, same size, 8px gap. */
-.drawer-refresh { position: absolute; top: 12px; right: 52px; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); cursor: pointer; }
-.drawer-refresh:hover:not(:disabled) { background: var(--bg-subtle); }
-.drawer-refresh:disabled { opacity: 0.5; cursor: default; }
-.drawer-refresh svg { display: block; }
+.drawer .drawer-refresh { position: absolute; top: 12px; right: 52px; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); cursor: pointer; }
+.drawer .drawer-refresh:hover:not(:disabled) { background: var(--bg-subtle); }
+.drawer .drawer-refresh:disabled { opacity: 0.5; cursor: default; }
+.drawer .drawer-refresh svg { display: block; flex-shrink: 0; }
 .drawer-refresh-spinner { width: 16px; height: 16px; border-width: 2px; margin: 0; }
 .pr-header h2 { margin-bottom: 4px; }
 .pr-header-meta { color: var(--muted); font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
