@@ -24,9 +24,11 @@ export function LocalClaudeThread({ chat, anchor, onAsk, onDismiss }: Props) {
     onAsk(draft);
     setDraft('');
   };
+  // File path is dropped — the thread is already visually anchored to the
+  // line in the diff above. Just show line(s) + side for orientation.
   const rangeLabel = anchor.startLine != null && anchor.startLine !== anchor.line
-    ? `${anchor.path}:${anchor.startLine}–${anchor.line} (${anchor.side})`
-    : `${anchor.path}:${anchor.line} (${anchor.side})`;
+    ? `Lines ${anchor.startLine}–${anchor.line} (${anchor.side})`
+    : `Line ${anchor.line} (${anchor.side})`;
   return (
     <article className="local-claude-thread" aria-label="Claude inline thread">
       <header className="local-claude-thread-header">
