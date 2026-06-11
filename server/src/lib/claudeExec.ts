@@ -14,8 +14,10 @@ export class ClaudeCliError extends Error {
 }
 
 export interface ClaudeExecOptions {
-  /** Hard timeout in ms; default 60_000. Claude responses for code review are
-   * typically 5-30s; allow headroom for large diffs. */
+  /** Hard timeout in ms; default 300_000 (5 min). Claude responses for code
+   * review are typically 5-30s but can run a few minutes on very large diffs
+   * or when the model needs to think through complex changes — better to let
+   * those run than to hard-cut early and force a retry. */
   timeoutMs?: number;
 }
 
@@ -28,7 +30,7 @@ export interface ClaudeExecOptions {
  * than burning a second attempt.
  */
 export function claudeExec(prompt: string, opts: ClaudeExecOptions = {}): Promise<string> {
-  const timeoutMs = opts.timeoutMs ?? 60_000;
+  const timeoutMs = opts.timeoutMs ?? 300_000;
   return new Promise((resolve, reject) => {
     const child = execFile('claude', ['-p'], { maxBuffer: 50 * 1024 * 1024, timeout: timeoutMs }, (err, stdout, stderr) => {
       if (err) {

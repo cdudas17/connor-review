@@ -158,7 +158,7 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
   it('maps TIMEOUT to 504', async () => {
     mockedGh.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
     mockedGh.mockResolvedValueOnce(DIFF);
-    mockedClaude.mockRejectedValueOnce(new ClaudeCliError('TIMEOUT', 'claude -p timed out after 60000ms', ''));
+    mockedClaude.mockRejectedValueOnce(new ClaudeCliError('TIMEOUT', 'claude -p timed out after 300000ms', ''));
     const app = await buildServer();
     const res = await app.inject({
       method: 'POST',
