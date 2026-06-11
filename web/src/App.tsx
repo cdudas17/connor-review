@@ -84,7 +84,15 @@ export function App() {
   // to localStorage). When an in-flight request resolves after the drawer's no
   // longer on that PR, the hook fires a toast.
   const currentPRKey = useMemo(() => (current ? prKey(current) : null), [current]);
-  const claudeResponses = useClaudeResponses({ onToast: addToast, currentPRKey });
+  const claudeResponses = useClaudeResponses({
+    onToast: addToast,
+    currentPRKey,
+    // Resolve a local checkout from `localRepos` so `claude -p` can grep the
+    // actual repo. For GitHub PRs, owner/repo is e.g. Gusto/zenpayroll —
+    // we match on the short repo name. Local-tab entries already have
+    // owner='local' + repo=<shortName> (which is also a localRepos key).
+    repoPathFor: (target) => APP_CONFIG.localRepos?.[target.repo],
+  });
   const [refreshing, setRefreshing] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [memberFilter, setMemberFilter] = useState<Set<string> | null>(null);

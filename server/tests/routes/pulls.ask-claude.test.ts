@@ -22,6 +22,9 @@ vi.mock('../../src/lib/claudeExec.js', () => {
   return { claudeExec, ClaudeCliError };
 });
 
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { buildServer } from '../../src/index.js';
 import { ghExec } from '../../src/lib/ghExec.js';
 import { claudeExec, ClaudeCliError } from '../../src/lib/claudeExec.js';
@@ -182,6 +185,46 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
     const prompt = mockedClaude.mock.calls[0][0] as string;
     expect(prompt).not.toContain('Conversation so far');
     expect(prompt).toContain("User's draft comment");
+    await app.close();
+  });
+
+  it('passes repoPath as cwd to claudeExec when the path is a valid git checkout', async () => {
+    // Make a fake repo dir so the validation passes.
+    const tmp = await fs.mkdtemp(join(tmpdir(), 'cr-claude-cwd-'));
+    try {
+      await fs.mkdir(join(tmp, '.git'));
+      mockedGh.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
+      mockedGh.mockResolvedValueOnce(DIFF);
+      mockedClaude.mockResolvedValueOnce('ok\n');
+      const app = await buildServer();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+        payload: { draft: 'q', repoPath: tmp },
+      });
+      expect(res.statusCode).toBe(200);
+      const opts = mockedClaude.mock.calls[0][1] as { cwd?: string } | undefined;
+      expect(opts?.cwd).toBe(tmp);
+      await app.close();
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('silently ignores repoPath when the path is not a git checkout (falls back to default cwd)', async () => {
+    // Path doesn't exist on disk → validation fails, no cwd passed.
+    mockedGh.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
+    mockedGh.mockResolvedValueOnce(DIFF);
+    mockedClaude.mockResolvedValueOnce('ok\n');
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+      payload: { draft: 'q', repoPath: '/Users/nobody/no-such-path' },
+    });
+    expect(res.statusCode).toBe(200);
+    const opts = mockedClaude.mock.calls[0][1] as { cwd?: string } | undefined;
+    expect(opts?.cwd).toBeUndefined();
     await app.close();
   });
 

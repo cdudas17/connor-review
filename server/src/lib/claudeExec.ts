@@ -19,6 +19,10 @@ export interface ClaudeExecOptions {
    * or when the model needs to think through complex changes — better to let
    * those run than to hard-cut early and force a retry. */
   timeoutMs?: number;
+  /** Working directory for `claude -p`. Lets Claude grep the actual repo
+   * being reviewed (e.g. `~/workspace/zenpayroll`) instead of the connor-review
+   * server dir. Caller is responsible for validating the path. */
+  cwd?: string;
 }
 
 /** Shells out to the user's local `claude` CLI in non-interactive mode and
@@ -32,7 +36,7 @@ export interface ClaudeExecOptions {
 export function claudeExec(prompt: string, opts: ClaudeExecOptions = {}): Promise<string> {
   const timeoutMs = opts.timeoutMs ?? 300_000;
   return new Promise((resolve, reject) => {
-    const child = execFile('claude', ['-p'], { maxBuffer: 50 * 1024 * 1024, timeout: timeoutMs }, (err, stdout, stderr) => {
+    const child = execFile('claude', ['-p'], { maxBuffer: 50 * 1024 * 1024, timeout: timeoutMs, cwd: opts.cwd }, (err, stdout, stderr) => {
       if (err) {
         const stderrStr = stderr.toString();
         const errno = (err as NodeJS.ErrnoException).code;

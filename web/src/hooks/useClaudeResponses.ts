@@ -116,6 +116,10 @@ function sweepStore<T extends { savedAt?: number }>(store: Record<string, T>, no
 interface Options {
   onToast: (kind: 'success' | 'error' | 'info', message: string) => void;
   currentPRKey: string | null;
+  /** Optional: resolve a local checkout path for the PR so `claude -p` runs in
+   * that cwd. Without this, Claude runs from the server's cwd (the
+   * connor-review server) and can't read the target repo's files. */
+  repoPathFor?: (target: PRTarget) => string | undefined;
 }
 
 /** Centralised Claude state for the drawer's "Ask Claude" surfaces.
@@ -129,7 +133,11 @@ interface Options {
  * In-flight requests survive drawer close. When a response lands and the drawer
  * is no longer on that PR, we toast so the user knows to reopen. */
 export function useClaudeResponses(opts: Options) {
-  const { onToast, currentPRKey } = opts;
+  const { onToast, currentPRKey, repoPathFor } = opts;
+  // Stable ref so the ask callbacks (wrapped in useCallback([])) always read
+  // the latest resolver without invalidating their identity.
+  const repoPathForRef = useRef<typeof repoPathFor>(repoPathFor);
+  useEffect(() => { repoPathForRef.current = repoPathFor; }, [repoPathFor]);
   const [chats, setChats] = useState<Record<string, ClaudeChat>>(() => sweepStore(loadChats(), Date.now()));
   const [threads, setThreads] = useState<Record<string, ClaudeResponseState>>(() => sweepStore(loadStore(THREAD_STORAGE_KEY), Date.now()));
 
@@ -180,6 +188,7 @@ export function useClaudeResponses(opts: Options) {
     api.askClaude(target.owner, target.repo, target.number, {
       draft: trimmed,
       conversation: priorTurns.map((t) => ({ role: t.role, body: t.body })),
+      repoPath: repoPathForRef.current?.(target),
     })
       .then((res) => {
         if (tokensRef.current.get(`chat::${key}`) !== token) return;
@@ -228,7 +237,11 @@ export function useClaudeResponses(opts: Options) {
     tokensRef.current.set(`thread::${key}`, token);
     setThreads((s) => ({ ...s, [key]: { loading: true } }));
     const prRef = prKey(target);
-    api.askClaude(target.owner, target.repo, target.number, { draft, lineRange })
+    api.askClaude(target.owner, target.repo, target.number, {
+      draft,
+      lineRange,
+      repoPath: repoPathForRef.current?.(target),
+    })
       .then((res) => {
         if (tokensRef.current.get(`thread::${key}`) !== token) return;
         setThreads((s) => ({ ...s, [key]: { loading: false, body: res.response, truncatedDiff: res.truncatedDiff, savedAt: Date.now() } }));

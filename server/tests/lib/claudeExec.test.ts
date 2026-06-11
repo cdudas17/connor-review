@@ -68,6 +68,13 @@ describe('claudeExec', () => {
     expect(call[1]).toEqual(['-p']);
   });
 
+  it('passes the cwd option through to execFile', async () => {
+    setExecFile({ stdout: 'ok\n' });
+    await claudeExec('hi', { cwd: '/Users/me/zenpayroll' });
+    const call = (childProcess.execFile as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[2]).toMatchObject({ cwd: '/Users/me/zenpayroll' });
+  });
+
   it('throws CLAUDE_NOT_INSTALLED when the CLI is missing', async () => {
     setExecFile({ errno: 'ENOENT' });
     await expect(claudeExec('hi')).rejects.toMatchObject({

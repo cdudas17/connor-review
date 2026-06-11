@@ -10,6 +10,8 @@ import { ADD_PULL_REQUEST_REVIEW_THREAD_REPLY_MUTATION } from '../queries/addPul
 import { SUBMIT_PULL_REQUEST_REVIEW_MUTATION } from '../queries/submitPullRequestReview.graphql.js';
 import { MARK_READY_FOR_REVIEW_MUTATION } from '../queries/markReadyForReview.graphql.js';
 import { claudeExec, ClaudeCliError } from '../lib/claudeExec.js';
+import { existsSync, statSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
 
 type CiStatus = 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' | null;
 
@@ -545,6 +547,11 @@ export async function registerPullsRoutes(app: FastifyInstance) {
        * doesn't matter — we render them in order. Each turn's `body` goes into
        * the prompt verbatim labeled by role. */
       conversation?: Array<{ role: 'user' | 'claude'; body: string }>;
+      /** Optional local checkout path. When valid (exists + has .git), `claude -p`
+       * runs with that as its cwd so Claude can grep / read the actual repo
+       * being reviewed. Without it, Claude runs from the server's cwd (the
+       * connor-review repo) and can't see the target codebase. */
+      repoPath?: string;
     };
   }>('/api/pulls/:owner/:repo/:number/claude/ask', async (req, reply) => {
     const params = parsePullParams(req.params);
@@ -602,8 +609,21 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       'Respond as a thoughtful, concise code reviewer would — engage with the user\'s point, flag anything they may have missed, suggest follow-ups when useful. Do not pretend to be the PR author. When a prior conversation is present, build on it (do not repeat earlier explanations verbatim). Keep the response focused and well under 400 words unless the question genuinely demands more.',
     ].join('\n');
 
+    // Resolve cwd for claude: only honor the path if it's a real directory with
+    // a .git subdir. Anything else falls back to default (claude runs in the
+    // server's cwd) so a stale config doesn't error out the whole request.
+    let claudeCwd: string | undefined;
+    if (req.body.repoPath) {
+      const abs = resolvePath(req.body.repoPath);
+      try {
+        if (existsSync(abs) && statSync(abs).isDirectory() && existsSync(resolvePath(abs, '.git'))) {
+          claudeCwd = abs;
+        }
+      } catch { /* ignore — fall back to default cwd */ }
+    }
+
     try {
-      const response = await claudeExec(prompt);
+      const response = await claudeExec(prompt, { cwd: claudeCwd });
       return { response: response.trim(), truncatedDiff: truncated };
     } catch (e) {
       if (e instanceof ClaudeCliError) {
