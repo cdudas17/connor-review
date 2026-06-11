@@ -32,6 +32,17 @@ interface Identity {
 const noopAsync = async (_c: StagedInlineComment): Promise<void> => { /* local entries can't post inline comments */ };
 const noopReply = async (_threadId: string, _body: string): Promise<void> => { /* local entries have no threads */ };
 
+/** Material-design "refresh" icon. Defined inline using the EXACT same JSX
+ * shape as CopyIcon / ChevronRightIcon in this codebase (numeric size prop,
+ * 24×24 viewBox, single filled path) so it renders at the same fidelity. */
+function RefreshIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+    </svg>
+  );
+}
+
 interface Props {
   current: Identity | null;
   prs: TrackedPR[];
@@ -262,26 +273,7 @@ export function ReviewDrawer(props: Props) {
           {loading ? (
             <span className="loading-spinner drawer-refresh-spinner" aria-hidden="true" />
           ) : (
-            // Refresh-cw — full 24x24 viewBox coverage so the icon doesn't
-            // collapse into a corner the way my earlier path did.
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              focusable="false"
-            >
-              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-              <path d="M21 3v5h-5" />
-              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-              <path d="M3 21v-5h5" />
-            </svg>
+            <RefreshIcon size={18} />
           )}
         </button>
       {/* Local-branch entries have no GitHub server-of-record for reviews/comments,
