@@ -702,11 +702,11 @@ export function App() {
             onToast={addToast}
             onSetStatus={activeSetStatus}
             onClose={() => setCurrent(null)}
-            summaryClaudeState={claudeResponses.summaryFor(current)}
+            claudeChat={claudeResponses.chatFor(current)}
             threadClaudeState={(threadId) => claudeResponses.threadFor(current, threadId)}
-            onAskSummaryClaude={(draft) => claudeResponses.askSummary(current, draft.trim())}
+            onAskClaudeChat={(userMessage) => claudeResponses.askInChat(current, userMessage)}
+            onClearClaudeChat={() => claudeResponses.dismissChat(current)}
             onAskThreadClaude={(threadId, draft, lineRange) => claudeResponses.askThread(current, threadId, draft, lineRange)}
-            onDismissSummaryClaude={() => claudeResponses.dismissSummary(current)}
             onDismissThreadClaude={(threadId) => claudeResponses.dismissThread(current, threadId)}
           />
         );

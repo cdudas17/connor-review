@@ -129,6 +129,27 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .btn-ask-claude { border: 1px solid var(--accent) !important; color: var(--accent) !important; background: transparent !important; }
 .btn-ask-claude:hover:not(:disabled) { background: var(--bg-subtle) !important; }
 
+/* Pinned multi-turn Claude chat panel — sits above the diff Conversations
+ * section. Persisted per PR across drawer close + navigation. */
+.claude-chat-panel { margin: 12px 0; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; background: var(--bg-subtle); padding: 12px 14px; }
+.claude-chat-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.claude-chat-header h3 { margin: 0; font-size: 0.95rem; color: var(--fg); }
+.claude-chat-count { color: var(--muted); font-weight: 400; font-size: 0.85rem; margin-left: 6px; }
+.claude-chat-clear { background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); padding: 4px 10px; font: inherit; cursor: pointer; font-size: 0.85rem; }
+.claude-chat-clear:hover { background: var(--bg); color: var(--fg); }
+.claude-chat-turns { list-style: none; padding: 0; margin: 0 0 10px; display: flex; flex-direction: column; gap: 10px; }
+.claude-chat-turn { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); }
+.claude-chat-turn-user { border-left: 3px solid var(--muted); }
+.claude-chat-turn-claude { border-left: 3px solid var(--accent); }
+.claude-chat-turn-header { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 4px; }
+.claude-chat-turn-body { color: var(--fg); margin: 0; }
+.claude-chat-turn-user-body { white-space: pre-wrap; word-break: break-word; }
+.claude-chat-turn-loading { display: flex; align-items: center; gap: 10px; color: var(--muted); padding: 4px 0; }
+.claude-chat-turn-error { color: var(--err, #cf6679); margin: 0; white-space: pre-wrap; }
+.claude-chat-turn-note { margin: 6px 0 0; color: var(--muted); font-size: 0.8rem; font-style: italic; }
+.claude-chat-input { display: flex; flex-direction: column; gap: 6px; }
+.claude-chat-input-actions { display: flex; justify-content: flex-end; }
+
 /* Per-row Claude indicator on the PR list. */
 .claude-badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; background: transparent; font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1; }
 .claude-badge-loading { color: var(--accent); }

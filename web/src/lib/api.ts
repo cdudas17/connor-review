@@ -111,6 +111,8 @@ export const api = {
     body: {
       draft: string;
       lineRange?: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' };
+      /** Prior turns so Claude has chat context on follow-ups. */
+      conversation?: Array<{ role: 'user' | 'claude'; body: string }>;
     },
   ): Promise<{ response: string; truncatedDiff?: boolean }> {
     return call(`/api/pulls/${owner}/${repo}/${number}/claude/ask`, {

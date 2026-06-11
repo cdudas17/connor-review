@@ -541,6 +541,10 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         endLine: number;
         side: 'LEFT' | 'RIGHT';
       };
+      /** Prior turns when continuing a chat. Most-recent-first or oldest-first
+       * doesn't matter — we render them in order. Each turn's `body` goes into
+       * the prompt verbatim labeled by role. */
+      conversation?: Array<{ role: 'user' | 'claude'; body: string }>;
     };
   }>('/api/pulls/:owner/:repo/:number/claude/ask', async (req, reply) => {
     const params = parsePullParams(req.params);
@@ -573,6 +577,16 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       ? `\nThe user is commenting on ${req.body.lineRange.path} ${req.body.lineRange.startLine != null && req.body.lineRange.startLine !== req.body.lineRange.endLine ? `lines ${req.body.lineRange.startLine}–${req.body.lineRange.endLine}` : `line ${req.body.lineRange.endLine}`} (${req.body.lineRange.side === 'LEFT' ? 'old/deleted side' : 'new/added side'}).\n`
       : '';
 
+    // Multi-turn chat: prior turns go into the prompt so Claude has context.
+    // The user's latest draft is appended as the "latest message" block.
+    const priorTurns = (req.body.conversation ?? []).filter((t) => t && typeof t.body === 'string' && t.body.length > 0);
+    const conversationBlock = priorTurns.length > 0
+      ? '\nConversation so far:\n' + priorTurns.map((t) => {
+          const label = t.role === 'claude' ? 'Claude' : 'User';
+          return `[${label}]:\n${t.body}\n`;
+        }).join('\n')
+      : '';
+
     const prompt = [
       `You're helping the user review GitHub PR "${meta.title}" by @${meta.authorLogin ?? 'unknown'} on ${params.owner}/${params.repo}.`,
       '',
@@ -581,10 +595,11 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       diffForPrompt,
       '```',
       lineRangeBlock,
-      "User's draft comment:",
+      conversationBlock,
+      priorTurns.length > 0 ? "User's latest message:" : "User's draft comment:",
       '> ' + draft.replace(/\n/g, '\n> '),
       '',
-      'Respond as a thoughtful, concise code reviewer would — engage with the user\'s point, flag anything they may have missed, suggest follow-ups when useful. Do not pretend to be the PR author. Keep the response focused and well under 400 words unless the question genuinely demands more.',
+      'Respond as a thoughtful, concise code reviewer would — engage with the user\'s point, flag anything they may have missed, suggest follow-ups when useful. Do not pretend to be the PR author. When a prior conversation is present, build on it (do not repeat earlier explanations verbatim). Keep the response focused and well under 400 words unless the question genuinely demands more.',
     ].join('\n');
 
     try {

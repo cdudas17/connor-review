@@ -5,33 +5,91 @@ import type { ClaudeResponseState } from '../components/ClaudeResponseCard.js';
 interface PRTarget { owner: string; repo: string; number: number; }
 interface LineRange { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }
 
-const SUMMARY_STORAGE_KEY = 'connor-review.claudeSummary.v1';
+export interface ClaudeChatTurn {
+  role: 'user' | 'claude';
+  body: string;
+  ts: number;
+  /** True only on the latest claude turn while in-flight; cleared on settle. Never persisted. */
+  loading?: boolean;
+  /** Set on a claude turn that failed. */
+  error?: string;
+  /** Set on a claude turn whose prompt had a truncated diff. Display-only. */
+  truncatedDiff?: boolean;
+}
+
+export interface ClaudeChat {
+  turns: ClaudeChatTurn[];
+  /** Epoch ms when this chat was last updated. Drives sweep + LRU. */
+  savedAt: number;
+}
+
+/** Persisted-chat storage. Replaces the old per-PR summary card store. */
+const CHAT_STORAGE_KEY = 'connor-review.claudeChat.v1';
+/** Legacy summary card store (single response per PR). Read once at boot and
+ * migrated into the new chat shape (single claude turn), then ignored. */
+const LEGACY_SUMMARY_STORAGE_KEY = 'connor-review.claudeSummary.v1';
 const THREAD_STORAGE_KEY = 'connor-review.claudeThread.v1';
 
-/** Drop persisted responses older than this on hook mount. 30 days is generous
- * enough that you can pick up where you left off after a long break, while
- * still preventing unbounded localStorage growth. */
+/** Drop persisted responses older than this on hook mount. */
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
-/** Hard cap per bucket. With ~2KB per response and a 5MB quota, this gives ~10x
- * headroom even at the upper end. Eviction is LRU by `savedAt`. */
 const MAX_ENTRIES = 200;
 
 function prKey(p: PRTarget): string { return `${p.owner}/${p.repo}#${p.number}`; }
 function threadKey(p: PRTarget, threadId: string): string { return `${prKey(p)}::${threadId}`; }
 
-function loadStore(key: string): Record<string, ClaudeResponseState> {
+function loadJson<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
-    if (!raw) return {};
+    if (!raw) return fallback;
     const parsed = JSON.parse(raw);
-    return typeof parsed === 'object' && parsed != null ? parsed : {};
+    return parsed ?? fallback;
   } catch {
-    return {};
+    return fallback;
   }
 }
 
-/** Save a store, but drop any entries still in `loading` — those would be stuck
- * if the page reloaded mid-request (the request itself dies with the page). */
+function loadChats(): Record<string, ClaudeChat> {
+  const direct = loadJson<Record<string, ClaudeChat>>(CHAT_STORAGE_KEY, {});
+  if (Object.keys(direct).length > 0) return direct;
+  // Migrate any legacy single-card entries on first run.
+  const legacy = loadJson<Record<string, ClaudeResponseState & { savedAt?: number }>>(LEGACY_SUMMARY_STORAGE_KEY, {});
+  const migrated: Record<string, ClaudeChat> = {};
+  for (const [key, v] of Object.entries(legacy)) {
+    if (v.loading) continue;
+    if (!v.body && !v.error) continue;
+    const ts = v.savedAt ?? Date.now();
+    migrated[key] = {
+      savedAt: ts,
+      turns: [
+        // The legacy single-card stored only Claude's response — we don't have
+        // the user's original prompt. Render as a Claude turn with a marker so
+        // the user knows what it is.
+        { role: 'claude', body: v.body ?? '', ts, truncatedDiff: v.truncatedDiff, error: v.error },
+      ],
+    };
+  }
+  return migrated;
+}
+
+function persistChats(store: Record<string, ClaudeChat>) {
+  try {
+    // Drop transient `loading` flags from any claude turn before persisting —
+    // a loading request that's lost on reload would otherwise stay stuck.
+    const stable: Record<string, ClaudeChat> = {};
+    for (const [k, v] of Object.entries(store)) {
+      stable[k] = {
+        savedAt: v.savedAt,
+        turns: v.turns.map((t) => (t.loading ? { ...t, loading: false } : t)),
+      };
+    }
+    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(stable));
+  } catch { /* quota — ignore */ }
+}
+
+function loadStore(key: string): Record<string, ClaudeResponseState> {
+  return loadJson<Record<string, ClaudeResponseState>>(key, {});
+}
+
 function persistStore(key: string, store: Record<string, ClaudeResponseState>) {
   try {
     const stable: Record<string, ClaudeResponseState> = {};
@@ -40,96 +98,130 @@ function persistStore(key: string, store: Record<string, ClaudeResponseState>) {
       stable[k] = v;
     }
     localStorage.setItem(key, JSON.stringify(stable));
-  } catch { /* quota — ignore */ }
+  } catch { /* ignore */ }
 }
 
-/** Strip entries older than MAX_AGE_MS and LRU-evict down to MAX_ENTRIES.
- * Returns the cleaned store; pure (no localStorage side effect). */
-function sweepStore(store: Record<string, ClaudeResponseState>, now: number): Record<string, ClaudeResponseState> {
+function sweepStore<T extends { savedAt?: number }>(store: Record<string, T>, now: number): Record<string, T> {
   const cutoff = now - MAX_AGE_MS;
-  // First pass: drop too-old. Anything without a savedAt is treated as freshly
-  // saved at the cutoff so old un-stamped entries don't all get wiped on the
-  // first run — they'll get a real timestamp on the next ask.
-  const fresh: Array<[string, ClaudeResponseState & { savedAt?: number }]> = [];
+  const fresh: Array<[string, T]> = [];
   for (const [k, v] of Object.entries(store)) {
-    const savedAt = (v as ClaudeResponseState & { savedAt?: number }).savedAt;
-    if (savedAt != null && savedAt < cutoff) continue;
+    if (v.savedAt != null && v.savedAt < cutoff) continue;
     fresh.push([k, v]);
   }
-  // Second pass: cap at MAX_ENTRIES. Sort by savedAt asc and drop oldest.
-  if (fresh.length <= MAX_ENTRIES) {
-    return Object.fromEntries(fresh);
-  }
-  fresh.sort((a, b) => {
-    const aT = a[1].savedAt ?? 0;
-    const bT = b[1].savedAt ?? 0;
-    return aT - bT;
-  });
+  if (fresh.length <= MAX_ENTRIES) return Object.fromEntries(fresh);
+  fresh.sort((a, b) => (a[1].savedAt ?? 0) - (b[1].savedAt ?? 0));
   return Object.fromEntries(fresh.slice(fresh.length - MAX_ENTRIES));
 }
 
 interface Options {
-  /** App's toast callback. Fired only when a response lands while the drawer is NOT on the asking PR. */
   onToast: (kind: 'success' | 'error' | 'info', message: string) => void;
-  /** Currently-open drawer's PR key, or null when no drawer is open. Used to decide
-   * whether a late-arriving response should toast (drawer closed / different PR)
-   * vs just silently update state (drawer still on the asking PR). */
   currentPRKey: string | null;
 }
 
-/** Centralised Claude response state for the drawer's "Ask Claude" surfaces.
+/** Centralised Claude state for the drawer's "Ask Claude" surfaces.
  *
- * - **Summary card** (one per PR): persisted across drawer close, PR navigation, page reload.
- * - **Thread reply cards** (one per PR + thread id): same.
- * - **Inline composer cards** (per file/line range): NOT owned here — those stay
- *   ephemeral inside DiffViewer because the composer itself is ephemeral.
+ * - **Chat panel** (one per PR): a multi-turn conversation. Replaces what used
+ *   to be the single summary response card. Persisted across drawer close, PR
+ *   navigation, and page reload. Follow-up turns send the full history.
+ * - **Thread reply cards** (one per PR + thread id): single-shot, persisted.
+ * - **Inline composer cards**: ephemeral, not owned here.
  *
  * In-flight requests survive drawer close. When a response lands and the drawer
- * is no longer on the asking PR, we fire an info/error toast so the user knows
- * to reopen. The state itself is keyed by PR (+ thread), so reopening the
- * drawer always shows whatever's currently stored. */
+ * is no longer on that PR, we toast so the user knows to reopen. */
 export function useClaudeResponses(opts: Options) {
   const { onToast, currentPRKey } = opts;
-  // Sweep on mount: drop entries past MAX_AGE_MS, cap at MAX_ENTRIES (LRU by
-  // savedAt). Pure function so it's also straightforward to unit-test directly.
-  const [summary, setSummary] = useState<Record<string, ClaudeResponseState>>(() => sweepStore(loadStore(SUMMARY_STORAGE_KEY), Date.now()));
+  const [chats, setChats] = useState<Record<string, ClaudeChat>>(() => sweepStore(loadChats(), Date.now()));
   const [threads, setThreads] = useState<Record<string, ClaudeResponseState>>(() => sweepStore(loadStore(THREAD_STORAGE_KEY), Date.now()));
 
-  // Per-key token: lets us discard a stale resolution if the user fires a second
-  // ask on the same key before the first settles.
   const tokensRef = useRef<Map<string, number>>(new Map());
-
-  // Ref-mirror of currentPRKey so the async resolver reads the up-to-date drawer
-  // location, not the value captured when `ask*` was called.
   const currentPRKeyRef = useRef<string | null>(currentPRKey);
   useEffect(() => { currentPRKeyRef.current = currentPRKey; }, [currentPRKey]);
 
-  useEffect(() => { persistStore(SUMMARY_STORAGE_KEY, summary); }, [summary]);
+  // Ref-mirror of chats so the synchronous part of askInChat can read the
+  // latest turns without going through a state-updater (React 18 batches the
+  // updater, which means it runs AFTER `api.askClaude` is called otherwise).
+  const chatsRef = useRef<Record<string, ClaudeChat>>(chats);
+  useEffect(() => { chatsRef.current = chats; }, [chats]);
+
+  useEffect(() => { persistChats(chats); }, [chats]);
   useEffect(() => { persistStore(THREAD_STORAGE_KEY, threads); }, [threads]);
 
-  const askSummary = useCallback((target: PRTarget, draft: string) => {
+  /** Append a user message to the PR's chat, fire Claude with the full history,
+   * and stream the resolved reply into a claude turn. Token-guarded — a second
+   * ask while the first is still in flight discards the older resolution. */
+  const askInChat = useCallback((target: PRTarget, userMessage: string) => {
+    const trimmed = userMessage.trim();
+    if (!trimmed) return;
     const key = prKey(target);
-    const token = (tokensRef.current.get(`summary::${key}`) ?? 0) + 1;
-    tokensRef.current.set(`summary::${key}`, token);
-    setSummary((s) => ({ ...s, [key]: { loading: true } }));
-    api.askClaude(target.owner, target.repo, target.number, { draft })
+    const token = (tokensRef.current.get(`chat::${key}`) ?? 0) + 1;
+    tokensRef.current.set(`chat::${key}`, token);
+
+    // Read existing turns from the ref synchronously — state-updater runs
+    // later under React 18 batching, which would race with api.askClaude below.
+    const existing = chatsRef.current[key];
+    const priorTurns: ClaudeChatTurn[] = existing?.turns.filter((t) => !t.loading) ?? [];
+    const now = Date.now();
+    setChats((c) => {
+      const cur = c[key];
+      const baseTurns = cur?.turns.filter((t) => !t.loading) ?? [];
+      return {
+        ...c,
+        [key]: {
+          savedAt: now,
+          turns: [
+            ...baseTurns,
+            { role: 'user', body: trimmed, ts: now },
+            { role: 'claude', body: '', ts: now, loading: true },
+          ],
+        },
+      };
+    });
+
+    api.askClaude(target.owner, target.repo, target.number, {
+      draft: trimmed,
+      conversation: priorTurns.map((t) => ({ role: t.role, body: t.body })),
+    })
       .then((res) => {
-        if (tokensRef.current.get(`summary::${key}`) !== token) return;
-        setSummary((s) => ({ ...s, [key]: { loading: false, body: res.response, truncatedDiff: res.truncatedDiff, savedAt: Date.now() } }));
+        if (tokensRef.current.get(`chat::${key}`) !== token) return;
+        setChats((c) => {
+          const cur = c[key];
+          if (!cur) return c;
+          // Replace the trailing loading claude turn with the resolved one.
+          const turns = cur.turns.map((t, i) =>
+            i === cur.turns.length - 1 && t.role === 'claude' && t.loading
+              ? { ...t, loading: false, body: res.response, truncatedDiff: res.truncatedDiff, ts: Date.now() }
+              : t);
+          return { ...c, [key]: { savedAt: Date.now(), turns } };
+        });
         if (currentPRKeyRef.current !== key) {
           onToast('info', `Claude answered on ${key} — reopen to see it`);
         }
       })
       .catch((e) => {
-        if (tokensRef.current.get(`summary::${key}`) !== token) return;
+        if (tokensRef.current.get(`chat::${key}`) !== token) return;
         const msg = (e as ApiCallError | Error).message;
-        setSummary((s) => ({ ...s, [key]: { loading: false, error: msg, savedAt: Date.now() } }));
+        setChats((c) => {
+          const cur = c[key];
+          if (!cur) return c;
+          const turns = cur.turns.map((t, i) =>
+            i === cur.turns.length - 1 && t.role === 'claude' && t.loading
+              ? { ...t, loading: false, error: msg, ts: Date.now() }
+              : t);
+          return { ...c, [key]: { savedAt: Date.now(), turns } };
+        });
         if (currentPRKeyRef.current !== key) {
           onToast('error', `Claude failed for ${key}: ${msg}`);
         }
       });
   }, [onToast]);
 
+  const dismissChat = useCallback((target: PRTarget) => {
+    const key = prKey(target);
+    tokensRef.current.set(`chat::${key}`, (tokensRef.current.get(`chat::${key}`) ?? 0) + 1);
+    setChats((c) => { const next = { ...c }; delete next[key]; return next; });
+  }, []);
+
+  // Thread reply Claude state — unchanged single-shot per (PR, threadId).
   const askThread = useCallback((target: PRTarget, threadId: string, draft: string, lineRange: LineRange) => {
     const key = threadKey(target, threadId);
     const token = (tokensRef.current.get(`thread::${key}`) ?? 0) + 1;
@@ -154,29 +246,18 @@ export function useClaudeResponses(opts: Options) {
       });
   }, [onToast]);
 
-  const dismissSummary = useCallback((target: PRTarget) => {
-    const key = prKey(target);
-    // bump the token so any in-flight resolution is dropped — a dismiss is an
-    // explicit "I don't care about the result anymore" signal.
-    tokensRef.current.set(`summary::${key}`, (tokensRef.current.get(`summary::${key}`) ?? 0) + 1);
-    setSummary((s) => { const next = { ...s }; delete next[key]; return next; });
-  }, []);
-
   const dismissThread = useCallback((target: PRTarget, threadId: string) => {
     const key = threadKey(target, threadId);
     tokensRef.current.set(`thread::${key}`, (tokensRef.current.get(`thread::${key}`) ?? 0) + 1);
     setThreads((s) => { const next = { ...s }; delete next[key]; return next; });
   }, []);
 
-  /** Drop every Claude entry tied to a PR — summary + all thread replies for that PR.
-   * Used when the user deletes a PR from a tracked list so we don't carry stale
-   * Claude state around for PRs they're no longer following. */
+  /** Drop every Claude entry tied to a PR — chat + all thread replies. */
   const dismissAllForPR = useCallback((target: PRTarget) => {
     const sKey = prKey(target);
     const tPrefix = `${sKey}::`;
-    // Bump tokens for any in-flight requests so their resolutions get dropped.
-    tokensRef.current.set(`summary::${sKey}`, (tokensRef.current.get(`summary::${sKey}`) ?? 0) + 1);
-    setSummary((s) => { const next = { ...s }; delete next[sKey]; return next; });
+    tokensRef.current.set(`chat::${sKey}`, (tokensRef.current.get(`chat::${sKey}`) ?? 0) + 1);
+    setChats((c) => { const next = { ...c }; delete next[sKey]; return next; });
     setThreads((s) => {
       const next: Record<string, ClaudeResponseState> = {};
       for (const [k, v] of Object.entries(s)) {
@@ -190,37 +271,45 @@ export function useClaudeResponses(opts: Options) {
     });
   }, []);
 
-  /** Pick out the state slice relevant to a single PR. */
-  const summaryFor = useCallback((target: PRTarget): ClaudeResponseState | null => summary[prKey(target)] ?? null, [summary]);
+  const chatFor = useCallback((target: PRTarget): ClaudeChat | null => chats[prKey(target)] ?? null, [chats]);
   const threadFor = useCallback((target: PRTarget, threadId: string): ClaudeResponseState | null => threads[threadKey(target, threadId)] ?? null, [threads]);
 
-  /** Aggregate Claude state across the summary card + every thread card for a PR.
-   * Used by the PR list to render a single per-row indicator.
-   *
-   * Priority: loading wins, then error, then success. Returns null when there's
-   * no Claude state on this PR at all (the common case — most rows). */
+  /** Aggregate state for the PR-list row badge. Inspects chat turns + every
+   * thread card for the PR. Priority: loading > error > success > none. */
   const aggregateFor = useCallback((target: PRTarget): { kind: 'loading' | 'error' | 'success' } | null => {
     const prefix = prKey(target);
-    const candidates: ClaudeResponseState[] = [];
-    const s = summary[prefix];
-    if (s) candidates.push(s);
+    const chat = chats[prefix];
+    let anyLoading = false;
+    let anyError = false;
+    let anyBody = false;
+    if (chat) {
+      for (const t of chat.turns) {
+        if (t.loading) anyLoading = true;
+        if (t.error) anyError = true;
+        if (t.role === 'claude' && t.body && !t.error) anyBody = true;
+      }
+    }
     const threadPrefix = `${prefix}::`;
     for (const [k, v] of Object.entries(threads)) {
-      if (k.startsWith(threadPrefix)) candidates.push(v);
+      if (!k.startsWith(threadPrefix)) continue;
+      if (v.loading) anyLoading = true;
+      if (v.error) anyError = true;
+      if (v.body && !v.error) anyBody = true;
     }
-    if (candidates.length === 0) return null;
-    if (candidates.some((c) => c.loading)) return { kind: 'loading' };
-    if (candidates.some((c) => c.error)) return { kind: 'error' };
+    if (!chat && !Object.keys(threads).some((k) => k.startsWith(threadPrefix))) return null;
+    if (anyLoading) return { kind: 'loading' };
+    if (anyError && !anyBody) return { kind: 'error' };
     return { kind: 'success' };
-  }, [summary, threads]);
+  }, [chats, threads]);
 
-  return { summaryFor, threadFor, aggregateFor, askSummary, askThread, dismissSummary, dismissThread, dismissAllForPR };
+  return { chatFor, threadFor, aggregateFor, askInChat, askThread, dismissChat, dismissThread, dismissAllForPR };
 }
 
-/** Test-only: clear both storage buckets. Exported so tests don't leak across runs. */
+/** Test-only: clear all storage buckets. */
 export function __resetClaudeResponseStorage(): void {
   try {
-    localStorage.removeItem(SUMMARY_STORAGE_KEY);
+    localStorage.removeItem(CHAT_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_SUMMARY_STORAGE_KEY);
     localStorage.removeItem(THREAD_STORAGE_KEY);
   } catch { /* ignore */ }
 }

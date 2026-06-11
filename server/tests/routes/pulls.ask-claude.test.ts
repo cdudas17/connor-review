@@ -140,6 +140,51 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
     await app.close();
   });
 
+  it('includes the prior conversation in the prompt when one is supplied', async () => {
+    mockedGh.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
+    mockedGh.mockResolvedValueOnce(DIFF);
+    mockedClaude.mockResolvedValueOnce('continuing...\n');
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+      payload: {
+        draft: 'follow up question',
+        conversation: [
+          { role: 'user', body: 'first ask' },
+          { role: 'claude', body: 'first reply' },
+        ],
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const prompt = mockedClaude.mock.calls[0][0] as string;
+    // The history block is present.
+    expect(prompt).toContain('Conversation so far');
+    expect(prompt).toContain('[User]:\nfirst ask');
+    expect(prompt).toContain('[Claude]:\nfirst reply');
+    // The latest message is labeled differently when history is present.
+    expect(prompt).toContain("User's latest message");
+    expect(prompt).toContain('> follow up question');
+    expect(prompt).not.toContain("User's draft comment");
+    await app.close();
+  });
+
+  it('does NOT add a conversation block when none is supplied (first-turn path unchanged)', async () => {
+    mockedGh.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
+    mockedGh.mockResolvedValueOnce(DIFF);
+    mockedClaude.mockResolvedValueOnce('ok\n');
+    const app = await buildServer();
+    await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+      payload: { draft: 'q' },
+    });
+    const prompt = mockedClaude.mock.calls[0][0] as string;
+    expect(prompt).not.toContain('Conversation so far');
+    expect(prompt).toContain("User's draft comment");
+    await app.close();
+  });
+
   it('maps CLAUDE_NOT_INSTALLED to 502', async () => {
     mockedGh.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
     mockedGh.mockResolvedValueOnce(DIFF);

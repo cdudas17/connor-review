@@ -11,6 +11,8 @@ import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
 import { api } from '../lib/api.js';
 import { maybeAutoLabelOnReview } from '../lib/autoLabel.js';
 import type { ClaudeResponseState } from './ClaudeResponseCard.js';
+import type { ClaudeChat } from '../hooks/useClaudeResponses.js';
+import { ClaudeChatPanel } from './ClaudeChatPanel.js';
 import type { CiStatus, GhStatus, PRStatus, PullRequestMeta, ReviewEvent, StagedInlineComment, TrackedPR } from '../types.js';
 
 interface Identity {
@@ -54,17 +56,18 @@ interface Props {
   /** Reset a PR's local status — used to revert when a fire-and-forget API call fails. */
   onSetStatus: (id: Identity, status: PRStatus) => void;
   onClose: () => void;
-  /** Claude summary state for this PR. Owned at App level so it survives close + nav. */
-  summaryClaudeState: ClaudeResponseState | null;
+  /** Persistent Claude chat for this PR. Owned at App level. */
+  claudeChat: ClaudeChat | null;
   /** Look up thread-reply Claude state by thread id. */
   threadClaudeState: (threadId: string) => ClaudeResponseState | null;
-  /** Fire an ask against the summary card. Drawer snapshots its summary draft and passes it in. */
-  onAskSummaryClaude: (draft: string) => void;
+  /** Append a user turn + fire Claude with the full chat history. Drawer
+   * passes either the summary-textarea draft (first turn) or the chat panel's
+   * own input (follow-ups). */
+  onAskClaudeChat: (userMessage: string) => void;
+  /** Drop the whole chat for this PR. */
+  onClearClaudeChat: () => void;
   /** Fire an ask against a thread reply. */
   onAskThreadClaude: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
-  /** Dismiss the summary card. */
-  onDismissSummaryClaude: () => void;
-  /** Dismiss a thread reply card. */
   onDismissThreadClaude: (threadId: string) => void;
 }
 
@@ -73,8 +76,8 @@ export function ReviewDrawer(props: Props) {
     current, prs, pendingReviewId, latestGhStatus, latestCiStatus, latestCiUrl, viewedPaths,
     onViewedChange, onPendingReviewChange, onMetaLoaded, onAdvance, onNavigatePrev, onNavigateNext,
     canNavigatePrev, canNavigateNext, onToast, onSetStatus, onClose,
-    summaryClaudeState, threadClaudeState, onAskSummaryClaude, onAskThreadClaude,
-    onDismissSummaryClaude, onDismissThreadClaude,
+    claudeChat, threadClaudeState, onAskClaudeChat, onClearClaudeChat,
+    onAskThreadClaude, onDismissThreadClaude,
   } = props;
   const { meta, diff, loading, error, reload } = usePRDetails(current);
   const [summary, setSummary] = useState('');
@@ -257,6 +260,13 @@ export function ReviewDrawer(props: Props) {
       {meta.source !== 'local' && <PRDescription bodyHtml={meta.bodyHtml} />}
       {meta.source !== 'local' && <ReviewSummaryList reviews={meta.reviews ?? []} />}
       {meta.source !== 'local' && (
+        <ClaudeChatPanel
+          chat={claudeChat}
+          onAsk={onAskClaudeChat}
+          onClear={onClearClaudeChat}
+        />
+      )}
+      {meta.source !== 'local' && (
         <ConversationsList
           threads={meta.reviewThreads}
           onReply={reply}
@@ -313,9 +323,15 @@ export function ReviewDrawer(props: Props) {
           canNextPR={canNavigateNext && canNext}
           finishLabel={pendingReviewId ? 'Finish your review' : null}
           onMarkReady={meta.isDraft ? markReady : undefined}
-          onAskClaude={() => onAskSummaryClaude(summary)}
-          claudeState={summaryClaudeState}
-          onDismissClaude={onDismissSummaryClaude}
+          onAskClaude={() => {
+            // Drain the summary textarea into the chat as the next user turn,
+            // then clear it so the box is free for an actual review summary.
+            const draft = summary.trim();
+            if (!draft) return;
+            onAskClaudeChat(draft);
+            setSummary('');
+          }}
+          claudeChatLoading={claudeChat?.turns.some((t) => t.loading) ?? false}
         />
       )}
       {error && <ErrorToast message={error.message} onDismiss={() => { /* user can reload */ }} />}

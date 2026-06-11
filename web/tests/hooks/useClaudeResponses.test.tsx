@@ -11,125 +11,114 @@ beforeEach(() => {
   __resetClaudeResponseStorage();
 });
 
-describe('useClaudeResponses — summary card', () => {
-  it('routes a successful ask through to summaryFor + persists to localStorage', async () => {
+describe('useClaudeResponses — chat (multi-turn summary panel)', () => {
+  it('first askInChat appends user + claude turns and resolves with body', async () => {
     server.use(
-      http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'looks fine', truncatedDiff: false })),
+      http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'first answer' })),
     );
-    const onToast = vi.fn();
-    const { result } = renderHook(() => useClaudeResponses({ onToast, currentPRKey: TARGET_KEY }));
-    act(() => { result.current.askSummary(TARGET, 'thoughts?'); });
-    expect(result.current.summaryFor(TARGET)?.loading).toBe(true);
-    await waitFor(() => expect(result.current.summaryFor(TARGET)?.loading).toBe(false));
-    expect(result.current.summaryFor(TARGET)?.body).toBe('looks fine');
-    // Drawer was on the asking PR → no toast.
-    expect(onToast).not.toHaveBeenCalled();
-    // Persisted to localStorage (body only, no loading flag).
-    const stored = JSON.parse(localStorage.getItem('connor-review.claudeSummary.v1') ?? '{}');
-    expect(stored[TARGET_KEY].body).toBe('looks fine');
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
+    act(() => { result.current.askInChat(TARGET, 'is this safe?'); });
+    // Optimistic: user turn + loading claude turn appear immediately.
+    const optimistic = result.current.chatFor(TARGET)!;
+    expect(optimistic.turns).toHaveLength(2);
+    expect(optimistic.turns[0]).toMatchObject({ role: 'user', body: 'is this safe?' });
+    expect(optimistic.turns[1]).toMatchObject({ role: 'claude', loading: true });
+    await waitFor(() => expect(result.current.chatFor(TARGET)!.turns[1].loading).toBeFalsy());
+    expect(result.current.chatFor(TARGET)!.turns[1].body).toBe('first answer');
   });
 
-  it('fires an info toast when the response lands while drawer is on a DIFFERENT PR', async () => {
+  it('follow-up ask sends the prior turns as `conversation`', async () => {
+    const capturedBodies: Array<{ draft: string; conversation?: Array<{ role: string; body: string }> }> = [];
     server.use(
-      http.post('/api/pulls/:o/:r/:n/claude/ask', async () => {
-        // small delay so we can swap currentPRKey before resolution
-        await new Promise((r) => setTimeout(r, 20));
-        return HttpResponse.json({ response: 'late answer' });
-      }),
-    );
-    const onToast = vi.fn();
-    const { result, rerender } = renderHook(
-      ({ key }) => useClaudeResponses({ onToast, currentPRKey: key }),
-      { initialProps: { key: TARGET_KEY as string | null } },
-    );
-    act(() => { result.current.askSummary(TARGET, 'q'); });
-    // user closes drawer / navigates away
-    rerender({ key: null });
-    await waitFor(() => expect(result.current.summaryFor(TARGET)?.body).toBe('late answer'));
-    expect(onToast).toHaveBeenCalledWith('info', expect.stringContaining(TARGET_KEY));
-  });
-
-  it('fires an error toast when the response fails AND drawer is closed', async () => {
-    server.use(
-      http.post('/api/pulls/:o/:r/:n/claude/ask', async () => {
-        await new Promise((r) => setTimeout(r, 20));
-        return HttpResponse.json({ code: 'CLAUDE_NOT_INSTALLED', message: 'claude CLI not found' }, { status: 502 });
-      }),
-    );
-    const onToast = vi.fn();
-    const { result, rerender } = renderHook(
-      ({ key }) => useClaudeResponses({ onToast, currentPRKey: key }),
-      { initialProps: { key: TARGET_KEY as string | null } },
-    );
-    act(() => { result.current.askSummary(TARGET, 'q'); });
-    rerender({ key: null });
-    await waitFor(() => expect(result.current.summaryFor(TARGET)?.error).toMatch(/claude cli/i));
-    expect(onToast).toHaveBeenCalledWith('error', expect.stringMatching(/claude failed/i));
-  });
-
-  it('per-key token guard: a second ask supersedes the first', async () => {
-    // First response resolves slowly with one body, second resolves fast with another.
-    let call = 0;
-    server.use(
-      http.post('/api/pulls/:o/:r/:n/claude/ask', async () => {
-        call++;
-        if (call === 1) {
-          await new Promise((r) => setTimeout(r, 60));
-          return HttpResponse.json({ response: 'STALE' });
-        }
-        return HttpResponse.json({ response: 'FRESH' });
-      }),
-    );
-    const onToast = vi.fn();
-    const { result } = renderHook(() => useClaudeResponses({ onToast, currentPRKey: TARGET_KEY }));
-    act(() => { result.current.askSummary(TARGET, 'a'); });
-    act(() => { result.current.askSummary(TARGET, 'b'); });
-    await waitFor(() => expect(result.current.summaryFor(TARGET)?.body).toBe('FRESH'));
-    // Wait long enough for the stale response to also settle.
-    await new Promise((r) => setTimeout(r, 80));
-    expect(result.current.summaryFor(TARGET)?.body).toBe('FRESH');
-  });
-
-  it('rehydrates summary state from localStorage on mount', () => {
-    localStorage.setItem('connor-review.claudeSummary.v1', JSON.stringify({
-      [TARGET_KEY]: { loading: false, body: 'from prior session' },
-    }));
-    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: null }));
-    expect(result.current.summaryFor(TARGET)?.body).toBe('from prior session');
-  });
-
-  it('does not persist loading=true entries (would be stuck after page reload)', async () => {
-    server.use(
-      http.post('/api/pulls/:o/:r/:n/claude/ask', async () => {
-        await new Promise((r) => setTimeout(r, 50));
-        return HttpResponse.json({ response: 'eventually' });
+      http.post('/api/pulls/:o/:r/:n/claude/ask', async ({ request }) => {
+        const body = await request.json() as { draft: string; conversation?: Array<{ role: string; body: string }> };
+        capturedBodies.push(body);
+        return HttpResponse.json({ response: capturedBodies.length === 1 ? 'A1' : 'A2' });
       }),
     );
     const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
-    act(() => { result.current.askSummary(TARGET, 'q'); });
-    // While still loading, localStorage should NOT contain a loading entry.
-    const midflight = JSON.parse(localStorage.getItem('connor-review.claudeSummary.v1') ?? '{}');
-    expect(midflight[TARGET_KEY]).toBeUndefined();
-    await waitFor(() => expect(result.current.summaryFor(TARGET)?.body).toBe('eventually'));
-    const settled = JSON.parse(localStorage.getItem('connor-review.claudeSummary.v1') ?? '{}');
-    expect(settled[TARGET_KEY]?.body).toBe('eventually');
+    act(() => { result.current.askInChat(TARGET, 'q1'); });
+    await waitFor(() => expect(result.current.chatFor(TARGET)?.turns[1].body).toBe('A1'));
+    act(() => { result.current.askInChat(TARGET, 'q2'); });
+    await waitFor(() => expect(result.current.chatFor(TARGET)?.turns[3].body).toBe('A2'));
+    expect(capturedBodies).toHaveLength(2);
+    // First call sends no prior turns.
+    expect(capturedBodies[0].conversation ?? []).toEqual([]);
+    // Second call sends the first user + claude turn.
+    expect(capturedBodies[1].conversation).toEqual([
+      { role: 'user', body: 'q1' },
+      { role: 'claude', body: 'A1' },
+    ]);
+    expect(capturedBodies[1].draft).toBe('q2');
   });
 
-  it('dismissSummary removes the entry from state + persists the removal', async () => {
+  it('persists chats to localStorage with loading stripped', async () => {
+    server.use(
+      http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'done' })),
+    );
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
+    act(() => { result.current.askInChat(TARGET, 'q'); });
+    await waitFor(() => expect(result.current.chatFor(TARGET)?.turns[1].body).toBe('done'));
+    const stored = JSON.parse(localStorage.getItem('connor-review.claudeChat.v1') ?? '{}');
+    expect(stored[TARGET_KEY].turns[0]).toMatchObject({ role: 'user', body: 'q' });
+    expect(stored[TARGET_KEY].turns[1]).toMatchObject({ role: 'claude', body: 'done' });
+    expect(stored[TARGET_KEY].turns[1].loading).toBeFalsy();
+  });
+
+  it('migrates legacy single-card summary entries to a single-turn chat on first read', () => {
+    localStorage.setItem('connor-review.claudeSummary.v1', JSON.stringify({
+      [TARGET_KEY]: { loading: false, body: 'legacy answer', truncatedDiff: true, savedAt: Date.now() },
+    }));
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: null }));
+    const chat = result.current.chatFor(TARGET);
+    expect(chat).not.toBeNull();
+    expect(chat!.turns).toHaveLength(1);
+    expect(chat!.turns[0]).toMatchObject({ role: 'claude', body: 'legacy answer', truncatedDiff: true });
+  });
+
+  it('toasts when a chat reply lands while drawer has moved to a different PR', async () => {
+    server.use(
+      http.post('/api/pulls/:o/:r/:n/claude/ask', async () => {
+        await new Promise((r) => setTimeout(r, 30));
+        return HttpResponse.json({ response: 'late' });
+      }),
+    );
+    const onToast = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ key }) => useClaudeResponses({ onToast, currentPRKey: key }),
+      { initialProps: { key: TARGET_KEY as string | null } },
+    );
+    act(() => { result.current.askInChat(TARGET, 'q'); });
+    rerender({ key: null });
+    await waitFor(() => expect(result.current.chatFor(TARGET)?.turns[1].body).toBe('late'));
+    expect(onToast).toHaveBeenCalledWith('info', expect.stringContaining(TARGET_KEY));
+  });
+
+  it('a failed response settles the claude turn with an error', async () => {
+    server.use(
+      http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ code: 'CLAUDE_FAILED', message: 'boom' }, { status: 500 })),
+    );
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
+    act(() => { result.current.askInChat(TARGET, 'q'); });
+    await waitFor(() => expect(result.current.chatFor(TARGET)?.turns[1].error).toMatch(/boom/i));
+    expect(result.current.chatFor(TARGET)?.turns[1].loading).toBeFalsy();
+  });
+
+  it('dismissChat removes the conversation', async () => {
     server.use(
       http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'ok' })),
     );
     const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
-    act(() => { result.current.askSummary(TARGET, 'q'); });
-    await waitFor(() => expect(result.current.summaryFor(TARGET)?.body).toBe('ok'));
-    act(() => { result.current.dismissSummary(TARGET); });
-    expect(result.current.summaryFor(TARGET)).toBeNull();
-    const stored = JSON.parse(localStorage.getItem('connor-review.claudeSummary.v1') ?? '{}');
+    act(() => { result.current.askInChat(TARGET, 'q'); });
+    await waitFor(() => expect(result.current.chatFor(TARGET)?.turns[1].body).toBe('ok'));
+    act(() => { result.current.dismissChat(TARGET); });
+    expect(result.current.chatFor(TARGET)).toBeNull();
+    const stored = JSON.parse(localStorage.getItem('connor-review.claudeChat.v1') ?? '{}');
     expect(stored[TARGET_KEY]).toBeUndefined();
   });
 });
 
-describe('useClaudeResponses — thread reply cards', () => {
+describe('useClaudeResponses — thread reply cards (unchanged single-shot)', () => {
   it('threadFor lookup is keyed by (PR, threadId)', async () => {
     server.use(
       http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'thread answer' })),
@@ -141,7 +130,6 @@ describe('useClaudeResponses — thread reply cards', () => {
       });
     });
     await waitFor(() => expect(result.current.threadFor(TARGET, 'THREAD_42')?.body).toBe('thread answer'));
-    // Other thread id on same PR is independent.
     expect(result.current.threadFor(TARGET, 'THREAD_43')).toBeNull();
   });
 });
@@ -152,108 +140,72 @@ describe('useClaudeResponses — aggregateFor (PR-list indicator)', () => {
     expect(result.current.aggregateFor(TARGET)).toBeNull();
   });
 
-  it('returns kind:success when only a settled summary exists', async () => {
+  it('returns kind:success when there is at least one settled claude turn body', async () => {
     server.use(http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'ok' })));
     const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
-    act(() => { result.current.askSummary(TARGET, 'q'); });
+    act(() => { result.current.askInChat(TARGET, 'q'); });
     await waitFor(() => expect(result.current.aggregateFor(TARGET)?.kind).toBe('success'));
   });
 
-  it('returns kind:loading when ANY card is in-flight (priority over success)', async () => {
+  it('returns kind:loading when ANY chat turn or thread is in-flight (priority over success)', async () => {
     server.use(
-      // Delay the response long enough that we can assert mid-flight, then
-      // resolve so the test doesn't hang.
       http.post('/api/pulls/:o/:r/:n/claude/ask', async () => {
         await new Promise((r) => setTimeout(r, 100));
         return HttpResponse.json({ response: 'late' });
       }),
     );
-    // Seed a saved summary (success) first.
-    localStorage.setItem('connor-review.claudeSummary.v1', JSON.stringify({
-      [TARGET_KEY]: { loading: false, body: 'old', savedAt: Date.now() },
+    // Pre-seed a settled chat so we start in success.
+    localStorage.setItem('connor-review.claudeChat.v1', JSON.stringify({
+      [TARGET_KEY]: { savedAt: Date.now(), turns: [
+        { role: 'user', body: 'q', ts: Date.now() },
+        { role: 'claude', body: 'old', ts: Date.now() },
+      ] },
     }));
     const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
     expect(result.current.aggregateFor(TARGET)?.kind).toBe('success');
-    // Fire a thread ask that won't resolve for 100ms — the aggregate should flip
-    // to loading immediately because loading-wins-over-success.
-    act(() => {
-      result.current.askThread(TARGET, 'TH', 'q', { path: 'a', endLine: 1, side: 'RIGHT' });
-    });
+    act(() => { result.current.askInChat(TARGET, 'q2'); });
     expect(result.current.aggregateFor(TARGET)?.kind).toBe('loading');
-    // After the response settles, we go back to success (all settled, no errors).
     await waitFor(() => expect(result.current.aggregateFor(TARGET)?.kind).toBe('success'));
   });
 
-  it('returns kind:error when there is no loading card but at least one error', async () => {
+  it('returns kind:error when only error turns exist', async () => {
     server.use(
-      http.post('/api/pulls/:o/:r/:n/claude/ask', () =>
-        HttpResponse.json({ code: 'CLAUDE_FAILED', message: 'boom' }, { status: 500 })),
+      http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ code: 'CLAUDE_FAILED', message: 'no' }, { status: 500 })),
     );
     const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
-    act(() => { result.current.askSummary(TARGET, 'q'); });
+    act(() => { result.current.askInChat(TARGET, 'q'); });
     await waitFor(() => expect(result.current.aggregateFor(TARGET)?.kind).toBe('error'));
   });
 });
 
 describe('useClaudeResponses — cleanup', () => {
-  it('sweeps entries older than 30 days on mount', () => {
-    const ancient = Date.now() - (40 * 24 * 60 * 60 * 1000); // 40 days ago
-    const recent = Date.now() - (5 * 24 * 60 * 60 * 1000);   // 5 days ago
-    localStorage.setItem('connor-review.claudeSummary.v1', JSON.stringify({
-      'old/repo#1': { loading: false, body: 'gone', savedAt: ancient },
-      'new/repo#2': { loading: false, body: 'kept', savedAt: recent },
+  it('sweeps chat entries older than 30 days on mount', () => {
+    const ancient = Date.now() - (40 * 24 * 60 * 60 * 1000);
+    const recent = Date.now() - (5 * 24 * 60 * 60 * 1000);
+    localStorage.setItem('connor-review.claudeChat.v1', JSON.stringify({
+      'old/repo#1': { savedAt: ancient, turns: [{ role: 'claude', body: 'gone', ts: ancient }] },
+      'new/repo#2': { savedAt: recent, turns: [{ role: 'claude', body: 'kept', ts: recent }] },
     }));
     const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: null }));
-    expect(result.current.summaryFor({ owner: 'old', repo: 'repo', number: 1 })).toBeNull();
-    expect(result.current.summaryFor({ owner: 'new', repo: 'repo', number: 2 })?.body).toBe('kept');
+    expect(result.current.chatFor({ owner: 'old', repo: 'repo', number: 1 })).toBeNull();
+    expect(result.current.chatFor({ owner: 'new', repo: 'repo', number: 2 })?.turns[0].body).toBe('kept');
   });
 
-  it('keeps un-timestamped legacy entries (gives them a grace pass on first run)', () => {
-    // Entries persisted before savedAt was added shouldn't all get nuked on the
-    // first sweep — they have no timestamp.
-    localStorage.setItem('connor-review.claudeSummary.v1', JSON.stringify({
-      'legacy/repo#1': { loading: false, body: 'no timestamp' },
-    }));
-    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: null }));
-    expect(result.current.summaryFor({ owner: 'legacy', repo: 'repo', number: 1 })?.body).toBe('no timestamp');
-  });
-
-  it('LRU-caps the summary bucket to MAX_ENTRIES on mount', () => {
-    // 250 entries with strictly increasing savedAt → keep the 200 most recent.
-    const baseTs = Date.now() - (1000 * 60 * 60); // 1h ago, well under the age cutoff
-    const entries: Record<string, { loading: boolean; body: string; savedAt: number }> = {};
-    for (let i = 0; i < 250; i++) {
-      entries[`org/repo#${i}`] = { loading: false, body: `r${i}`, savedAt: baseTs + i };
-    }
-    localStorage.setItem('connor-review.claudeSummary.v1', JSON.stringify(entries));
-    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: null }));
-    // The 50 oldest entries (0–49) should be gone; the 200 newest (50–249) should remain.
-    expect(result.current.summaryFor({ owner: 'org', repo: 'repo', number: 49 })).toBeNull();
-    expect(result.current.summaryFor({ owner: 'org', repo: 'repo', number: 50 })?.body).toBe('r50');
-    expect(result.current.summaryFor({ owner: 'org', repo: 'repo', number: 249 })?.body).toBe('r249');
-  });
-
-  it('dismissAllForPR drops summary + every thread entry for that PR', async () => {
-    server.use(
-      http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'ok' })),
-    );
-    const otherTarget = { owner: 'Gusto', repo: 'zenpayroll', number: 999 };
+  it('dismissAllForPR drops chat + every thread entry for that PR', async () => {
+    server.use(http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'ok' })));
+    const other = { owner: 'Gusto', repo: 'zenpayroll', number: 999 };
     const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
-    act(() => { result.current.askSummary(TARGET, 'q1'); });
-    act(() => { result.current.askThread(TARGET, 'TH1', 'q2', { path: 'a', endLine: 1, side: 'RIGHT' }); });
-    act(() => { result.current.askThread(TARGET, 'TH2', 'q3', { path: 'a', endLine: 2, side: 'RIGHT' }); });
-    act(() => { result.current.askSummary(otherTarget, 'q4'); });
+    act(() => { result.current.askInChat(TARGET, 'q'); });
+    act(() => { result.current.askThread(TARGET, 'TH1', 'q', { path: 'a', endLine: 1, side: 'RIGHT' }); });
+    act(() => { result.current.askInChat(other, 'q'); });
     await waitFor(() => {
-      expect(result.current.summaryFor(TARGET)?.body).toBe('ok');
+      expect(result.current.chatFor(TARGET)?.turns[1].body).toBe('ok');
       expect(result.current.threadFor(TARGET, 'TH1')?.body).toBe('ok');
-      expect(result.current.threadFor(TARGET, 'TH2')?.body).toBe('ok');
-      expect(result.current.summaryFor(otherTarget)?.body).toBe('ok');
+      expect(result.current.chatFor(other)?.turns[1].body).toBe('ok');
     });
     act(() => { result.current.dismissAllForPR(TARGET); });
-    expect(result.current.summaryFor(TARGET)).toBeNull();
+    expect(result.current.chatFor(TARGET)).toBeNull();
     expect(result.current.threadFor(TARGET, 'TH1')).toBeNull();
-    expect(result.current.threadFor(TARGET, 'TH2')).toBeNull();
-    // Other PR's entries are untouched.
-    expect(result.current.summaryFor(otherTarget)?.body).toBe('ok');
+    expect(result.current.chatFor(other)?.turns[1].body).toBe('ok');
   });
 });
