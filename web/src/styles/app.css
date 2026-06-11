@@ -148,6 +148,9 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .claude-chat-turn-error { color: var(--err, #cf6679); margin: 0; white-space: pre-wrap; }
 .claude-chat-turn-note { margin: 6px 0 0; color: var(--muted); font-size: 0.8rem; font-style: italic; }
 .claude-chat-input { display: flex; flex-direction: column; gap: 6px; }
+/* Match the "Leave a summary" textarea styling — same width, resize affordance, min-height. */
+.claude-chat-input textarea { width: 100%; min-height: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; font: inherit; resize: vertical; box-sizing: border-box; }
+.claude-chat-input textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .claude-chat-input-actions { display: flex; justify-content: flex-end; }
 
 /* Per-row Claude indicator on the PR list. */
