@@ -96,6 +96,14 @@ export function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [memberFilter, setMemberFilter] = useState<Set<string> | null>(null);
+  // Team tab: when true, hide any PR whose CI rollup isn't SUCCESS (red, pending,
+  // error, missing). Persisted across reloads so it survives tab refreshes.
+  const [teamGreenCiOnly, setTeamGreenCiOnly] = useState<boolean>(() => {
+    try { return localStorage.getItem('connor-review.teamGreenCiOnly.v1') === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('connor-review.teamGreenCiOnly.v1', teamGreenCiOnly ? '1' : '0'); } catch { /* ignore */ }
+  }, [teamGreenCiOnly]);
   // Oncall tab state-filter (Draft vs Ready for review). Defaults to Draft only — that's
   // what the on-call person actually needs to triage.
   const [oncallStates, setOncallStates] = useState<Set<OncallState>>(() => new Set<OncallState>(['draft']));
@@ -132,8 +140,15 @@ export function App() {
     // No member chips selected → empty list. (memberFilter === null happens briefly
     // before the talent.yml fetch resolves; treat the same as "nothing selected".)
     if (!memberFilter || memberFilter.size === 0) return [];
-    return teamPRs.prs.filter((p) => p.authorLogin != null && memberFilter.has(p.authorLogin));
-  }, [teamPRs.prs, memberFilter]);
+    return teamPRs.prs.filter((p) => {
+      if (p.authorLogin == null || !memberFilter.has(p.authorLogin)) return false;
+      // Green-CI filter: drop anything whose CI rollup isn't SUCCESS. EXPECTED
+      // (the GitHub state for "checks not yet reported") counts as not-green
+      // since it usually means CI hasn't even started.
+      if (teamGreenCiOnly && p.ciStatus !== 'SUCCESS') return false;
+      return true;
+    });
+  }, [teamPRs.prs, memberFilter, teamGreenCiOnly]);
 
   const filteredOncallPRs = useMemo(() => {
     if (oncallStates.size === 0) return [];
@@ -593,6 +608,24 @@ export function App() {
               onClearAll={clearAllMembers}
             />
           )}
+          {/* Green-CI quick filter — hides PRs with failing/pending/missing CI.
+              Counter shows how many of the currently member-filtered PRs would
+              survive if the toggle were on. */}
+          {teamPRs.members.length > 0 && (() => {
+            const greenCount = (memberFilter ?? new Set(teamPRs.members)).size === 0
+              ? 0
+              : teamPRs.prs.filter((p) => p.authorLogin != null && (memberFilter ?? new Set(teamPRs.members)).has(p.authorLogin) && p.ciStatus === 'SUCCESS').length;
+            return (
+              <label className="team-green-ci-toggle">
+                <input
+                  type="checkbox"
+                  checked={teamGreenCiOnly}
+                  onChange={(e) => setTeamGreenCiOnly(e.target.checked)}
+                />
+                <span>Green CI only{greenCount > 0 ? ` (${greenCount})` : ''}</span>
+              </label>
+            );
+          })()}
         </>
       )}
 
