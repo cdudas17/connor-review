@@ -11,7 +11,7 @@ import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
 import { api } from '../lib/api.js';
 import { maybeAutoLabelOnReview } from '../lib/autoLabel.js';
 import type { ClaudeResponseState } from './ClaudeResponseCard.js';
-import type { ClaudeChat } from '../hooks/useClaudeResponses.js';
+import type { ClaudeChat, LocalThreadAnchor } from '../hooks/useClaudeResponses.js';
 import { ClaudeChatPanel } from './ClaudeChatPanel.js';
 import type { CiStatus, GhStatus, PRStatus, PullRequestMeta, ReviewEvent, StagedInlineComment, TrackedPR } from '../types.js';
 
@@ -91,6 +91,12 @@ interface Props {
   /** Fire an ask against a thread reply. */
   onAskThreadClaude: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
   onDismissThreadClaude: (threadId: string) => void;
+  /** Persisted inline Claude threads anchored on the diff for this PR. */
+  localClaudeThreads: Array<ClaudeChat & { anchor: LocalThreadAnchor; key: string }>;
+  /** Start or continue a local Claude thread at the given line anchor. */
+  onAskInlineClaudeForLine: (anchor: LocalThreadAnchor, draft: string) => void;
+  /** Dismiss a local Claude thread (× on the card). */
+  onDismissLocalClaudeThread: (anchor: LocalThreadAnchor) => void;
 }
 
 export function ReviewDrawer(props: Props) {
@@ -100,6 +106,7 @@ export function ReviewDrawer(props: Props) {
     canNavigatePrev, canNavigateNext, onToast, onSetStatus, onClose,
     claudeChat, threadClaudeState, onAskClaudeChat, onClearClaudeChat,
     onAskThreadClaude, onDismissThreadClaude,
+    localClaudeThreads, onAskInlineClaudeForLine, onDismissLocalClaudeThread,
   } = props;
   const { meta, diff, loading, error, reload } = usePRDetails(current);
   const [summary, setSummary] = useState('');
@@ -334,8 +341,11 @@ export function ReviewDrawer(props: Props) {
         onAddToReview={meta.source === 'local' ? noopAsync : addToReview}
         onReply={meta.source === 'local' ? noopReply : reply}
         commentsEnabled={meta.source !== 'local'}
-        // Inline composer Ask Claude: ephemeral (composer is ephemeral) — fires API directly.
-        onAskClaude={meta.source === 'local' ? undefined : (args) => api.askClaude(current.owner, current.repo, current.number, args)}
+        // Inline composer Ask Claude: persisted local-only thread anchored to the line range.
+        onAskInlineClaude={meta.source === 'local' ? undefined : onAskInlineClaudeForLine}
+        localClaudeThreads={meta.source === 'local' ? [] : localClaudeThreads}
+        onAskLocalThread={meta.source === 'local' ? undefined : onAskInlineClaudeForLine}
+        onDismissLocalThread={meta.source === 'local' ? undefined : onDismissLocalClaudeThread}
         // InlineThreadCard Ask Claude: persisted at App level. Drawer hands the threadId + draft to the parent.
         threadClaudeStateFor={threadClaudeState}
         onAskThreadClaude={onAskThreadClaude}

@@ -129,6 +129,30 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .btn-ask-claude { border: 1px solid var(--accent) !important; color: var(--accent) !important; background: transparent !important; }
 .btn-ask-claude:hover:not(:disabled) { background: var(--bg-subtle) !important; }
 
+/* Inline local Claude thread — rendered on the diff, anchored to a line range.
+ * Persisted per (PR, anchor), never sent to GitHub. Same multi-turn shape as
+ * the summary chat panel; visually marked as local-only. */
+.local-claude-thread { margin: 6px 0; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; background: var(--bg-subtle); padding: 10px 12px; }
+.local-claude-thread-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.local-claude-thread-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); font-weight: 600; }
+.local-claude-thread-anchor { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.75rem; color: var(--muted); margin-right: auto; }
+.local-claude-thread-dismiss { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 4px; }
+.local-claude-thread-dismiss:hover { color: var(--fg); }
+.local-claude-thread-turns { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 8px; }
+.local-claude-thread-turn { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); }
+.local-claude-thread-turn-user { border-left: 3px solid var(--muted); }
+.local-claude-thread-turn-claude { border-left: 3px solid var(--accent); }
+.local-claude-thread-turn-header { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 3px; }
+.local-claude-thread-turn-body { color: var(--fg); margin: 0; font-size: 0.9rem; }
+.local-claude-thread-turn-user-body { white-space: pre-wrap; word-break: break-word; }
+.local-claude-thread-turn-loading { display: flex; align-items: center; gap: 8px; color: var(--muted); padding: 2px 0; }
+.local-claude-thread-turn-error { color: var(--err, #cf6679); margin: 0; white-space: pre-wrap; font-size: 0.9rem; }
+.local-claude-thread-turn-note { margin: 4px 0 0; color: var(--muted); font-size: 0.75rem; font-style: italic; }
+.local-claude-thread-input { display: flex; flex-direction: column; gap: 6px; }
+.local-claude-thread-input textarea { width: 100%; min-height: 50px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; font: inherit; resize: vertical; box-sizing: border-box; }
+.local-claude-thread-input textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.local-claude-thread-input-actions { display: flex; justify-content: flex-end; }
+
 /* Pinned multi-turn Claude chat panel — sits above the diff Conversations
  * section. Persisted per PR across drawer close + navigation. */
 .claude-chat-panel { margin: 12px 0; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; background: var(--bg-subtle); padding: 12px 14px; }

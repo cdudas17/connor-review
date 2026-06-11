@@ -19,6 +19,8 @@ import { EmojiTextarea } from './EmojiTextarea.js';
 import { Avatar } from './Avatar.js';
 import type { ReviewThread, StagedInlineComment } from '../types.js';
 import { ClaudeResponseCard, type ClaudeResponseState } from './ClaudeResponseCard.js';
+import { LocalClaudeThread } from './LocalClaudeThread.js';
+import type { ClaudeChat, LocalThreadAnchor } from '../hooks/useClaudeResponses.js';
 
 export interface DiffViewerProps {
   diff: string;
@@ -40,13 +42,18 @@ export interface DiffViewerProps {
   onReply: (threadId: string, body: string) => Promise<void>;
   /** When false, the gutter-drag inline composer is disabled (e.g. local-branch entries with nowhere to post). Defaults to true. */
   commentsEnabled?: boolean;
-  /** When provided, the inline composer renders an "Ask Claude" button next to Comment/Add to review.
-   * Calls back with the draft body + the file path / line range so the server can scope context.
-   * This one is ephemeral — the composer itself is ephemeral. */
-  onAskClaude?: (args: {
-    draft: string;
-    lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' };
-  }) => Promise<{ response: string; truncatedDiff?: boolean }>;
+  /** When provided, the inline composer renders an "Ask Claude" button next to
+   * Comment / Add to review. Clicking it creates (or appends to) a *local*
+   * Claude thread anchored to the selected line range. The composer closes;
+   * the thread persists, renders inline on the diff, and supports follow-ups. */
+  onAskInlineClaude?: (anchor: LocalThreadAnchor, draft: string) => void;
+  /** All local Claude threads on this PR. DiffViewer anchors them to their
+   * (path, line, side) on top of the diff. */
+  localClaudeThreads?: Array<ClaudeChat & { anchor: LocalThreadAnchor; key: string }>;
+  /** Continue an existing local thread (follow-up turn). */
+  onAskLocalThread?: (anchor: LocalThreadAnchor, draft: string) => void;
+  /** Drop a local thread (the × button on the card). */
+  onDismissLocalThread?: (anchor: LocalThreadAnchor) => void;
   /** Per-thread Claude state lookup. Owned at App level + persisted; used by InlineThreadCard. */
   threadClaudeStateFor?: (threadId: string) => ClaudeResponseState | null;
   /** Ask Claude for an InlineThreadCard reply. App-owned handler — survives drawer close. */
@@ -241,15 +248,18 @@ function DiffFile({
   onAddToReview,
   onReply,
   commentsEnabled = true,
-  onAskClaude,
+  onAskInlineClaude,
+  localClaudeThreads,
+  onAskLocalThread,
+  onDismissLocalThread,
   threadClaudeStateFor,
   onAskThreadClaude,
   onDismissThreadClaude,
 }: {
-  onAskClaude?: (args: {
-    draft: string;
-    lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' };
-  }) => Promise<{ response: string; truncatedDiff?: boolean }>;
+  onAskInlineClaude?: (anchor: LocalThreadAnchor, draft: string) => void;
+  localClaudeThreads?: Array<ClaudeChat & { anchor: LocalThreadAnchor; key: string }>;
+  onAskLocalThread?: (anchor: LocalThreadAnchor, draft: string) => void;
+  onDismissLocalThread?: (anchor: LocalThreadAnchor) => void;
   threadClaudeStateFor?: (threadId: string) => ClaudeResponseState | null;
   onAskThreadClaude?: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
   onDismissThreadClaude?: (threadId: string) => void;
@@ -322,14 +332,6 @@ function DiffFile({
   const [editorBody, setEditorBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Per-editor Claude state — cleared whenever the editor closes/reopens (via the
-  // useEffect below). Token guards against stale responses if the user asks twice.
-  const [editorClaude, setEditorClaude] = useState<ClaudeResponseState | null>(null);
-  const editorClaudeTokenRef = useRef(0);
-  useEffect(() => {
-    // editor closed → drop any lingering response.
-    if (!editor) setEditorClaude(null);
-  }, [editor?.anchorKey]);
   const [replyState, setReplyState] = useState<{ threadId: string; body: string } | null>(null);
   const [replyBusy, setReplyBusy] = useState(false);
 
@@ -400,28 +402,18 @@ function DiffFile({
   };
 
   function askEditorClaude() {
-    if (!editor || !onAskClaude) return;
+    if (!editor || !onAskInlineClaude) return;
     const draft = editorBody.trim();
     if (!draft) return;
-    const token = ++editorClaudeTokenRef.current;
-    setEditorClaude({ loading: true });
-    onAskClaude({
+    // Spawn a local Claude thread anchored to this line range, then close the
+    // composer. The thread renders inline on the diff and supports follow-ups.
+    onAskInlineClaude(
+      { path, line: editor.line, startLine: editor.startLine, side: editor.side },
       draft,
-      lineRange: {
-        path,
-        endLine: editor.line,
-        startLine: editor.startLine,
-        side: editor.side,
-      },
-    })
-      .then((res) => {
-        if (editorClaudeTokenRef.current !== token) return;
-        setEditorClaude({ loading: false, body: res.response, truncatedDiff: res.truncatedDiff });
-      })
-      .catch((e) => {
-        if (editorClaudeTokenRef.current !== token) return;
-        setEditorClaude({ loading: false, error: (e as Error).message });
-      });
+    );
+    setEditor(null);
+    setEditorBody('');
+    setError(null);
   }
 
   async function postEditor(target: 'standalone' | 'review') {
@@ -460,6 +452,22 @@ function DiffFile({
     return byKey;
   }, [threads, anchors, path]);
 
+  /** Same anchoring as GitHub threads, but for the local-only Claude threads.
+   * Group by changeKey so multiple Claude conversations on the same line stack
+   * together. Anything that doesn't resolve to a current anchor (e.g. the
+   * line moved in a later commit) is filtered out — the thread still lives in
+   * state, it just won't render here until the diff returns to that anchor. */
+  const localThreadsByAnchor = useMemo(() => {
+    const byKey: Record<string, Array<ClaudeChat & { anchor: LocalThreadAnchor; key: string }>> = {};
+    for (const lt of (localClaudeThreads ?? []).filter((t) => t.anchor.path === path)) {
+      const anchor = anchors.find((a) => a.line === lt.anchor.line && a.side === lt.anchor.side)
+        ?? anchors.find((a) => a.line === lt.anchor.line);
+      if (!anchor) continue;
+      (byKey[anchor.changeKey] ||= []).push(lt);
+    }
+    return byKey;
+  }, [localClaudeThreads, anchors, path]);
+
   // Pick a tone (add/del/normal) for each anchor based on the change type, used to
   // tint the thread card background to match the diff row underneath.
   function toneForChangeKey(key: string): ChangeTone {
@@ -476,13 +484,20 @@ function DiffFile({
     return `${path}:${editor.line} (${editor.side})`;
   }
 
-  // Construct widgets per change: any threads + the editor (if active on this change).
+  // Construct widgets per change: any threads + any local Claude threads +
+  // the editor (if active on this change).
   const widgets: Record<string, React.ReactNode> = {};
-  for (const [key, ts] of Object.entries(threadsByAnchor)) {
+  const anchorKeys = new Set<string>([
+    ...Object.keys(threadsByAnchor),
+    ...Object.keys(localThreadsByAnchor),
+  ]);
+  for (const key of anchorKeys) {
     const tone = toneForChangeKey(key);
+    const ghs = threadsByAnchor[key] ?? [];
+    const locals = localThreadsByAnchor[key] ?? [];
     widgets[key] = (
       <div className={`thread-stack thread-stack-tone-${tone}`}>
-        {ts.map((t) => (
+        {ghs.map((t) => (
           <InlineThreadCard
             key={t.id}
             thread={t}
@@ -495,6 +510,15 @@ function DiffFile({
             claudeState={threadClaudeStateFor?.(t.id) ?? null}
             onAskClaude={onAskThreadClaude}
             onDismissClaude={onDismissThreadClaude}
+          />
+        ))}
+        {locals.map((lt) => (
+          <LocalClaudeThread
+            key={lt.key}
+            chat={lt}
+            anchor={lt.anchor}
+            onAsk={(msg) => onAskLocalThread?.(lt.anchor, msg)}
+            onDismiss={() => onDismissLocalThread?.(lt.anchor)}
           />
         ))}
       </div>
@@ -515,25 +539,21 @@ function DiffFile({
             autoFocus
           />
           {error && <p className="inline-editor-error">{error}</p>}
-          <ClaudeResponseCard
-            state={editorClaude}
-            onDismiss={() => setEditorClaude(null)}
-          />
           <div className="inline-editor-actions">
             <button type="button" className="btn-secondary" disabled={busy} onClick={() => { setEditor(null); setEditorBody(''); setError(null); }}>Cancel</button>
             <button type="button" className="btn-secondary" disabled={busy || editorBody.trim() === ''} onClick={() => postEditor('standalone')}>Comment</button>
             <button type="button" className="btn-primary" disabled={busy || editorBody.trim() === ''} onClick={() => postEditor('review')}>
               {hasPendingReview ? 'Add review comment' : 'Start a review'}
             </button>
-            {onAskClaude && (
+            {onAskInlineClaude && (
               <button
                 type="button"
                 className="btn-ask-claude"
-                disabled={busy || editorBody.trim() === '' || editorClaude?.loading}
+                disabled={busy || editorBody.trim() === ''}
                 onClick={askEditorClaude}
-                title="Send your draft + this line range to your local `claude` CLI"
+                title="Post this as a local-only Claude thread on these lines (not sent to GitHub)"
               >
-                {editorClaude?.loading ? 'Asking…' : 'Ask Claude'}
+                Ask Claude
               </button>
             )}
           </div>
@@ -652,7 +672,7 @@ function makePseudoChangeForSide(_t: ReviewThread): ChangeData {
   return { type: 'insert', content: '', lineNumber: 0, isInsert: true } as unknown as ChangeData;
 }
 
-export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, onViewedChange, onCommitComment, onAddToReview, onReply, commentsEnabled = true, onAskClaude, threadClaudeStateFor, onAskThreadClaude, onDismissThreadClaude }: DiffViewerProps) {
+export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, onViewedChange, onCommitComment, onAddToReview, onReply, commentsEnabled = true, onAskInlineClaude, localClaudeThreads, onAskLocalThread, onDismissLocalThread, threadClaudeStateFor, onAskThreadClaude, onDismissThreadClaude }: DiffViewerProps) {
   const files = useMemo(() => parseDiff(diff), [diff]);
 
   if (files.length === 0) {
@@ -676,7 +696,10 @@ export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, o
             onAddToReview={onAddToReview}
             onReply={onReply}
             commentsEnabled={commentsEnabled}
-            onAskClaude={onAskClaude}
+            onAskInlineClaude={onAskInlineClaude}
+            localClaudeThreads={localClaudeThreads}
+            onAskLocalThread={onAskLocalThread}
+            onDismissLocalThread={onDismissLocalThread}
             threadClaudeStateFor={threadClaudeStateFor}
             onAskThreadClaude={onAskThreadClaude}
             onDismissThreadClaude={onDismissThreadClaude}

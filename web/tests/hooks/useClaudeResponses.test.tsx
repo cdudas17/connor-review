@@ -178,6 +178,70 @@ describe('useClaudeResponses — aggregateFor (PR-list indicator)', () => {
   });
 });
 
+describe('useClaudeResponses — local inline threads', () => {
+  const ANCHOR = { path: 'app/widget.rb', line: 42, startLine: 38, side: 'RIGHT' as const };
+
+  it('askInLocalThread creates a thread keyed by (PR, anchor) and seeds turns', async () => {
+    server.use(http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'looks dicey' })));
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
+    act(() => { result.current.askInLocalThread(TARGET, ANCHOR, 'why mutate here?'); });
+    const after = result.current.localThreadsForPR(TARGET);
+    expect(after).toHaveLength(1);
+    expect(after[0].turns[0]).toMatchObject({ role: 'user', body: 'why mutate here?' });
+    expect(after[0].turns[1]).toMatchObject({ role: 'claude', loading: true });
+    expect(after[0].anchor).toEqual(ANCHOR);
+    await waitFor(() => expect(result.current.localThreadsForPR(TARGET)[0].turns[1].body).toBe('looks dicey'));
+  });
+
+  it('follow-up turn sends prior conversation', async () => {
+    const captured: Array<{ conversation?: Array<{ role: string; body: string }>; lineRange?: { path: string; endLine: number; side: string } }> = [];
+    server.use(http.post('/api/pulls/:o/:r/:n/claude/ask', async ({ request }) => {
+      const body = await request.json() as { conversation?: Array<{ role: string; body: string }>; lineRange?: { path: string; endLine: number; side: string } };
+      captured.push(body);
+      return HttpResponse.json({ response: `A${captured.length}` });
+    }));
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
+    act(() => { result.current.askInLocalThread(TARGET, ANCHOR, 'q1'); });
+    await waitFor(() => expect(result.current.localThreadsForPR(TARGET)[0].turns[1].body).toBe('A1'));
+    act(() => { result.current.askInLocalThread(TARGET, ANCHOR, 'q2'); });
+    await waitFor(() => expect(result.current.localThreadsForPR(TARGET)[0].turns[3].body).toBe('A2'));
+    expect(captured[1].conversation).toEqual([
+      { role: 'user', body: 'q1' },
+      { role: 'claude', body: 'A1' },
+    ]);
+    // lineRange is always sent so Claude knows which code is being asked about.
+    expect(captured[1].lineRange).toMatchObject({ path: 'app/widget.rb', endLine: 42, side: 'RIGHT' });
+  });
+
+  it('threads at different anchors are independent on the same PR', async () => {
+    server.use(http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'ok' })));
+    const A1 = { ...ANCHOR, line: 10, startLine: undefined };
+    const A2 = { ...ANCHOR, line: 20, startLine: undefined };
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
+    act(() => { result.current.askInLocalThread(TARGET, A1, 'q'); });
+    act(() => { result.current.askInLocalThread(TARGET, A2, 'q'); });
+    await waitFor(() => expect(result.current.localThreadsForPR(TARGET)).toHaveLength(2));
+  });
+
+  it('dismissLocalThread drops just that thread', async () => {
+    server.use(http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'ok' })));
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
+    act(() => { result.current.askInLocalThread(TARGET, ANCHOR, 'q'); });
+    await waitFor(() => expect(result.current.localThreadsForPR(TARGET)).toHaveLength(1));
+    act(() => { result.current.dismissLocalThread(TARGET, ANCHOR); });
+    expect(result.current.localThreadsForPR(TARGET)).toEqual([]);
+  });
+
+  it('aggregateFor includes local-thread state', async () => {
+    server.use(http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'ok' })));
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
+    expect(result.current.aggregateFor(TARGET)).toBeNull();
+    act(() => { result.current.askInLocalThread(TARGET, ANCHOR, 'q'); });
+    expect(result.current.aggregateFor(TARGET)?.kind).toBe('loading');
+    await waitFor(() => expect(result.current.aggregateFor(TARGET)?.kind).toBe('success'));
+  });
+});
+
 describe('useClaudeResponses — cleanup', () => {
   it('sweeps chat entries older than 30 days on mount', () => {
     const ancient = Date.now() - (40 * 24 * 60 * 60 * 1000);

@@ -716,6 +716,9 @@ export function App() {
             onClearClaudeChat={() => claudeResponses.dismissChat(current)}
             onAskThreadClaude={(threadId, draft, lineRange) => claudeResponses.askThread(current, threadId, draft, lineRange)}
             onDismissThreadClaude={(threadId) => claudeResponses.dismissThread(current, threadId)}
+            localClaudeThreads={claudeResponses.localThreadsForPR(current)}
+            onAskInlineClaudeForLine={(anchor, draft) => claudeResponses.askInLocalThread(current, anchor, draft)}
+            onDismissLocalClaudeThread={(anchor) => claudeResponses.dismissLocalThread(current, anchor)}
           />
         );
       })()}
