@@ -302,8 +302,9 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
  * (0,1,0). We use `.drawer .drawer-close` / `.drawer .drawer-refresh` to
  * out-rank it so our `padding: 0` actually applies (otherwise the 6×12 padding
  * squishes the SVG inside the 28×28 box and the icon renders tiny). */
-.drawer .drawer-close { position: absolute; top: 12px; right: 16px; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.4rem; line-height: 1; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); cursor: pointer; }
+.drawer .drawer-close { position: absolute; top: 12px; right: 16px; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); cursor: pointer; }
 .drawer .drawer-close:hover { background: var(--bg-subtle); }
+.drawer .drawer-close svg { display: block; flex-shrink: 0; }
 .drawer-refresh-indicator { position: absolute; top: 18px; right: 60px; display: inline-flex; align-items: center; color: var(--muted); }
 /* Per-PR refresh button — sibling of the close ×, same size, 8px gap. */
 .drawer .drawer-refresh { position: absolute; top: 12px; right: 52px; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); cursor: pointer; }

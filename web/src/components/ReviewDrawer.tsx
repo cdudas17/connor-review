@@ -43,6 +43,17 @@ function RefreshIcon({ size = 18 }: { size?: number }) {
   );
 }
 
+/** Close "×" icon — Material/Heroicons-style stroked X. Symmetric within the
+ * 24×24 viewBox so it centers cleanly inside the button (unlike the unicode
+ * × character which sits visually low because of its baseline). */
+function CloseIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+    </svg>
+  );
+}
+
 interface Props {
   current: Identity | null;
   prs: TrackedPR[];
@@ -181,7 +192,9 @@ export function ReviewDrawer(props: Props) {
         <>
           <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
           <aside className="drawer">
-            <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
+            <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">
+          <CloseIcon size={18} />
+        </button>
             <div className="drawer-error">
               <h3>Couldn't load this PR</h3>
               <p className="drawer-error-message">{error.message}</p>
@@ -198,7 +211,9 @@ export function ReviewDrawer(props: Props) {
       <>
         <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
         <aside className="drawer">
-          <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
+          <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">
+          <CloseIcon size={18} />
+        </button>
           <div className="drawer-loading" role="status" aria-live="polite">
             <span className="loading-spinner drawer-loading-spinner" aria-hidden="true" />
             <span className="drawer-loading-label">Loading diff…</span>
@@ -261,7 +276,9 @@ export function ReviewDrawer(props: Props) {
     <>
       <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
       <aside className="drawer" aria-label="Review drawer" ref={drawerRef}>
-        <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">×</button>
+        <button type="button" className="drawer-close" onClick={onClose} aria-label="Close drawer">
+          <CloseIcon size={18} />
+        </button>
         <button
           type="button"
           className="drawer-refresh"
