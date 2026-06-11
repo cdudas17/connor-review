@@ -655,6 +655,7 @@ export function App() {
         prs={activePRs}
         mode={mode}
         onOpen={setCurrent}
+        claudeStateFor={claudeResponses.aggregateFor}
         {...(tab === 'my'
           ? { selection: { selectedKeys, onToggle: toggleSelect } }
           : tab === 'mine'

@@ -2,6 +2,7 @@ import type { TrackedPR } from '../types.js';
 import { StatusBadge } from './StatusBadge.js';
 import { GhStatusBadge } from './GhStatusBadge.js';
 import { CiBadge } from './CiBadge.js';
+import { ClaudeBadge } from './ClaudeBadge.js';
 import { LabelChips } from './LabelChips.js';
 import type { FilterMode } from './FilterToggle.js';
 
@@ -36,9 +37,12 @@ interface Props {
     /** Optional predicate — when false for a row, no checkbox renders on that row. */
     isSelectable?: (id: Identity) => boolean;
   };
+  /** Per-PR Claude state aggregator (summary + threads). When provided, each row
+   * renders a small badge indicating in-progress / saved-response / failed. */
+  claudeStateFor?: (id: { owner: string; repo: string; number: number }) => { kind: 'loading' | 'error' | 'success' } | null;
 }
 
-export function PRList({ prs, mode, onOpen, selection }: Props) {
+export function PRList({ prs, mode, onOpen, selection, claudeStateFor }: Props) {
   const filtered = mode === 'untouched-only' ? prs.filter((p) => p.status === 'untouched') : prs;
   if (filtered.length === 0) {
     return <p className="empty">No PRs to review.</p>;
@@ -94,6 +98,7 @@ export function PRList({ prs, mode, onOpen, selection }: Props) {
               </span>
             </span>
             <span className="pr-badges">
+              <ClaudeBadge state={claudeStateFor?.({ owner: p.owner, repo: p.repo, number: p.number }) ?? null} />
               <CiBadge status={p.ciStatus} url={p.ciUrl} />
               <GhStatusBadge status={p.ghStatus} />
               {/* If GitHub already reports the PR as approved, the local

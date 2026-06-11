@@ -194,7 +194,27 @@ export function useClaudeResponses(opts: Options) {
   const summaryFor = useCallback((target: PRTarget): ClaudeResponseState | null => summary[prKey(target)] ?? null, [summary]);
   const threadFor = useCallback((target: PRTarget, threadId: string): ClaudeResponseState | null => threads[threadKey(target, threadId)] ?? null, [threads]);
 
-  return { summaryFor, threadFor, askSummary, askThread, dismissSummary, dismissThread, dismissAllForPR };
+  /** Aggregate Claude state across the summary card + every thread card for a PR.
+   * Used by the PR list to render a single per-row indicator.
+   *
+   * Priority: loading wins, then error, then success. Returns null when there's
+   * no Claude state on this PR at all (the common case — most rows). */
+  const aggregateFor = useCallback((target: PRTarget): { kind: 'loading' | 'error' | 'success' } | null => {
+    const prefix = prKey(target);
+    const candidates: ClaudeResponseState[] = [];
+    const s = summary[prefix];
+    if (s) candidates.push(s);
+    const threadPrefix = `${prefix}::`;
+    for (const [k, v] of Object.entries(threads)) {
+      if (k.startsWith(threadPrefix)) candidates.push(v);
+    }
+    if (candidates.length === 0) return null;
+    if (candidates.some((c) => c.loading)) return { kind: 'loading' };
+    if (candidates.some((c) => c.error)) return { kind: 'error' };
+    return { kind: 'success' };
+  }, [summary, threads]);
+
+  return { summaryFor, threadFor, aggregateFor, askSummary, askThread, dismissSummary, dismissThread, dismissAllForPR };
 }
 
 /** Test-only: clear both storage buckets. Exported so tests don't leak across runs. */

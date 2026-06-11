@@ -146,6 +146,55 @@ describe('useClaudeResponses — thread reply cards', () => {
   });
 });
 
+describe('useClaudeResponses — aggregateFor (PR-list indicator)', () => {
+  it('returns null when there is no Claude state for the PR', () => {
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: null }));
+    expect(result.current.aggregateFor(TARGET)).toBeNull();
+  });
+
+  it('returns kind:success when only a settled summary exists', async () => {
+    server.use(http.post('/api/pulls/:o/:r/:n/claude/ask', () => HttpResponse.json({ response: 'ok' })));
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
+    act(() => { result.current.askSummary(TARGET, 'q'); });
+    await waitFor(() => expect(result.current.aggregateFor(TARGET)?.kind).toBe('success'));
+  });
+
+  it('returns kind:loading when ANY card is in-flight (priority over success)', async () => {
+    server.use(
+      // Delay the response long enough that we can assert mid-flight, then
+      // resolve so the test doesn't hang.
+      http.post('/api/pulls/:o/:r/:n/claude/ask', async () => {
+        await new Promise((r) => setTimeout(r, 100));
+        return HttpResponse.json({ response: 'late' });
+      }),
+    );
+    // Seed a saved summary (success) first.
+    localStorage.setItem('connor-review.claudeSummary.v1', JSON.stringify({
+      [TARGET_KEY]: { loading: false, body: 'old', savedAt: Date.now() },
+    }));
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
+    expect(result.current.aggregateFor(TARGET)?.kind).toBe('success');
+    // Fire a thread ask that won't resolve for 100ms — the aggregate should flip
+    // to loading immediately because loading-wins-over-success.
+    act(() => {
+      result.current.askThread(TARGET, 'TH', 'q', { path: 'a', endLine: 1, side: 'RIGHT' });
+    });
+    expect(result.current.aggregateFor(TARGET)?.kind).toBe('loading');
+    // After the response settles, we go back to success (all settled, no errors).
+    await waitFor(() => expect(result.current.aggregateFor(TARGET)?.kind).toBe('success'));
+  });
+
+  it('returns kind:error when there is no loading card but at least one error', async () => {
+    server.use(
+      http.post('/api/pulls/:o/:r/:n/claude/ask', () =>
+        HttpResponse.json({ code: 'CLAUDE_FAILED', message: 'boom' }, { status: 500 })),
+    );
+    const { result } = renderHook(() => useClaudeResponses({ onToast: vi.fn(), currentPRKey: TARGET_KEY }));
+    act(() => { result.current.askSummary(TARGET, 'q'); });
+    await waitFor(() => expect(result.current.aggregateFor(TARGET)?.kind).toBe('error'));
+  });
+});
+
 describe('useClaudeResponses — cleanup', () => {
   it('sweeps entries older than 30 days on mount', () => {
     const ancient = Date.now() - (40 * 24 * 60 * 60 * 1000); // 40 days ago
