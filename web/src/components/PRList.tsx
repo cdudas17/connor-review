@@ -132,11 +132,13 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, onToggleA
             </span>
             <span className="pr-badges">
               <ClaudeBadge state={claudeStateFor?.({ owner: p.owner, repo: p.repo, number: p.number }) ?? null} />
+              {/* StatusBadge returns null for 'untouched' (the default state),
+                  so this just renders Reviewed / Approved chips when set. Sits
+                  to the left of CI so my own state on the PR is the first
+                  signal in the cluster. */}
+              <StatusBadge status={p.status} />
               <CiBadge status={p.ciStatus} url={p.ciUrl} />
               <GhStatusBadge status={p.ghStatus} />
-              {/* StatusBadge returns null for 'untouched' (the default state),
-                  so this just renders Reviewed / Approved chips when set. */}
-              <StatusBadge status={p.status} />
               {/* My PRs tab: per-row "Copy PR link" button. Renders to the
                   left of the auto-merge toggle so both action icons sit in
                   the same trailing cluster. */}
