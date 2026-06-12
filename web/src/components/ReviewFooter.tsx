@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ReviewEvent } from '../types.js';
 import { EmojiTextarea } from './EmojiTextarea.js';
+import { GitMergeIcon } from '@primer/octicons-react';
 
 interface Props {
   summary: string;
@@ -74,15 +75,6 @@ export function LocalReviewFooter({
         </div>
       </div>
     </footer>
-  );
-}
-
-function GitMergeIcon({ size = 14 }: { size?: number }) {
-  // Octicons "git-merge".
-  return (
-    <svg viewBox="0 0 16 16" width={size} height={size} aria-hidden="true" focusable="false">
-      <path fill="currentColor" d="M5 3.254V3.25v.005a.75.75 0 1 1 0-.005ZM5 5.5V3.5a3.5 3.5 0 0 1 5.487-2.87l2.07-2.07a.75.75 0 1 1 1.06 1.06l-2.07 2.07A3.5 3.5 0 0 1 9 8.732V11.5a3.25 3.25 0 1 1-1.5 0V8.732A3.5 3.5 0 0 1 5 5.5ZM5.5 14.5a1.75 1.75 0 1 0 0-3.5 1.75 1.75 0 0 0 0 3.5Zm0-13a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/>
-    </svg>
   );
 }
 
