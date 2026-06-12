@@ -136,8 +136,9 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
-  /** The viewer's open GitHub issues (assigned + authored, most-recent first). */
-  getMyIssues(opts?: { scope?: 'assigned' | 'authored' | 'either'; limit?: number }): Promise<{
+  /** The viewer's open GitHub issues (assigned + authored, most-recent first).
+   * Pass `owner` (e.g. 'Gusto') to scope the search to a single GitHub org/user. */
+  getMyIssues(opts?: { scope?: 'assigned' | 'authored' | 'either'; limit?: number; owner?: string }): Promise<{
     issues: Array<{
       number: number;
       title: string;
@@ -155,6 +156,7 @@ export const api = {
     const qs = new URLSearchParams();
     if (opts?.scope) qs.set('scope', opts.scope);
     if (opts?.limit) qs.set('limit', String(opts.limit));
+    if (opts?.owner) qs.set('owner', opts.owner);
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
     return call(`/api/issues/mine${suffix}`);
   },

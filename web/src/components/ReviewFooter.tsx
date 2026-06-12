@@ -125,10 +125,10 @@ export function ReviewFooter({
               ? 'footer-auto-merge footer-auto-merge-on'
               : 'footer-auto-merge';
           const label = mergeQueueQueued
-            ? "Queued to merge — click to cancel"
+            ? 'Queued — click to cancel'
             : autoMergeEnabled
-              ? "Cancel 'merge when ready' (auto-merge will no longer happen)"
-              : "Enable 'merge when ready' (auto-merge once checks pass + approvals land)";
+              ? 'Cancel merge when ready'
+              : 'Merge when ready';
           const aria = mergeQueueQueued
             ? 'Cancel merge queue entry'
             : autoMergeEnabled
@@ -137,7 +137,7 @@ export function ReviewFooter({
           return (
             <button
               type="button"
-              className={cls}
+              className={`${cls} has-tooltip`}
               disabled={togglingAutoMerge}
               onClick={async () => {
                 setTogglingAutoMerge(true);
@@ -145,7 +145,7 @@ export function ReviewFooter({
                 finally { setTogglingAutoMerge(false); }
               }}
               aria-label={aria}
-              title={label}
+              data-tooltip={label}
             >
               {mergeQueueQueued ? <GitMergeQueueIcon size={18} /> : <GitMergeIcon size={18} />}
             </button>

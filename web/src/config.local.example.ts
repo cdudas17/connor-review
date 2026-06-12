@@ -25,6 +25,10 @@ export const APP_CONFIG: Partial<AppConfig> = {
   // included). Leave empty to hide the tab.
   myPRsAuthor: 'your-gh-username',
 
+  // Scope the floating "My open issues" panel to a single GitHub org / user
+  // (e.g. 'Gusto'). Leave empty to include every issue gh can see.
+  myIssuesOwner: '',
+
   // Local git checkouts that should power the "Local" tab. Short name → absolute
   // path. Each path must be a directory with a `.git` subdir. Diff is always
   // against the checkout's local `main`. Leave empty / omit to hide the tab.

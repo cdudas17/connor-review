@@ -417,7 +417,7 @@ export function App() {
         for (const r of results) {
           if (r.status === 'fulfilled') {
             const { p, meta } = r.value;
-            mineAddedPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt });
+            mineAddedPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null });
           }
         }
       });
@@ -723,19 +723,46 @@ export function App() {
         showCopyLink={tab === 'mine'}
         onToggleAutoMerge={tab === 'mine' ? (id) => {
           const target = activePRs.find((p) => p.owner === id.owner && p.repo === id.repo && p.number === id.number);
-          // Optimistic flip.
+          // Optimistic flip. If the PR is already approved when enabling, also
+          // assume it'll land straight in the merge queue (amber state) — that's
+          // what GitHub does in practice. After the API call succeeds we refetch
+          // meta to confirm the actual state.
           const nextEnabled = !id.currentlyEnabled;
-          if (target && minePRs.prs.some((p) => same(p, id))) minePRs.update(target, { autoMergeEnabled: nextEnabled });
-          if (target && mineAddedPRs.prs.some((p) => same(p, id))) mineAddedPRs.update(target, { autoMergeEnabled: nextEnabled });
+          const isApproved = target?.ghStatus === 'approved';
+          const optimisticPatch = nextEnabled
+            ? { autoMergeEnabled: true, mergeQueueQueued: isApproved }
+            : { autoMergeEnabled: false, mergeQueueQueued: false };
+          const inMine = !!target && minePRs.prs.some((p) => same(p, id));
+          const inAdded = !!target && mineAddedPRs.prs.some((p) => same(p, id));
+          if (target && inMine) minePRs.update(target, optimisticPatch);
+          if (target && inAdded) mineAddedPRs.update(target, optimisticPatch);
           const prRef = `${id.owner}/${id.repo}#${id.number}`;
           (id.currentlyEnabled
             ? api.disableAutoMerge(id.owner, id.repo, id.number)
             : api.enableAutoMerge(id.owner, id.repo, id.number))
-            .then(() => addToast('success', id.currentlyEnabled ? `Cancelled merge-when-ready for ${prRef}` : `Merge when ready enabled for ${prRef}`))
+            .then(async () => {
+              addToast('success', id.currentlyEnabled ? `Cancelled merge-when-ready for ${prRef}` : `Merge when ready enabled for ${prRef}`);
+              // Refetch the PR meta to replace the optimistic flags with the
+              // authoritative ones. GitHub is eventually-consistent here, so we
+              // do an immediate refetch and a delayed one (~2s) to catch the
+              // merge-queue state once it lands.
+              const sync = async () => {
+                if (!target) return;
+                try {
+                  const meta = await api.getPullRequest(id.owner, id.repo, id.number, { fresh: true });
+                  const truth = { autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null };
+                  if (inMine) minePRs.update(target, truth);
+                  if (inAdded) mineAddedPRs.update(target, truth);
+                } catch { /* keep the optimistic state — better than blanking */ }
+              };
+              sync();
+              setTimeout(sync, 2000);
+            })
             .catch((e) => {
-              // Revert optimistic flip on failure.
-              if (target && minePRs.prs.some((p) => same(p, id))) minePRs.update(target, { autoMergeEnabled: id.currentlyEnabled });
-              if (target && mineAddedPRs.prs.some((p) => same(p, id))) mineAddedPRs.update(target, { autoMergeEnabled: id.currentlyEnabled });
+              // Revert optimistic flip on failure (both fields).
+              const revert = { autoMergeEnabled: id.currentlyEnabled, mergeQueueQueued: !!target?.mergeQueueQueued };
+              if (target && inMine) minePRs.update(target, revert);
+              if (target && inAdded) mineAddedPRs.update(target, revert);
               addToast('error', `Failed to toggle merge-when-ready for ${prRef}: ${(e as Error).message}`);
             });
         } : undefined}

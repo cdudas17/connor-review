@@ -28,6 +28,8 @@ interface Options {
   /** 'assigned' (default — only issues I'm assigned to), 'authored', or
    * 'either' (assigned ∪ authored). */
   scope?: 'assigned' | 'authored' | 'either';
+  /** When set, restrict results to issues in this GitHub org/user (e.g. 'Gusto'). */
+  owner?: string;
 }
 
 /** Fetches the viewer's open GitHub issues. Lazy — first fetch fires only when
@@ -45,14 +47,14 @@ export function useMyIssues(opts: Options) {
     try {
       // Default scope is 'either' so users see both issues assigned to them
       // AND issues they opened themselves.
-      const { issues } = await api.getMyIssues({ scope: opts.scope ?? 'either' });
+      const { issues } = await api.getMyIssues({ scope: opts.scope ?? 'either', owner: opts.owner });
       setState({ issues, loading: false, error: null, hasLoaded: true, lastFetchedAt: Date.now() });
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e as ApiCallError, hasLoaded: true, lastFetchedAt: Date.now() }));
     } finally {
       loadingRef.current = false;
     }
-  }, [opts.scope]);
+  }, [opts.scope, opts.owner]);
 
   // Lazy first fetch: kick off when `enabled` first goes true.
   useEffect(() => {

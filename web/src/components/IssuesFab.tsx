@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useFabPosition } from '../hooks/useFabPosition.js';
 import { useMyIssues } from '../hooks/useMyIssues.js';
+import { APP_CONFIG } from '../config.js';
 
 function IssueOpenedIcon({ size = 18 }: { size?: number }) {
   // GitHub Octicons "issue-opened" (16×16).
@@ -61,7 +62,13 @@ export function IssuesFab() {
 
   // 'either' = assigned ∪ authored. Matches the user's mental model of "issues
   // I care about": ones someone gave me + ones I opened myself.
-  const { issues, loading, error, lastFetchedAt, refresh } = useMyIssues({ enabled: open, scope: 'either' });
+  // `owner` (when set in config) scopes the gh search to a single org/user so
+  // out-of-org clutter doesn't drown the panel.
+  const { issues, loading, error, lastFetchedAt, refresh } = useMyIssues({
+    enabled: open,
+    scope: 'either',
+    owner: APP_CONFIG.myIssuesOwner || undefined,
+  });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

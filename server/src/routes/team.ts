@@ -64,6 +64,11 @@ interface TeamPR {
   headSha: string;
   createdAt: string | null;
   updatedAt: string;
+  // Auto-merge + merge-queue surface for the My PRs / Team PRs rows. Both
+  // are best-effort: a search result that doesn't include them simply renders
+  // the default (not enabled, not queued) state.
+  autoMergeEnabled: boolean;
+  mergeQueueQueued: boolean;
 }
 
 interface TalentFile {
@@ -118,6 +123,8 @@ interface SearchNode {
   createdAt?: string;
   updatedAt: string;
   labels?: { nodes?: Array<{ name?: string; color?: string }> };
+  autoMergeRequest?: { mergeMethod?: string } | null;
+  mergeQueueEntry?: { state?: string; position?: number | null } | null;
   commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string; contexts?: { nodes?: Array<{ __typename?: string; context?: string; name?: string; targetUrl?: string | null; detailsUrl?: string | null; state?: string; status?: string; conclusion?: string | null }> } } } }> };
 }
 
@@ -190,6 +197,8 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
       headSha: n.headRefOid,
       createdAt: n.createdAt ?? null,
       updatedAt: n.updatedAt,
+      autoMergeEnabled: n.autoMergeRequest != null,
+      mergeQueueQueued: n.mergeQueueEntry != null,
     }))
     .filter((p) => p.owner && p.repo);
 }
@@ -262,6 +271,8 @@ export async function registerTeamRoutes(app: FastifyInstance) {
           headSha: n.headRefOid ?? '',
           createdAt: n.createdAt ?? null,
           updatedAt: n.updatedAt ?? new Date().toISOString(),
+          autoMergeEnabled: n.autoMergeRequest != null,
+          mergeQueueQueued: n.mergeQueueEntry != null,
         }))
         .filter((p) => p.owner && p.repo);
       const result = { author, prs };
@@ -307,6 +318,8 @@ export async function registerTeamRoutes(app: FastifyInstance) {
           headSha: n.headRefOid ?? '',
           createdAt: n.createdAt ?? null,
           updatedAt: n.updatedAt ?? new Date().toISOString(),
+          autoMergeEnabled: n.autoMergeRequest != null,
+          mergeQueueQueued: n.mergeQueueEntry != null,
         }))
         .filter((p) => p.owner && p.repo);
       const result = { label, prs };

@@ -4,6 +4,10 @@ import { CheckCircleFillIcon } from '@primer/octicons-react';
 
 export function GhStatusBadge({ status }: { status: GhStatus | null }) {
   if (status == null) return <span className="gh-status gh-status-unknown">…</span>;
+  // 'open' is the default for a normal PR — rendering a chip for it is just
+  // noise. Draft / approved / changes-requested / merged / closed still
+  // render because each carries actual information.
+  if (status === 'open') return null;
   // Approved: green check icon (Octicons CheckCircleFill) instead of a text
   // badge — easier to scan in a busy row. Other states stay textual since
   // they don't have a universally-understood single glyph.

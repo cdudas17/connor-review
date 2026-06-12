@@ -38,6 +38,9 @@ export interface AppConfig {
   markReadyAddLabels: string[];
   /** Labels to REMOVE when clicking "Mark ready for review" on a draft PR. Empty = no-op. */
   markReadyRemoveLabels: string[];
+  /** When set (e.g. 'Gusto'), the floating "My open issues" panel only fetches
+   * issues from this GitHub org/user. Empty = no filter (everything `gh` can see). */
+  myIssuesOwner: string;
   /**
    * Auto-apply labels when you leave visible feedback on a PR authored by a specific user.
    * Keys are GitHub logins; values are the labels to add. Fired after a successful Comment,
@@ -59,6 +62,7 @@ const DEFAULTS: AppConfig = {
   autoLabelOnReview: {},
   markReadyAddLabels: [],
   markReadyRemoveLabels: [],
+  myIssuesOwner: '',
 };
 
 // Vite's import.meta.glob lets us optionally pull in config.local.ts if it

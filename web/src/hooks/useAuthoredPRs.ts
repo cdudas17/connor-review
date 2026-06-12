@@ -77,6 +77,11 @@ export function useAuthoredPRs(author: string, opts: Options = {}) {
         isDraft: p.isDraft,
         createdAt: p.createdAt,
         addedAt: Date.parse(p.updatedAt) || Date.now(),
+        // Forward the merge-state flags so the My PRs row shows the right
+        // toggle visual immediately, without needing the drawer to fetch
+        // full meta first.
+        autoMergeEnabled: !!p.autoMergeEnabled,
+        mergeQueueQueued: !!p.mergeQueueQueued,
       }));
       tracked.sort((a, b) => b.addedAt - a.addedAt);
       setState({ prs: tracked, loading: false, error: null, errorDismissed: false, hasLoaded: true, lastFetchedAt: Date.now() });

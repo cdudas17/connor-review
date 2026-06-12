@@ -58,7 +58,7 @@ function CopyLinkButton({ owner, repo, number }: { owner: string; repo: string; 
   return (
     <button
       type="button"
-      className={`pr-row-copy${copied ? ' pr-row-copy-copied' : ''}`}
+      className={`pr-row-copy has-tooltip${copied ? ' pr-row-copy-copied' : ''}`}
       onClick={async (e) => {
         e.stopPropagation();
         try {
@@ -67,7 +67,7 @@ function CopyLinkButton({ owner, repo, number }: { owner: string; repo: string; 
           setTimeout(() => setCopied(false), 1200);
         } catch { /* clipboard may be unavailable in some contexts */ }
       }}
-      title={copied ? 'Copied!' : 'Copy PR link'}
+      data-tooltip={copied ? 'Copied!' : 'Copy PR link'}
       aria-label="Copy PR link"
     >
       {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
@@ -134,13 +134,9 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, onToggleA
               <ClaudeBadge state={claudeStateFor?.({ owner: p.owner, repo: p.repo, number: p.number }) ?? null} />
               <CiBadge status={p.ciStatus} url={p.ciUrl} />
               <GhStatusBadge status={p.ghStatus} />
-              {/* If GitHub already reports the PR as approved, the local
-                  "Untouched" badge is contradictory noise — hide it. The user
-                  can still see local statuses they set themselves (Reviewed,
-                  Approved) so explicit local intent isn't hidden. */}
-              {!(p.ghStatus === 'approved' && p.status === 'untouched') && (
-                <StatusBadge status={p.status} />
-              )}
+              {/* StatusBadge returns null for 'untouched' (the default state),
+                  so this just renders Reviewed / Approved chips when set. */}
+              <StatusBadge status={p.status} />
               {/* My PRs tab: per-row "Copy PR link" button. Renders to the
                   left of the auto-merge toggle so both action icons sit in
                   the same trailing cluster. */}
@@ -157,18 +153,18 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, onToggleA
                 const queued = !!p.mergeQueueQueued;
                 const enabled = !!p.autoMergeEnabled;
                 const cls = queued ? 'pr-row-automerge pr-row-automerge-queued' : enabled ? 'pr-row-automerge pr-row-automerge-on' : 'pr-row-automerge';
-                const label = queued ? 'Queued to merge — click to cancel'
-                  : enabled ? 'Auto-merge enabled — click to cancel'
-                  : 'Enable merge when ready';
+                const label = queued ? 'Queued — click to cancel'
+                  : enabled ? 'Cancel merge when ready'
+                  : 'Merge when ready';
                 return (
                   <button
                     type="button"
-                    className={cls}
+                    className={`${cls} has-tooltip`}
                     onClick={(e) => {
                       e.stopPropagation();
                       onToggleAutoMerge({ owner: p.owner, repo: p.repo, number: p.number, currentlyEnabled: enabled || queued });
                     }}
-                    title={label}
+                    data-tooltip={label}
                     aria-label={label}
                   >
                     {queued ? <GitMergeQueueIcon size={16} /> : <GitMergeIcon size={16} />}

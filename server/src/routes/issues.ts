@@ -33,11 +33,15 @@ interface GhSearchIssueNode {
  * searches across everything the user can see.
  */
 export async function registerIssuesRoutes(app: FastifyInstance) {
-  app.get<{ Querystring: { scope?: 'assigned' | 'authored' | 'either'; limit?: string } }>(
+  app.get<{ Querystring: { scope?: 'assigned' | 'authored' | 'either'; limit?: string; owner?: string } }>(
     '/api/issues/mine',
     async (req, reply) => {
       const scope = req.query.scope ?? 'either';
       const limit = Math.min(Math.max(parseInt(req.query.limit ?? '50', 10) || 50, 1), 200);
+      // Optional org/user filter so the My open issues widget can scope to a
+      // single GitHub owner (e.g. `Gusto`). Trim to be defensive against
+      // accidental whitespace; empty / undefined means "no filter".
+      const owner = (req.query.owner ?? '').trim();
       // IMPORTANT: gh search issues does NOT accept `is:open` / `is:issue`
       // inside the query string — those qualifiers come back as zero-result
       // searches. Use the dedicated flags instead (`--state`, `--author`,
@@ -46,13 +50,15 @@ export async function registerIssuesRoutes(app: FastifyInstance) {
       const JSON_FIELDS = 'number,title,url,state,author,repository,createdAt,updatedAt,labels';
       const runScopedSearch = async (kind: 'assigned' | 'authored'): Promise<GhSearchIssueNode[]> => {
         const flag = kind === 'assigned' ? '--assignee' : '--author';
-        const out = await ghExec([
+        const args = [
           'search', 'issues',
           flag, '@me',
           '--state', 'open',
           '--json', JSON_FIELDS,
           '--limit', String(limit),
-        ]);
+        ];
+        if (owner) { args.push('--owner', owner); }
+        const out = await ghExec(args);
         const parsed = JSON.parse(out);
         return Array.isArray(parsed) ? parsed as GhSearchIssueNode[] : [];
       };

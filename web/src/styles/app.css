@@ -199,11 +199,14 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .claude-chat-input-actions { display: flex; justify-content: flex-end; padding: 0 12px; }
 
 /* Per-row Claude indicator on the PR list. */
-.claude-badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; background: transparent; font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1; }
+/* Icon-only Claude badge — sized to match the other 16-ish px row badges
+ * (CiBadge, gh-status-approved-icon) so the trailing cluster reads as a row
+ * of equal-weight glyphs rather than a mix of text pills and icons. */
+.claude-badge { font-size: 0.75rem; width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid currentColor; background: transparent; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 .claude-badge-loading { color: var(--accent); }
 .claude-badge-success { color: var(--accent); }
 .claude-badge-error { color: var(--err, #cf6679); }
-.claude-badge-spinner { width: 8px; height: 8px; border-width: 1.5px; margin: 0; }
+.claude-badge-spinner { width: 9px; height: 9px; border-width: 1.5px; margin: 0; }
 
 /* :shortcode: emoji autocomplete dropdown */
 .emoji-textarea { position: relative; }
@@ -289,6 +292,11 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .status-badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
 .status-approved { color: var(--ok); border-color: var(--ok); }
 .status-reviewed { color: var(--accent); border-color: var(--accent); }
+/* Local 'approved' is rendered as a naked green check (same glyph as the
+ * GH-side approved badge) — strip the pill chrome inherited from
+ * .status-badge so the icon sits clean next to its neighbours. */
+.status-approved-icon { border: none; padding: 0; background: transparent; display: inline-flex; align-items: center; line-height: 1; }
+.status-approved-icon svg { display: block; }
 
 /* GitHub-side status pills (Draft / Open / Approved / Merged / etc.) — outlined only */
 .gh-status { font-size: 0.75rem; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; background: transparent; font-weight: 500; white-space: nowrap; }
@@ -327,18 +335,20 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
  * GitHub UI style. Both surfaces (drawer footer + PR row) share the same
  * visual treatment; the row uses a smaller size.
  *
- * Default state: outlined green (transparent bg, green border, green icon).
- * Enabled state: filled green (green bg, white icon).
+ * All three states stay outlined — color carries the meaning:
+ *   - default: green outline + green icon (action available)
+ *   - on:       green outline + green icon, faint green wash (auto-merge enabled, not yet queued)
+ *   - queued:   amber outline + amber icon, faint amber wash (in the merge queue)
  *
  * Drawer footer: 28×28 — matches the close/refresh chrome above. */
 .footer-auto-merge { display: inline-flex !important; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0 !important; border: 1px solid var(--ok) !important; border-radius: 6px !important; background: transparent !important; color: var(--ok) !important; cursor: pointer; }
 .footer-auto-merge:hover:not(:disabled) { background: rgba(31, 136, 61, 0.12) !important; }
 .footer-auto-merge svg { display: block; flex-shrink: 0; }
-.footer-auto-merge-on { background: var(--ok) !important; border-color: var(--ok) !important; color: #ffffff !important; }
-.footer-auto-merge-on:hover:not(:disabled) { background: var(--ok-hover, #28a35a) !important; border-color: var(--ok-hover, #28a35a) !important; }
+.footer-auto-merge-on { background: rgba(31, 136, 61, 0.14) !important; border-color: var(--ok) !important; color: var(--ok) !important; }
+.footer-auto-merge-on:hover:not(:disabled) { background: rgba(31, 136, 61, 0.22) !important; }
 /* Queued in the merge queue — amber, matches GitHub's own visual. */
-.footer-auto-merge-queued { background: #bb8009 !important; border-color: #bb8009 !important; color: #ffffff !important; }
-.footer-auto-merge-queued:hover:not(:disabled) { background: #a06e07 !important; border-color: #a06e07 !important; }
+.footer-auto-merge-queued { background: rgba(187, 128, 9, 0.14) !important; border-color: #bb8009 !important; color: #bb8009 !important; }
+.footer-auto-merge-queued:hover:not(:disabled) { background: rgba(187, 128, 9, 0.22) !important; }
 /* Per-row "Copy PR link" button — same 22×22 visual weight as the auto-merge
  * pill but in muted-grey so the two trailing actions aren't competing. */
 .pr-row-copy { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer; transition: color 80ms, background-color 80ms; }
@@ -349,10 +359,64 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .pr-row-automerge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 1px solid var(--ok); border-radius: 5px; background: transparent; color: var(--ok); cursor: pointer; }
 .pr-row-automerge:hover { background: rgba(31, 136, 61, 0.12); }
 .pr-row-automerge svg { display: block; flex-shrink: 0; }
-.pr-row-automerge-on { background: var(--ok); border-color: var(--ok); color: #ffffff; }
-.pr-row-automerge-on:hover { background: var(--ok-hover, #28a35a); border-color: var(--ok-hover, #28a35a); }
-.pr-row-automerge-queued { background: #bb8009; border-color: #bb8009; color: #ffffff; }
-.pr-row-automerge-queued:hover { background: #a06e07; border-color: #a06e07; }
+.pr-row-automerge-on { background: rgba(31, 136, 61, 0.14); border-color: var(--ok); color: var(--ok); }
+.pr-row-automerge-on:hover { background: rgba(31, 136, 61, 0.22); }
+.pr-row-automerge-queued { background: rgba(187, 128, 9, 0.14); border-color: #bb8009; color: #bb8009; }
+.pr-row-automerge-queued:hover { background: rgba(187, 128, 9, 0.22); }
+
+/* Reusable hover tooltip — drives off a [data-tooltip="..."] attribute on
+ * any element marked `.has-tooltip`. We use this instead of the native
+ * `title=` attribute so the tooltip can be styled, theme-aware, and appear
+ * without the ~1s OS-tooltip delay. Native `title` is intentionally NOT set
+ * on these buttons (would duplicate visually). The label still reaches AT
+ * via `aria-label`.
+ *
+ * The bubble is a ::after pseudo-element; an ::before triangle points back
+ * at the host. Both fade in on :hover / :focus-visible. `pointer-events:
+ * none` keeps the bubble from stealing hover from the button itself. */
+.has-tooltip { position: relative; }
+.has-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  padding: 4px 8px;
+  background: rgba(36, 41, 47, 0.96);
+  color: #e6edf3;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 80ms ease 150ms;
+  z-index: 200;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.has-tooltip::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 3px);
+  right: 8px;
+  border: 4px solid transparent;
+  border-top-color: rgba(36, 41, 47, 0.96);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 80ms ease 150ms;
+  z-index: 200;
+}
+.has-tooltip:hover::after,
+.has-tooltip:hover::before,
+.has-tooltip:focus-visible::after,
+.has-tooltip:focus-visible::before { opacity: 1; }
+/* Tooltip-below variant — used when the host sits near the top of its
+ * container (e.g. drawer header buttons) where the default "above" position
+ * would be clipped. */
+.has-tooltip-below::after { bottom: auto; top: calc(100% + 8px); }
+.has-tooltip-below::before { bottom: auto; top: calc(100% + 3px); border-top-color: transparent; border-bottom-color: rgba(36, 41, 47, 0.96); }
+
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(13, 17, 23, 0.35); z-index: 10; cursor: pointer; }
 
 /* Floating notes pencil — always on screen, above the drawer. */

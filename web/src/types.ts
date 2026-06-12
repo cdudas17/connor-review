@@ -148,4 +148,9 @@ export interface TeamPR {
   headSha: string;
   createdAt: string | null;
   updatedAt: string;
+  /** Best-effort flags from the search-result GraphQL — let rows render the
+   * correct merge-when-ready visual without first having to open the drawer.
+   * Older server builds omit them; treat undefined as "not enabled". */
+  autoMergeEnabled?: boolean;
+  mergeQueueQueued?: boolean;
 }

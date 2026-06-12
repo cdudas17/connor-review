@@ -14,22 +14,33 @@ export function ClaudeBadge({ state }: Props) {
   if (!state) return null;
   if (state.kind === 'loading') {
     return (
-      <span className="claude-badge claude-badge-loading" title="Asking Claude on this PR — answer will land in the drawer">
+      <span
+        className="claude-badge claude-badge-loading has-tooltip"
+        data-tooltip="Asking Claude on this PR — answer will land in the drawer"
+        aria-label="Asking Claude"
+      >
         <span className="loading-spinner claude-badge-spinner" aria-hidden="true" />
-        <span>Claude</span>
       </span>
     );
   }
   if (state.kind === 'error') {
     return (
-      <span className="claude-badge claude-badge-error" title="Claude request failed — open the drawer to retry">
-        ! Claude
+      <span
+        className="claude-badge claude-badge-error has-tooltip"
+        data-tooltip="Claude request failed — open the drawer to retry"
+        aria-label="Claude request failed"
+      >
+        !
       </span>
     );
   }
   return (
-    <span className="claude-badge claude-badge-success" title="Claude has a saved response on this PR — open the drawer to view it">
-      ✦ Claude
+    <span
+      className="claude-badge claude-badge-success has-tooltip"
+      data-tooltip="Claude has a saved response on this PR — open the drawer to view it"
+      aria-label="Claude has a saved response"
+    >
+      ✦
     </span>
   );
 }

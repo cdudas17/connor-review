@@ -209,10 +209,22 @@ export function ReviewDrawer(props: Props) {
     }
   }, [current, onToast, reloadWithCatchup]);
 
+  // Optimistic override for the merge-when-ready footer button. When the user
+  // clicks the toggle we flip the visual immediately (and assume an approved PR
+  // will land in the merge queue), then `reloadWithCatchup` re-fetches meta and
+  // the override clears once the fresh truth is in. `null` = no override, defer
+  // to whatever the latest meta says.
+  const [optimisticAutoMerge, setOptimisticAutoMerge] = useState<{ autoMergeEnabled: boolean; mergeQueueQueued: boolean } | null>(null);
+
   const toggleAutoMerge = useCallback(async () => {
     if (!current || !meta) return;
     const prRef = `${current.owner}/${current.repo}#${current.number}`;
     const enabled = !!meta.autoMergeRequest;
+    const isApproved = (meta.reviewDecision ?? null) === 'APPROVED';
+    // Optimistic flip: enabling an approved PR → assume the queue picks it up.
+    setOptimisticAutoMerge(enabled
+      ? { autoMergeEnabled: false, mergeQueueQueued: false }
+      : { autoMergeEnabled: true, mergeQueueQueued: isApproved });
     try {
       if (enabled) {
         await api.disableAutoMerge(current.owner, current.repo, current.number);
@@ -223,9 +235,26 @@ export function ReviewDrawer(props: Props) {
       }
       reloadWithCatchup();
     } catch (e) {
+      // Revert the optimistic visual; surface the failure.
+      setOptimisticAutoMerge(null);
       onToast('error', `Failed to toggle merge when ready for ${prRef}: ${(e as Error).message}`);
     }
   }, [current, meta, onToast, reloadWithCatchup]);
+
+  // Clear the optimistic override once a fresh meta arrives whose state agrees
+  // with what we optimistically flipped to — or after ~3s as a hard fallback
+  // for the eventual-consistency case where GitHub hasn't reflected the queue
+  // entry yet but our amber state is the truth on the wire.
+  useEffect(() => {
+    if (!optimisticAutoMerge || !meta) return;
+    const truthEnabled = meta.autoMergeRequest != null;
+    if (truthEnabled === optimisticAutoMerge.autoMergeEnabled) {
+      setOptimisticAutoMerge(null);
+      return;
+    }
+    const t = setTimeout(() => setOptimisticAutoMerge(null), 3000);
+    return () => clearTimeout(t);
+  }, [meta?.autoMergeRequest, meta?.mergeQueueEntry, optimisticAutoMerge]);
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
@@ -435,8 +464,8 @@ export function ReviewDrawer(props: Props) {
           // GitHub's own viewerCanEnableAutoMerge so we don't have to track
           // permission ourselves.
           onToggleAutoMerge={(meta.viewerCanEnableAutoMerge || !!meta.autoMergeRequest || !!meta.mergeQueueEntry) && meta.state === 'OPEN' && !meta.merged ? toggleAutoMerge : undefined}
-          autoMergeEnabled={!!meta.autoMergeRequest}
-          mergeQueueQueued={!!meta.mergeQueueEntry}
+          autoMergeEnabled={optimisticAutoMerge?.autoMergeEnabled ?? !!meta.autoMergeRequest}
+          mergeQueueQueued={optimisticAutoMerge?.mergeQueueQueued ?? !!meta.mergeQueueEntry}
           onAskClaude={() => {
             // Drain the summary textarea into the chat as the next user turn,
             // then clear it so the box is free for an actual review summary.

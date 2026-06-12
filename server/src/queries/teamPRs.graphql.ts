@@ -20,6 +20,8 @@ export const TEAM_PR_SEARCH_QUERY = /* GraphQL */ `
           createdAt
           updatedAt
           labels(first: 10) { nodes { name color } }
+          autoMergeRequest { mergeMethod }
+          mergeQueueEntry { state position }
           commits(last: 1) {
             nodes {
               commit {
