@@ -296,6 +296,11 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .gh-status-draft { color: #8b949e; }
 .gh-status-open { color: #3fb950; }
 .gh-status-approved { color: #3fb950; }
+/* Approved is rendered as an icon-only badge — strip the pill chrome
+ * (border, padding, radius) inherited from .gh-status so it sits as a
+ * naked green check next to the other badges. */
+.gh-status-approved-icon { border: none; padding: 0; background: transparent; display: inline-flex; align-items: center; line-height: 1; }
+.gh-status-approved-icon svg { display: block; }
 .gh-status-changes-requested { color: #d29922; }
 .gh-status-merged { color: #a371f7; }
 .gh-status-closed { color: #f85149; }
