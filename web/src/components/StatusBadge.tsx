@@ -1,5 +1,5 @@
 import type { PRStatus } from '../types.js';
-import { CheckCircleFillIcon } from '@primer/octicons-react';
+import { CheckCircleFillIcon, CommentIcon } from '@primer/octicons-react';
 
 const LABEL: Record<PRStatus, string> = {
   untouched: 'Untouched',
@@ -26,5 +26,16 @@ export function StatusBadge({ status }: { status: PRStatus }) {
       </span>
     );
   }
-  return <span className={`status-badge status-${status}`}>{LABEL[status]}</span>;
+  // Local 'reviewed' renders as a comment glyph inside an outlined blue
+  // circle — matches the visual weight of the approved checkmark + Claude
+  // badge so the trailing badge cluster reads as a row of equal-sized icons.
+  return (
+    <span
+      className="status-badge status-reviewed status-reviewed-icon has-tooltip"
+      data-tooltip={LABEL.reviewed}
+      aria-label={LABEL.reviewed}
+    >
+      <CommentIcon size={12} />
+    </span>
+  );
 }

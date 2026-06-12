@@ -297,6 +297,11 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
  * .status-badge so the icon sits clean next to its neighbours. */
 .status-approved-icon { border: none; padding: 0; background: transparent; display: inline-flex; align-items: center; line-height: 1; }
 .status-approved-icon svg { display: block; }
+/* Local 'reviewed' is a comment glyph inside an outlined blue circle —
+ * 18×18 to match the Claude badge so the trailing cluster reads as a row of
+ * equal-weight icons. Overrides the pill chrome inherited from .status-badge. */
+.status-reviewed-icon { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid currentColor; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.status-reviewed-icon svg { display: block; }
 
 /* GitHub-side status pills (Draft / Open / Approved / Merged / etc.) — outlined only */
 .gh-status { font-size: 0.75rem; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; background: transparent; font-weight: 500; white-space: nowrap; }
