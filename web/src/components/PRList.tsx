@@ -137,19 +137,22 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, onToggleA
                   cluster — they block forward progress regardless of CI or
                   review state, so this is the first signal worth seeing. */}
               <ConflictBadge hasConflicts={p.hasConflicts} />
-              {/* Draft + Closed are the GhStatus values we surface left-of-CI
-                  — Draft because it gates whether the PR is reviewable, Closed
-                  because the PR is dead so its other badges (CI status, etc.)
-                  matter less than knowing it's done. Everything else (approved
-                  icon, merged, changes-requested) renders to the right of CI. */}
-              {(p.ghStatus === 'draft' || p.ghStatus === 'closed') && <GhStatusBadge status={p.ghStatus} />}
+              {/* Draft + Closed + Approved are the GhStatus values we surface
+                  left-of-CI — Draft gates reviewability, Closed flags the PR
+                  is dead, and Approved is high-signal "ready to merge". Other
+                  states (merged, changes-requested) render to the right of CI. */}
+              {(p.ghStatus === 'draft' || p.ghStatus === 'closed' || p.ghStatus === 'approved') && (
+                <GhStatusBadge status={p.ghStatus} />
+              )}
               {/* StatusBadge returns null for 'untouched' (the default state),
                   so this just renders Reviewed / Approved chips when set. Sits
                   to the left of CI so my own state on the PR is the first
                   signal in the cluster. */}
               <StatusBadge status={p.status} />
               <CiBadge status={p.ciStatus} url={p.ciUrl} />
-              {p.ghStatus !== 'draft' && p.ghStatus !== 'closed' && <GhStatusBadge status={p.ghStatus} />}
+              {p.ghStatus !== 'draft' && p.ghStatus !== 'closed' && p.ghStatus !== 'approved' && (
+                <GhStatusBadge status={p.ghStatus} />
+              )}
               {/* My PRs tab: per-row "Copy PR link" button. Renders to the
                   left of the auto-merge toggle so both action icons sit in
                   the same trailing cluster. */}
