@@ -314,6 +314,25 @@ describe('pulls routes', () => {
     await app.close();
   });
 
+  it('POST /labels surfaces the real color from GitHubs response (not hardcoded grey)', async () => {
+    // Prime the meta cache so the labels write has a target to patch.
+    mocked.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
+    const app = await buildServer();
+    await app.inject({ url: '/api/pulls/Gusto/zenpayroll/1' }); // populates metaCache
+    // Now POST /labels — GitHub returns the real color (teal-ish 0075ca).
+    mocked.mockResolvedValueOnce(JSON.stringify([
+      { name: 'Comments left by reviewer', color: '0075ca' },
+    ]));
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/labels',
+      payload: { labels: ['Comments left by reviewer'], mode: 'replace' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().labels).toEqual([{ name: 'Comments left by reviewer', color: '0075ca' }]);
+    await app.close();
+  });
+
   it('POST /labels with mode=replace uses PUT (sets labels, drops the rest)', async () => {
     mocked.mockResolvedValueOnce(JSON.stringify([{ name: 'Comments left by reviewer' }]));
     const app = await buildServer();

@@ -519,22 +519,47 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       '--method', mode === 'replace' ? 'PUT' : 'POST',
       '--input', '-',
     ], { input: JSON.stringify({ labels }) });
-    // Refresh cached labels best-effort so the drawer/list shows them on next fetch.
+    // GitHub's REST POST/PUT .../labels returns the full updated label list
+    // with each label's real `color` (the hex configured in the repo). Use
+    // that to update our cache instead of hardcoding a grey `888888` —
+    // otherwise the chip on the row renders grey until the next real meta
+    // refetch overwrites it with the actual color from GraphQL.
+    let respLabels: Array<{ name: string; color: string }> = [];
+    try {
+      const parsed = JSON.parse(out) as Array<{ name?: string; color?: string }>;
+      if (Array.isArray(parsed)) {
+        respLabels = parsed
+          .filter((l) => typeof l?.name === 'string')
+          .map((l) => ({ name: l.name as string, color: typeof l.color === 'string' ? l.color : '888888' }));
+      }
+    } catch { /* fall back to whatever we have */ }
+
     const cached = metaCache.get(metaKey(params));
     if (cached) {
       if (mode === 'replace') {
-        // After PUT, the PR's label list IS exactly `labels` — drop everything else.
-        metaCache.set(metaKey(params), { ...cached, labels: labels.map((l) => ({ name: l, color: '888888' })) });
+        // After PUT, the PR's label list IS exactly the response.
+        const next = respLabels.length > 0
+          ? respLabels
+          : labels.map((l) => ({ name: l, color: '888888' }));
+        metaCache.set(metaKey(params), { ...cached, labels: next });
       } else {
-        // POST appended — union with what was already there.
-        metaCache.set(metaKey(params), { ...cached, labels: [...(cached.labels ?? []), ...labels.filter((l) => !cached.labels.some((c) => c.name === l)).map((l) => ({ name: l, color: '888888' }))] });
+        // POST appended — union with what was already there, preferring real
+        // colors from the response for any labels we added.
+        const realColorByName = new Map(respLabels.map((l) => [l.name, l.color]));
+        const merged = [...(cached.labels ?? [])];
+        for (const newName of labels) {
+          const exists = merged.find((m) => m.name === newName);
+          const realColor = realColorByName.get(newName);
+          if (exists) {
+            if (realColor) exists.color = realColor;
+          } else {
+            merged.push({ name: newName, color: realColor ?? '888888' });
+          }
+        }
+        metaCache.set(metaKey(params), { ...cached, labels: merged });
       }
     }
-    try {
-      return { ok: true, labels: JSON.parse(out), mode };
-    } catch {
-      return { ok: true, mode };
-    }
+    return { ok: true, labels: respLabels, mode };
   });
 
   // Bounce the user's draft comment off the local `claude` CLI for feedback.
