@@ -10,6 +10,7 @@ import { ADD_PULL_REQUEST_REVIEW_THREAD_REPLY_MUTATION } from '../queries/addPul
 import { SUBMIT_PULL_REQUEST_REVIEW_MUTATION } from '../queries/submitPullRequestReview.graphql.js';
 import { MARK_READY_FOR_REVIEW_MUTATION } from '../queries/markReadyForReview.graphql.js';
 import { claudeExec, ClaudeCliError } from '../lib/claudeExec.js';
+import { ENABLE_AUTO_MERGE_MUTATION, DISABLE_AUTO_MERGE_MUTATION } from '../queries/autoMerge.graphql.js';
 import { existsSync, statSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 
@@ -40,6 +41,11 @@ interface PullRequestMeta {
   assignees: PRAssignee[];
   reviews: ReviewSummary[];
   reviewThreads: ReviewThread[];
+  /** Auto-merge ("merge when ready") state. null when not enabled. */
+  autoMergeRequest: { mergeMethod: 'MERGE' | 'SQUASH' | 'REBASE'; enabledBy: string | null; enabledAt: string | null } | null;
+  /** Whether the viewer can flip auto-merge on. False for un-mergeable PRs
+   * (already merged, conflicts, or org/repo policy). */
+  viewerCanEnableAutoMerge: boolean;
 }
 
 interface PRLabel { name: string; color: string; }
@@ -242,6 +248,14 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
         diffHunk: c.diffHunk ?? null,
       })),
     })),
+    autoMergeRequest: pr.autoMergeRequest
+      ? {
+          mergeMethod: pr.autoMergeRequest.mergeMethod ?? 'SQUASH',
+          enabledBy: pr.autoMergeRequest.enabledBy?.login ?? null,
+          enabledAt: pr.autoMergeRequest.enabledAt ?? null,
+        }
+      : null,
+    viewerCanEnableAutoMerge: !!pr.viewerCanEnableAutoMerge,
   };
 }
 
@@ -684,6 +698,61 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       metaCache.set(metaKey(params), { ...meta, isDraft: false });
       const parsed = JSON.parse(out) as { data?: { markPullRequestReadyForReview?: { pullRequest?: { id: string; isDraft: boolean } } } };
       return parsed.data?.markPullRequestReadyForReview?.pullRequest ?? { id: meta.id, isDraft: false };
+    },
+  );
+
+  // Enable "merge when ready" (GitHub's auto-merge). Default method is SQUASH —
+  // matches the Gusto/zenpayroll convention; future config could override.
+  app.post<{
+    Params: { owner: string; repo: string; number: string };
+    Body: { mergeMethod?: 'MERGE' | 'SQUASH' | 'REBASE' };
+  }>('/api/pulls/:owner/:repo/:number/auto-merge', async (req) => {
+    const params = parsePullParams(req.params);
+    const mergeMethod = req.body?.mergeMethod ?? 'SQUASH';
+    const meta = metaCache.get(metaKey(params)) ?? (await fetchMeta(params.owner, params.repo, params.number));
+    const out = await ghExec(['api', 'graphql', '--input', '-'], {
+      input: JSON.stringify({
+        query: ENABLE_AUTO_MERGE_MUTATION,
+        variables: { pullRequestId: meta.id, mergeMethod },
+      }),
+    });
+    const parsed = JSON.parse(out) as {
+      data?: { enablePullRequestAutoMerge?: { pullRequest?: { id: string; autoMergeRequest?: { mergeMethod?: string; enabledAt?: string; enabledBy?: { login?: string } } } } };
+      errors?: Array<{ message?: string }>;
+    };
+    const pr = parsed.data?.enablePullRequestAutoMerge?.pullRequest;
+    if (!pr) {
+      const detail = (parsed.errors ?? []).map((e) => e.message).filter(Boolean).join('; ');
+      throw new Error(detail ? `Auto-merge failed: ${detail}` : 'Auto-merge mutation returned no pullRequest');
+    }
+    // Patch the cache so the next list refresh / drawer reload sees it on without
+    // another GraphQL round trip.
+    const next = pr.autoMergeRequest
+      ? {
+          mergeMethod: (pr.autoMergeRequest.mergeMethod ?? mergeMethod) as 'MERGE' | 'SQUASH' | 'REBASE',
+          enabledBy: pr.autoMergeRequest.enabledBy?.login ?? null,
+          enabledAt: pr.autoMergeRequest.enabledAt ?? null,
+        }
+      : null;
+    metaCache.set(metaKey(params), { ...meta, autoMergeRequest: next });
+    return { autoMergeRequest: next };
+  });
+
+  // Disable "merge when ready". Idempotent — disabling when not enabled is a
+  // no-op upstream.
+  app.delete<{ Params: { owner: string; repo: string; number: string } }>(
+    '/api/pulls/:owner/:repo/:number/auto-merge',
+    async (req) => {
+      const params = parsePullParams(req.params);
+      const meta = metaCache.get(metaKey(params)) ?? (await fetchMeta(params.owner, params.repo, params.number));
+      await ghExec(['api', 'graphql', '--input', '-'], {
+        input: JSON.stringify({
+          query: DISABLE_AUTO_MERGE_MUTATION,
+          variables: { pullRequestId: meta.id },
+        }),
+      });
+      metaCache.set(metaKey(params), { ...meta, autoMergeRequest: null });
+      return { autoMergeRequest: null };
     },
   );
 }

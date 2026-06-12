@@ -17,6 +17,14 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
         createdAt
         bodyHTML
         viewerLatestReview { id state }
+        # Auto-merge ("merge when ready") state for the toggle button. The
+        # request is null when auto-merge isn't enabled.
+        autoMergeRequest {
+          mergeMethod
+          enabledAt
+          enabledBy { login }
+        }
+        viewerCanEnableAutoMerge
         labels(first: 50) { nodes { name color } }
         assignees(first: 20) { nodes { login avatarUrl url } }
         reviews(first: 100) {

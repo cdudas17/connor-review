@@ -346,6 +346,7 @@ export function App() {
       ciUrl: meta.ciUrl,
       labels: meta.labels ?? [],
       createdAt: meta.createdAt,
+      autoMergeEnabled: meta.autoMergeRequest != null,
     };
     myPRs.update(id, patch);
     mineAddedPRs.update(id, patch);
@@ -716,6 +717,26 @@ export function App() {
         mode={mode}
         onOpen={setCurrent}
         claudeStateFor={claudeResponses.aggregateFor}
+        // Only on the My PRs tab — those are PRs the viewer can typically merge.
+        // Fire-and-forget toggle: optimistically flip the row, toast on failure.
+        onToggleAutoMerge={tab === 'mine' ? (id) => {
+          const target = activePRs.find((p) => p.owner === id.owner && p.repo === id.repo && p.number === id.number);
+          // Optimistic flip.
+          const nextEnabled = !id.currentlyEnabled;
+          if (target && minePRs.prs.some((p) => same(p, id))) minePRs.update(target, { autoMergeEnabled: nextEnabled });
+          if (target && mineAddedPRs.prs.some((p) => same(p, id))) mineAddedPRs.update(target, { autoMergeEnabled: nextEnabled });
+          const prRef = `${id.owner}/${id.repo}#${id.number}`;
+          (id.currentlyEnabled
+            ? api.disableAutoMerge(id.owner, id.repo, id.number)
+            : api.enableAutoMerge(id.owner, id.repo, id.number))
+            .then(() => addToast('success', id.currentlyEnabled ? `Cancelled merge-when-ready for ${prRef}` : `Merge when ready enabled for ${prRef}`))
+            .catch((e) => {
+              // Revert optimistic flip on failure.
+              if (target && minePRs.prs.some((p) => same(p, id))) minePRs.update(target, { autoMergeEnabled: id.currentlyEnabled });
+              if (target && mineAddedPRs.prs.some((p) => same(p, id))) mineAddedPRs.update(target, { autoMergeEnabled: id.currentlyEnabled });
+              addToast('error', `Failed to toggle merge-when-ready for ${prRef}: ${(e as Error).message}`);
+            });
+        } : undefined}
         {...(tab === 'my'
           ? { selection: { selectedKeys, onToggle: toggleSelect } }
           : tab === 'mine'

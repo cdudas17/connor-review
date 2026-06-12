@@ -184,6 +184,24 @@ export function ReviewDrawer(props: Props) {
     }
   }, [current, onToast, reload]);
 
+  const toggleAutoMerge = useCallback(async () => {
+    if (!current || !meta) return;
+    const prRef = `${current.owner}/${current.repo}#${current.number}`;
+    const enabled = !!meta.autoMergeRequest;
+    try {
+      if (enabled) {
+        await api.disableAutoMerge(current.owner, current.repo, current.number);
+        onToast('success', `Cancelled merge-when-ready for ${prRef}`);
+      } else {
+        await api.enableAutoMerge(current.owner, current.repo, current.number);
+        onToast('success', `Merge when ready enabled for ${prRef}`);
+      }
+      reloadWithCatchup();
+    } catch (e) {
+      onToast('error', `Failed to toggle merge when ready for ${prRef}: ${(e as Error).message}`);
+    }
+  }, [current, meta, onToast, reloadWithCatchup]);
+
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     if (!current) return;
@@ -386,6 +404,13 @@ export function ReviewDrawer(props: Props) {
           canNextPR={canNavigateNext && canNext}
           finishLabel={pendingReviewId ? 'Finish your review' : null}
           onMarkReady={meta.isDraft ? markReady : undefined}
+          // Show the auto-merge toggle when GitHub says the viewer can use it
+          // OR when auto-merge is already enabled (so they can cancel it).
+          // The viewer ≈ the configured myPRsAuthor for normal users; we use
+          // GitHub's own viewerCanEnableAutoMerge so we don't have to track
+          // permission ourselves.
+          onToggleAutoMerge={(meta.viewerCanEnableAutoMerge || !!meta.autoMergeRequest) && meta.state === 'OPEN' && !meta.merged ? toggleAutoMerge : undefined}
+          autoMergeEnabled={!!meta.autoMergeRequest}
           onAskClaude={() => {
             // Drain the summary textarea into the chat as the next user turn,
             // then clear it so the box is free for an actual review summary.

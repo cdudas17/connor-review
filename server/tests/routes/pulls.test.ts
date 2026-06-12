@@ -284,6 +284,41 @@ describe('pulls routes', () => {
     await app.close();
   });
 
+  it('POST /auto-merge enables auto-merge (default SQUASH) and returns the request state', async () => {
+    mocked.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
+    mocked.mockResolvedValueOnce(JSON.stringify({
+      data: {
+        enablePullRequestAutoMerge: {
+          pullRequest: { id: 'PR_abc', autoMergeRequest: { mergeMethod: 'SQUASH', enabledAt: '2026-06-12T00:00:00Z', enabledBy: { login: 'cdudas17' } } },
+        },
+      },
+    }));
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/auto-merge',
+      payload: {},
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ autoMergeRequest: { mergeMethod: 'SQUASH', enabledBy: 'cdudas17', enabledAt: '2026-06-12T00:00:00Z' } });
+    const callInput = mocked.mock.calls[1][1] as { input?: string };
+    const body = JSON.parse(callInput.input!);
+    expect(body.variables).toEqual({ pullRequestId: 'PR_abc', mergeMethod: 'SQUASH' });
+    await app.close();
+  });
+
+  it('DELETE /auto-merge disables auto-merge', async () => {
+    mocked.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
+    mocked.mockResolvedValueOnce(JSON.stringify({
+      data: { disablePullRequestAutoMerge: { pullRequest: { id: 'PR_abc', autoMergeRequest: null } } },
+    }));
+    const app = await buildServer();
+    const res = await app.inject({ method: 'DELETE', url: '/api/pulls/Gusto/zenpayroll/1/auto-merge' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ autoMergeRequest: null });
+    await app.close();
+  });
+
   it('POST /labels attaches labels via the REST issues API', async () => {
     mocked.mockResolvedValueOnce(JSON.stringify([{ name: 'Comments left by reviewer' }]));
     const app = await buildServer();

@@ -103,6 +103,18 @@ export const api = {
   markReadyForReview(owner: string, repo: string, number: number): Promise<{ id: string; isDraft: boolean }> {
     return call(`/api/pulls/${owner}/${repo}/${number}/ready-for-review`, { method: 'POST' });
   },
+  /** Enable GitHub's auto-merge ("merge when ready"). Defaults to SQUASH method. */
+  enableAutoMerge(owner: string, repo: string, number: number, opts?: { mergeMethod?: 'MERGE' | 'SQUASH' | 'REBASE' }): Promise<{ autoMergeRequest: { mergeMethod: 'MERGE' | 'SQUASH' | 'REBASE'; enabledBy: string | null; enabledAt: string | null } | null }> {
+    return call(`/api/pulls/${owner}/${repo}/${number}/auto-merge`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mergeMethod: opts?.mergeMethod ?? 'SQUASH' }),
+    });
+  },
+  /** Disable GitHub's auto-merge. Idempotent — calling when not enabled is a no-op. */
+  disableAutoMerge(owner: string, repo: string, number: number): Promise<{ autoMergeRequest: null }> {
+    return call(`/api/pulls/${owner}/${repo}/${number}/auto-merge`, { method: 'DELETE' });
+  },
   /** Bounce the user's draft comment off the local `claude` CLI for feedback. Never posts to GitHub. */
   askClaude(
     owner: string,

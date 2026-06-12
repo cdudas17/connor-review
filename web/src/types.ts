@@ -39,6 +39,9 @@ export interface TrackedPR {
   /** ISO-8601 timestamp of when the PR was opened on GitHub. null until meta is fetched. */
   createdAt: string | null;
   addedAt: number;
+  /** Whether "merge when ready" is enabled. Refreshed from meta on drawer open
+   * and after a toggle action; falls back to undefined for entries pre-feature. */
+  autoMergeEnabled?: boolean;
   /** Discriminator for entries that aren't GitHub PRs. Defaults to 'github' for back-compat. */
   source?: 'github' | 'local';
   /** For local entries: the branch name (the synthetic `number` is derived from it). */
@@ -71,6 +74,10 @@ export interface PullRequestMeta {
   headSha: string;
   url: string;
   reviewThreads: ReviewThread[];
+  /** Auto-merge ("merge when ready") state. null = not enabled. */
+  autoMergeRequest?: { mergeMethod: 'MERGE' | 'SQUASH' | 'REBASE'; enabledBy: string | null; enabledAt: string | null } | null;
+  /** Whether the viewer can enable auto-merge on this PR. */
+  viewerCanEnableAutoMerge?: boolean;
   /** Discriminator. Defaults to 'github' when omitted. */
   source?: 'github' | 'local';
   /** For local entries: the configured repo name (matches the AppConfig.localRepos key). */

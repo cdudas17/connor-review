@@ -318,6 +318,19 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .pr-header-title h2 { margin: 0; word-break: break-word; overflow-wrap: anywhere; min-width: 0; }
 .footer-mark-ready { border-color: var(--ok) !important; color: var(--ok) !important; }
 .footer-mark-ready:hover:not(:disabled) { background: rgba(31, 136, 61, 0.15) !important; }
+/* Merge-when-ready toggle in the drawer footer. Default state: outlined in
+ * accent. Enabled state: filled with the merge purple (Octicons convention). */
+.footer-auto-merge { display: inline-flex; align-items: center; gap: 6px; border-color: var(--accent) !important; color: var(--accent) !important; }
+.footer-auto-merge:hover:not(:disabled) { background: rgba(88, 166, 255, 0.12) !important; }
+.footer-auto-merge svg { display: block; }
+.footer-auto-merge-on { background: #8957e5 !important; border-color: #8957e5 !important; color: #ffffff !important; }
+.footer-auto-merge-on:hover:not(:disabled) { background: #7a4ee0 !important; border-color: #7a4ee0 !important; }
+/* PR-list row toggle — compact pill matching the other badges. */
+.pr-row-automerge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; font-weight: 500; line-height: 1; }
+.pr-row-automerge:hover { background: rgba(88, 166, 255, 0.12); }
+.pr-row-automerge svg { display: block; }
+.pr-row-automerge-on { background: #8957e5; border-color: #8957e5; color: #ffffff; }
+.pr-row-automerge-on:hover { background: #7a4ee0; border-color: #7a4ee0; }
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(13, 17, 23, 0.35); z-index: 10; cursor: pointer; }
 
 /* Floating notes pencil — always on screen, above the drawer. */
