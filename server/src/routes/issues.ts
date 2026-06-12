@@ -38,26 +38,37 @@ export async function registerIssuesRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const scope = req.query.scope ?? 'either';
       const limit = Math.min(Math.max(parseInt(req.query.limit ?? '50', 10) || 50, 1), 200);
-      // gh search issues uses GitHub's search syntax. `is:open is:issue` is the
-      // baseline; the scope qualifier narrows assignee vs author. `either`
-      // unions both with an OR.
-      const query = (() => {
-        if (scope === 'assigned') return 'is:open is:issue assignee:@me';
-        if (scope === 'authored') return 'is:open is:issue author:@me';
-        return 'is:open is:issue assignee:@me OR is:open is:issue author:@me';
-      })();
-      try {
+      // IMPORTANT: gh search issues does NOT accept `is:open` / `is:issue`
+      // inside the query string — those qualifiers come back as zero-result
+      // searches. Use the dedicated flags instead (`--state`, `--author`,
+      // `--assignee`). And there's no OR-across-flags, so for scope='either'
+      // we have to fire two scoped searches and merge.
+      const JSON_FIELDS = 'number,title,url,state,author,repository,createdAt,updatedAt,labels';
+      const runScopedSearch = async (kind: 'assigned' | 'authored'): Promise<GhSearchIssueNode[]> => {
+        const flag = kind === 'assigned' ? '--assignee' : '--author';
         const out = await ghExec([
-          'search', 'issues', query,
-          '--json', 'number,title,url,state,author,repository,createdAt,updatedAt,labels',
+          'search', 'issues',
+          flag, '@me',
+          '--state', 'open',
+          '--json', JSON_FIELDS,
           '--limit', String(limit),
         ]);
-        const parsed = JSON.parse(out) as GhSearchIssueNode[];
-        // Dedupe by (repo, number) — for scope='either' the OR query could in
-        // theory surface the same issue twice (assigned AND authored).
+        const parsed = JSON.parse(out);
+        return Array.isArray(parsed) ? parsed as GhSearchIssueNode[] : [];
+      };
+
+      try {
+        const raw: GhSearchIssueNode[] = scope === 'assigned'
+          ? await runScopedSearch('assigned')
+          : scope === 'authored'
+            ? await runScopedSearch('authored')
+            : [...await runScopedSearch('assigned'), ...await runScopedSearch('authored')];
+
+        // Dedupe by (repo, number). For scope='either' the two scoped searches
+        // can both return an issue you're assigned to AND authored.
         const seen = new Set<string>();
         const issues: MyIssue[] = [];
-        for (const n of (Array.isArray(parsed) ? parsed : [])) {
+        for (const n of raw) {
           const repository = n.repository?.nameWithOwner ?? '';
           if (!n.number || !repository) continue;
           const key = `${repository}#${n.number}`;
@@ -75,7 +86,6 @@ export async function registerIssuesRoutes(app: FastifyInstance) {
             labels: (n.labels ?? []).map((l) => l.name ?? '').filter(Boolean),
           });
         }
-        // Most-recently-updated first — matches how the user would scan the list.
         issues.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
         return { issues, scope, limit };
       } catch (e) {
