@@ -1,6 +1,6 @@
 import type { GhStatus } from '../types.js';
 import { GH_STATUS_LABEL } from '../lib/ghStatus.js';
-import { CheckCircleFillIcon, GitPullRequestDraftIcon } from '@primer/octicons-react';
+import { CheckCircleFillIcon, GitPullRequestDraftIcon, GitPullRequestClosedIcon } from '@primer/octicons-react';
 
 export function GhStatusBadge({ status }: { status: GhStatus | null }) {
   if (status == null) return <span className="gh-status gh-status-unknown">…</span>;
@@ -33,6 +33,19 @@ export function GhStatusBadge({ status }: { status: GhStatus | null }) {
         aria-label={GH_STATUS_LABEL.draft}
       >
         <GitPullRequestDraftIcon size={12} />
+      </span>
+    );
+  }
+  // Closed: GitHub's own GitPullRequestClosed glyph inside an outlined red
+  // circle. Matches the Draft icon pattern so the row cluster stays uniform.
+  if (status === 'closed') {
+    return (
+      <span
+        className="gh-status gh-status-closed gh-status-closed-icon has-tooltip"
+        data-tooltip={GH_STATUS_LABEL.closed}
+        aria-label={GH_STATUS_LABEL.closed}
+      >
+        <GitPullRequestClosedIcon size={12} />
       </span>
     );
   }
