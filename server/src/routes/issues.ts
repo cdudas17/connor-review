@@ -53,19 +53,28 @@ export async function registerIssuesRoutes(app: FastifyInstance) {
           '--limit', String(limit),
         ]);
         const parsed = JSON.parse(out) as GhSearchIssueNode[];
-        const issues: MyIssue[] = (Array.isArray(parsed) ? parsed : [])
-          .map((n) => ({
+        // Dedupe by (repo, number) — for scope='either' the OR query could in
+        // theory surface the same issue twice (assigned AND authored).
+        const seen = new Set<string>();
+        const issues: MyIssue[] = [];
+        for (const n of (Array.isArray(parsed) ? parsed : [])) {
+          const repository = n.repository?.nameWithOwner ?? '';
+          if (!n.number || !repository) continue;
+          const key = `${repository}#${n.number}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          issues.push({
             number: n.number,
             title: n.title,
             url: n.url,
             state: (n.state === 'open' ? 'open' : 'closed') as 'open' | 'closed',
             authorLogin: n.author?.login ?? null,
-            repository: n.repository?.nameWithOwner ?? '',
+            repository,
             createdAt: n.createdAt,
             updatedAt: n.updatedAt,
             labels: (n.labels ?? []).map((l) => l.name ?? '').filter(Boolean),
-          }))
-          .filter((i) => i.number > 0 && i.repository);
+          });
+        }
         // Most-recently-updated first — matches how the user would scan the list.
         issues.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
         return { issues, scope, limit };

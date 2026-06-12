@@ -43,7 +43,9 @@ export function useMyIssues(opts: Options) {
     loadingRef.current = true;
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const { issues } = await api.getMyIssues({ scope: opts.scope ?? 'assigned' });
+      // Default scope is 'either' so users see both issues assigned to them
+      // AND issues they opened themselves.
+      const { issues } = await api.getMyIssues({ scope: opts.scope ?? 'either' });
       setState({ issues, loading: false, error: null, hasLoaded: true, lastFetchedAt: Date.now() });
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e as ApiCallError, hasLoaded: true, lastFetchedAt: Date.now() }));

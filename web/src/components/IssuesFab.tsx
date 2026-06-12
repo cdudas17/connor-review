@@ -59,7 +59,9 @@ export function IssuesFab() {
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number; moved: boolean } | null>(null);
 
-  const { issues, loading, error, lastFetchedAt, refresh } = useMyIssues({ enabled: open, scope: 'assigned' });
+  // 'either' = assigned ∪ authored. Matches the user's mental model of "issues
+  // I care about": ones someone gave me + ones I opened myself.
+  const { issues, loading, error, lastFetchedAt, refresh } = useMyIssues({ enabled: open, scope: 'either' });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
