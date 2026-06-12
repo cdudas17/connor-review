@@ -110,7 +110,7 @@ function makeGitDispatch({
     }
     if (cmd === 'worktree' && args[1] === 'remove') return '';
     if (cmd === 'rev-parse' && args[1] === 'HEAD') return 'sha-pre-merge\n';
-    if (cmd === 'merge' && args.includes('--no-edit')) {
+    if (cmd === 'merge' && args.includes('--no-commit')) {
       if (mergeFails === 'hard') throw new GitCliError('GIT_FAILED', 'fatal: base ref missing', 'stderr');
       if (mergeFails === 'conflict' || mergeFails === undefined || mergeFails === false) {
         // Default: merge fails with conflicts (the route catches the throw and

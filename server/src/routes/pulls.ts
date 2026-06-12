@@ -905,12 +905,16 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       // first parent of the merge commit matches it.
       const preMergeHead = (await gitExec(['rev-parse', 'HEAD'], { cwd: worktreePath })).trim();
 
-      // 4) Attempt the merge. gitExec rejects on non-zero exit, but a merge
-      // with conflicts also exits non-zero — we have to distinguish from a
-      // hard failure by inspecting the resulting state.
+      // 4) Attempt the merge. `--no-commit` keeps the merge unfinalised so the
+      // commit step we run later (explicitly with --no-verify) is the one that
+      // creates the commit, regardless of whether there were conflicts. This
+      // avoids the auto-commit code path running pre-commit hooks on a clean
+      // merge. gitExec rejects on non-zero exit, but a merge with conflicts
+      // also exits non-zero — we distinguish hard failures from conflict
+      // failures by inspecting the resulting state.
       let mergeFailed = false;
       try {
-        await gitExec(['merge', '--no-edit', '--no-ff', remoteBase], { cwd: worktreePath });
+        await gitExec(['merge', '--no-commit', '--no-ff', remoteBase], { cwd: worktreePath });
       } catch (e) {
         if (!(e instanceof GitCliError)) throw e;
         mergeFailed = true;
@@ -923,9 +927,11 @@ export async function registerPullsRoutes(app: FastifyInstance) {
 
       if (conflictFiles.length === 0) {
         if (!mergeFailed) {
-          // Clean merge — push it. This is the trivial case (GitHub said
-          // CONFLICTING but the cached mergeable state was stale).
-          await gitExec(['push', 'origin', headRef], { cwd: worktreePath });
+          // Clean merge — commit + push. `--no-verify` to bypass the user's
+          // pre-commit / pre-push hooks (often `bundle exec rubocop`/`sorbet`
+          // in monorepos), which aren't reachable from a fresh worktree.
+          await gitExec(['commit', '--no-verify', '-m', `Merge ${baseRef} into ${headRef}`], { cwd: worktreePath });
+          await gitExec(['push', '--no-verify', 'origin', headRef], { cwd: worktreePath });
           const sha = (await gitExec(['rev-parse', 'HEAD'], { cwd: worktreePath })).trim();
           reply.send({ ok: true, commitSha: sha, trivial: true });
           return;
@@ -1013,8 +1019,14 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       const conflictSet = new Set(conflictFiles);
       await gitExec(['add', '--', ...conflictFiles], { cwd: worktreePath });
 
-      // Commit the merge resolution.
-      await gitExec(['commit', '-m', `Resolve merge conflicts with ${baseRef}`], { cwd: worktreePath });
+      // Commit the merge resolution. `--no-verify` skips pre-commit /
+      // commit-msg hooks: in monorepos those hooks typically shell out to
+      // `bundle exec rubocop / sorbet / tapioca`, which require the user's
+      // gem install + workspace-local caches. A fresh worktree doesn't have
+      // those, so hooks fail spuriously even though the commit content is
+      // mechanically correct. Linting concerns belong on the user's normal
+      // dev workflow, not on an auto-resolve merge commit.
+      await gitExec(['commit', '--no-verify', '-m', `Resolve merge conflicts with ${baseRef}`], { cwd: worktreePath });
 
       // Safety check #2 — commit shape.
       //   a. exactly two parents (it's a real merge commit)
@@ -1055,9 +1067,11 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         return;
       }
 
-      // 13) Push.
+      // 13) Push. `--no-verify` for the same reason as the commit step: the
+      // user's pre-push hook chain (rubocop / sorbet / etc.) isn't reachable
+      // from a fresh worktree's PATH/gem env.
       try {
-        await gitExec(['push', 'origin', headRef], { cwd: worktreePath });
+        await gitExec(['push', '--no-verify', 'origin', headRef], { cwd: worktreePath });
       } catch (e) {
         const stderr = e instanceof GitCliError ? e.stderr : (e as Error).message;
         reply.code(502).send({ code: 'PUSH_FAILED', message: `git push failed: ${stderr.trim()}`, stderr });
