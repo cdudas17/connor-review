@@ -318,6 +318,11 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
  * naked green check next to the other badges. */
 .gh-status-approved-icon { border: none; padding: 0; background: transparent; display: inline-flex; align-items: center; line-height: 1; }
 .gh-status-approved-icon svg { display: block; }
+/* Draft is the GitPullRequestDraft glyph inside an 18px outlined grey
+ * circle — matches the visual weight of the Reviewed and Claude badges
+ * so the trailing icon cluster reads as a row of equal-sized chips. */
+.gh-status-draft-icon { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid currentColor; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.gh-status-draft-icon svg { display: block; }
 .gh-status-changes-requested { color: #d29922; }
 .gh-status-merged { color: #a371f7; }
 .gh-status-closed { color: #f85149; }

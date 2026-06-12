@@ -1,6 +1,6 @@
 import type { GhStatus } from '../types.js';
 import { GH_STATUS_LABEL } from '../lib/ghStatus.js';
-import { CheckCircleFillIcon } from '@primer/octicons-react';
+import { CheckCircleFillIcon, GitPullRequestDraftIcon } from '@primer/octicons-react';
 
 export function GhStatusBadge({ status }: { status: GhStatus | null }) {
   if (status == null) return <span className="gh-status gh-status-unknown">…</span>;
@@ -14,11 +14,25 @@ export function GhStatusBadge({ status }: { status: GhStatus | null }) {
   if (status === 'approved') {
     return (
       <span
-        className="gh-status gh-status-approved gh-status-approved-icon"
-        title={GH_STATUS_LABEL.approved}
+        className="gh-status gh-status-approved gh-status-approved-icon has-tooltip"
+        data-tooltip={GH_STATUS_LABEL.approved}
         aria-label={GH_STATUS_LABEL.approved}
       >
         <CheckCircleFillIcon size={16} />
+      </span>
+    );
+  }
+  // Draft: GitHub's own GitPullRequestDraft glyph inside an outlined grey
+  // circle. Same visual weight as the Reviewed and Claude badges so the
+  // trailing icon cluster reads consistently.
+  if (status === 'draft') {
+    return (
+      <span
+        className="gh-status gh-status-draft gh-status-draft-icon has-tooltip"
+        data-tooltip={GH_STATUS_LABEL.draft}
+        aria-label={GH_STATUS_LABEL.draft}
+      >
+        <GitPullRequestDraftIcon size={12} />
       </span>
     );
   }
