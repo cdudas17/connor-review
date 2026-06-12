@@ -132,13 +132,18 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, onToggleA
             </span>
             <span className="pr-badges">
               <ClaudeBadge state={claudeStateFor?.({ owner: p.owner, repo: p.repo, number: p.number }) ?? null} />
+              {/* Draft is the only GhStatus we surface left-of-CI — it gates
+                  whether the PR is even ready for review, so it earns the
+                  leading position. Everything else (approved icon, merged,
+                  closed, changes-requested) renders to the right of CI. */}
+              {p.ghStatus === 'draft' && <GhStatusBadge status="draft" />}
               {/* StatusBadge returns null for 'untouched' (the default state),
                   so this just renders Reviewed / Approved chips when set. Sits
                   to the left of CI so my own state on the PR is the first
                   signal in the cluster. */}
               <StatusBadge status={p.status} />
               <CiBadge status={p.ciStatus} url={p.ciUrl} />
-              <GhStatusBadge status={p.ghStatus} />
+              {p.ghStatus !== 'draft' && <GhStatusBadge status={p.ghStatus} />}
               {/* My PRs tab: per-row "Copy PR link" button. Renders to the
                   left of the auto-merge toggle so both action icons sit in
                   the same trailing cluster. */}
