@@ -10,6 +10,7 @@ import { usePRDetails } from '../hooks/usePRDetails.js';
 import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
 import { api } from '../lib/api.js';
 import { maybeAutoLabelOnReview } from '../lib/autoLabel.js';
+import { APP_CONFIG } from '../config.js';
 import type { ClaudeResponseState } from './ClaudeResponseCard.js';
 import type { ClaudeChat, LocalThreadAnchor } from '../hooks/useClaudeResponses.js';
 import { ClaudeChatPanel } from './ClaudeChatPanel.js';
@@ -177,12 +178,36 @@ export function ReviewDrawer(props: Props) {
     const prRef = `${current.owner}/${current.repo}#${current.number}`;
     try {
       await api.markReadyForReview(current.owner, current.repo, current.number);
-      onToast('success', `Marked ${prRef} ready for review`);
-      reload();
+      // Apply the configured label transitions for this workflow event. Both
+      // operations are best-effort — a label failure shouldn't undo the
+      // draft→ready flip (which has no easy revert anyway).
+      const addLabels = APP_CONFIG.markReadyAddLabels ?? [];
+      const removeLabels = APP_CONFIG.markReadyRemoveLabels ?? [];
+      const labelOps: Array<Promise<unknown>> = [];
+      if (addLabels.length > 0) {
+        labelOps.push(api.addLabels(current.owner, current.repo, current.number, addLabels, { mode: 'add' }));
+      }
+      for (const name of removeLabels) {
+        labelOps.push(api.removeLabel(current.owner, current.repo, current.number, name));
+      }
+      if (labelOps.length > 0) {
+        const results = await Promise.allSettled(labelOps);
+        const failed = results.filter((r) => r.status === 'rejected');
+        if (failed.length > 0) {
+          onToast('info', `Marked ${prRef} ready, but ${failed.length} label change(s) failed — see console.`);
+          // eslint-disable-next-line no-console
+          for (const r of failed) console.warn('markReady label op failed:', r);
+        } else {
+          onToast('success', `Marked ${prRef} ready for review`);
+        }
+      } else {
+        onToast('success', `Marked ${prRef} ready for review`);
+      }
+      reloadWithCatchup();
     } catch (e) {
       onToast('error', `Failed to mark ${prRef} ready for review: ${(e as Error).message}`);
     }
-  }, [current, onToast, reload]);
+  }, [current, onToast, reloadWithCatchup]);
 
   const toggleAutoMerge = useCallback(async () => {
     if (!current || !meta) return;

@@ -34,6 +34,10 @@ export interface AppConfig {
    * Server receives the path as a query param and validates it's a git repo before shelling out.
    */
   localRepos: Record<string, string>;
+  /** Labels to ADD when clicking "Mark ready for review" on a draft PR. Empty = no-op. */
+  markReadyAddLabels: string[];
+  /** Labels to REMOVE when clicking "Mark ready for review" on a draft PR. Empty = no-op. */
+  markReadyRemoveLabels: string[];
   /**
    * Auto-apply labels when you leave visible feedback on a PR authored by a specific user.
    * Keys are GitHub logins; values are the labels to add. Fired after a successful Comment,
@@ -53,6 +57,8 @@ const DEFAULTS: AppConfig = {
   myPRsAuthor: '',
   localRepos: {},
   autoLabelOnReview: {},
+  markReadyAddLabels: [],
+  markReadyRemoveLabels: [],
 };
 
 // Vite's import.meta.glob lets us optionally pull in config.local.ts if it

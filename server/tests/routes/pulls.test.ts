@@ -337,6 +337,36 @@ describe('pulls routes', () => {
     await app.close();
   });
 
+  it('DELETE /labels/:label removes a label by name', async () => {
+    mocked.mockResolvedValueOnce('[]'); // gh DELETE returns the remaining labels array
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/pulls/Gusto/zenpayroll/1/labels/' + encodeURIComponent('Needs initial human review'),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, removed: 'Needs initial human review' });
+    const callArgs = mocked.mock.calls[0][0] as string[];
+    expect(callArgs).toContain('DELETE');
+    // gh wants the label name URL-encoded into the path.
+    const path = callArgs[1];
+    expect(path).toContain('repos/Gusto/zenpayroll/issues/1/labels/');
+    expect(path).toContain('Needs%20initial%20human%20review');
+    await app.close();
+  });
+
+  it('DELETE /labels/:label swallows a 404 (label not present) so the caller can be idempotent', async () => {
+    mocked.mockRejectedValueOnce(new GhCliError('GH_CLI_FAILED', 'HTTP 404', 'gh: HTTP 404: Label does not exist'));
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/pulls/Gusto/zenpayroll/1/labels/' + encodeURIComponent('Already gone'),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ok).toBe(true);
+    await app.close();
+  });
+
   it('POST /labels returns 400 when labels is empty', async () => {
     const app = await buildServer();
     const res = await app.inject({

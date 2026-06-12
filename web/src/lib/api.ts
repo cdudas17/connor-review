@@ -168,6 +168,10 @@ export const api = {
       body: JSON.stringify({ labels, mode: opts?.mode ?? 'add' }),
     });
   },
+  /** Remove a single label from a PR by name. Idempotent. */
+  removeLabel(owner: string, repo: string, number: number, label: string): Promise<{ ok: boolean; removed: string }> {
+    return call(`/api/pulls/${owner}/${repo}/${number}/labels/${encodeURIComponent(label)}`, { method: 'DELETE' });
+  },
   replyToThread(owner: string, repo: string, number: number, threadId: string, body: string) {
     return call(`/api/pulls/${owner}/${repo}/${number}/threads/${threadId}/reply`, {
       method: 'POST',

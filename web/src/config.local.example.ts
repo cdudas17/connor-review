@@ -33,6 +33,12 @@ export const APP_CONFIG: Partial<AppConfig> = {
     // web:        '/Users/you/workspace/web',
   },
 
+  // When you click "Mark ready for review" on a draft PR, also add / remove
+  // these labels in one action. Leave empty arrays if your workflow doesn't
+  // use this convention.
+  markReadyAddLabels: [],     // e.g. ['Ready for merging']
+  markReadyRemoveLabels: [],  // e.g. ['Needs initial human review']
+
   // Auto-apply labels when you leave visible feedback on a PR by a specific user.
   // Keys are GitHub logins; values are label names. Fires after Comment / Approve /
   // Request changes / inline comment / thread reply / submit-pending. Best-effort —

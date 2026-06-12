@@ -576,6 +576,37 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     return { ok: true, labels: respLabels, mode };
   });
 
+  // Remove a single label from a PR by name. Idempotent — removing a label
+  // that's already absent returns 200 (we eat GitHub's 404). Backed by
+  // DELETE /repos/{o}/{r}/issues/{n}/labels/{label_name}.
+  app.delete<{ Params: { owner: string; repo: string; number: string; label: string } }>(
+    '/api/pulls/:owner/:repo/:number/labels/:label',
+    async (req) => {
+      const params = parsePullParams({ owner: req.params.owner, repo: req.params.repo, number: req.params.number });
+      const labelName = decodeURIComponent(req.params.label);
+      try {
+        await ghExec([
+          'api',
+          `repos/${params.owner}/${params.repo}/issues/${params.number}/labels/${encodeURIComponent(labelName)}`,
+          '--method', 'DELETE',
+        ]);
+      } catch (e) {
+        // Label not present — treat as success so the caller doesn't have to check.
+        if (e instanceof GhCliError && /HTTP 404/i.test(e.stderr)) {
+          // fall through to success
+        } else {
+          throw e;
+        }
+      }
+      // Drop the label from the cached meta so the next render reflects it.
+      const cached = metaCache.get(metaKey(params));
+      if (cached) {
+        metaCache.set(metaKey(params), { ...cached, labels: (cached.labels ?? []).filter((l) => l.name !== labelName) });
+      }
+      return { ok: true, removed: labelName };
+    },
+  );
+
   // Bounce the user's draft comment off the local `claude` CLI for feedback.
   // Never publishes anything — purely a "what would Claude say to this?" loop.
   // Context = PR title + author + full diff (truncated if huge) + optional line range.
