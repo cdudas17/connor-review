@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { TrackedPR } from '../types.js';
 import { StatusBadge } from './StatusBadge.js';
 import { GhStatusBadge } from './GhStatusBadge.js';
@@ -5,7 +6,7 @@ import { CiBadge } from './CiBadge.js';
 import { ClaudeBadge } from './ClaudeBadge.js';
 import { LabelChips } from './LabelChips.js';
 import type { FilterMode } from './FilterToggle.js';
-import { GitMergeIcon } from '@primer/octicons-react';
+import { GitMergeIcon, CopyIcon, CheckIcon } from '@primer/octicons-react';
 
 interface Identity {
   owner: string;
@@ -44,9 +45,37 @@ interface Props {
   /** When set, each row renders a "Merge when ready" toggle button. Used on
    * the My PRs tab. The callback toggles auto-merge for that PR. */
   onToggleAutoMerge?: (id: { owner: string; repo: string; number: number; currentlyEnabled: boolean }) => void;
+  /** When true, each row renders a small "copy PR link" button. Used on the
+   * My PRs tab — handy for pasting your own PRs into Slack / Jira / etc. */
+  showCopyLink?: boolean;
 }
 
-export function PRList({ prs, mode, onOpen, selection, claudeStateFor, onToggleAutoMerge }: Props) {
+/** Per-row copy button: copies the PR's github.com URL and flashes a checkmark
+ * for ~1.2s. Stops propagation so the click doesn't also open the drawer. */
+function CopyLinkButton({ owner, repo, number }: { owner: string; repo: string; number: number }) {
+  const [copied, setCopied] = useState(false);
+  const url = `https://github.com/${owner}/${repo}/pull/${number}`;
+  return (
+    <button
+      type="button"
+      className={`pr-row-copy${copied ? ' pr-row-copy-copied' : ''}`}
+      onClick={async (e) => {
+        e.stopPropagation();
+        try {
+          await navigator.clipboard.writeText(url);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1200);
+        } catch { /* clipboard may be unavailable in some contexts */ }
+      }}
+      title={copied ? 'Copied!' : 'Copy PR link'}
+      aria-label="Copy PR link"
+    >
+      {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+    </button>
+  );
+}
+
+export function PRList({ prs, mode, onOpen, selection, claudeStateFor, onToggleAutoMerge, showCopyLink }: Props) {
   const filtered = mode === 'untouched-only' ? prs.filter((p) => p.status === 'untouched') : prs;
   if (filtered.length === 0) {
     return <p className="empty">No PRs to review.</p>;
@@ -111,6 +140,12 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, onToggleA
                   Approved) so explicit local intent isn't hidden. */}
               {!(p.ghStatus === 'approved' && p.status === 'untouched') && (
                 <StatusBadge status={p.status} />
+              )}
+              {/* My PRs tab: per-row "Copy PR link" button. Renders to the
+                  left of the auto-merge toggle so both action icons sit in
+                  the same trailing cluster. */}
+              {showCopyLink && (
+                <CopyLinkButton owner={p.owner} repo={p.repo} number={p.number} />
               )}
               {/* My PRs tab: per-row "Merge when ready" toggle. Clicking the
                   button stops propagation so it doesn't also open the drawer. */}

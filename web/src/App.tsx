@@ -719,6 +719,7 @@ export function App() {
         claudeStateFor={claudeResponses.aggregateFor}
         // Only on the My PRs tab — those are PRs the viewer can typically merge.
         // Fire-and-forget toggle: optimistically flip the row, toast on failure.
+        showCopyLink={tab === 'mine'}
         onToggleAutoMerge={tab === 'mine' ? (id) => {
           const target = activePRs.find((p) => p.owner === id.owner && p.repo === id.repo && p.number === id.number);
           // Optimistic flip.

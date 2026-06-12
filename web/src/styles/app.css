@@ -336,6 +336,12 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .footer-auto-merge svg { display: block; flex-shrink: 0; }
 .footer-auto-merge-on { background: var(--ok) !important; border-color: var(--ok) !important; color: #ffffff !important; }
 .footer-auto-merge-on:hover:not(:disabled) { background: var(--ok-hover, #28a35a) !important; border-color: var(--ok-hover, #28a35a) !important; }
+/* Per-row "Copy PR link" button — same 22×22 visual weight as the auto-merge
+ * pill but in muted-grey so the two trailing actions aren't competing. */
+.pr-row-copy { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer; transition: color 80ms, background-color 80ms; }
+.pr-row-copy:hover { background: var(--bg-subtle); color: var(--fg); }
+.pr-row-copy svg { display: block; flex-shrink: 0; }
+.pr-row-copy-copied { color: var(--ok); border-color: var(--ok); }
 /* PR-list row: 22×22 — slightly smaller to sit alongside the badges. */
 .pr-row-automerge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 1px solid var(--ok); border-radius: 5px; background: transparent; color: var(--ok); cursor: pointer; }
 .pr-row-automerge:hover { background: rgba(31, 136, 61, 0.12); }
