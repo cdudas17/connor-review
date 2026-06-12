@@ -11,6 +11,7 @@ import { BulkActionsBar } from './components/BulkActionsBar.js';
 import { MemberFilter } from './components/MemberFilter.js';
 import { OncallStateFilter, type OncallState } from './components/OncallStateFilter.js';
 import { NotesFab } from './components/NotesFab.js';
+import { IssuesFab } from './components/IssuesFab.js';
 import { ToastStack } from './components/ToastStack.js';
 import { useToasts } from './hooks/useToasts.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
@@ -774,6 +775,7 @@ export function App() {
         );
       })()}
       <NotesFab />
+      <IssuesFab />
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </main>
   );

@@ -4,6 +4,7 @@ import { registerPullsRoutes } from './routes/pulls.js';
 import { registerTeamRoutes } from './routes/team.js';
 import { registerNotesRoutes } from './routes/notes.js';
 import { registerLocalRoutes } from './routes/local.js';
+import { registerIssuesRoutes } from './routes/issues.js';
 
 export async function buildServer() {
   const app = Fastify({ logger: { level: 'warn' } });
@@ -13,6 +14,7 @@ export async function buildServer() {
   await registerTeamRoutes(app);
   await registerNotesRoutes(app);
   await registerLocalRoutes(app);
+  await registerIssuesRoutes(app);
   return app;
 }
 

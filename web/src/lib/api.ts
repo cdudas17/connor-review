@@ -124,6 +124,28 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
+  /** The viewer's open GitHub issues (assigned + authored, most-recent first). */
+  getMyIssues(opts?: { scope?: 'assigned' | 'authored' | 'either'; limit?: number }): Promise<{
+    issues: Array<{
+      number: number;
+      title: string;
+      url: string;
+      state: 'open' | 'closed';
+      authorLogin: string | null;
+      repository: string;
+      createdAt: string;
+      updatedAt: string;
+      labels: string[];
+    }>;
+    scope: string;
+    limit: number;
+  }> {
+    const qs = new URLSearchParams();
+    if (opts?.scope) qs.set('scope', opts.scope);
+    if (opts?.limit) qs.set('limit', String(opts.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return call(`/api/issues/mine${suffix}`);
+  },
   /** Attach (or replace) labels on a PR.
    *  - mode='add' (default): append; existing labels stay.
    *  - mode='replace': set the label list to exactly `labels`; drops everything else. */
