@@ -9,6 +9,10 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
         state
         merged
         isDraft
+        # MERGEABLE / CONFLICTING / UNKNOWN. GitHub computes this lazily — the
+        # first call after a base-branch update may return UNKNOWN until the
+        # check finishes. We treat UNKNOWN as "no conflict" client-side.
+        mergeable
         reviewDecision
         baseRefName
         headRefName

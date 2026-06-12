@@ -45,6 +45,8 @@ export interface TrackedPR {
   /** Whether the PR is currently sitting in the repo's merge queue (a stricter
    * state than autoMergeEnabled). Used for the amber "Queued to merge" visual. */
   mergeQueueQueued?: boolean;
+  /** True when GitHub reports the PR as having unresolved merge conflicts. */
+  hasConflicts?: boolean;
   /** Discriminator for entries that aren't GitHub PRs. Defaults to 'github' for back-compat. */
   source?: 'github' | 'local';
   /** For local entries: the branch name (the synthetic `number` is derived from it). */
@@ -61,6 +63,9 @@ export interface PullRequestMeta {
   state: 'OPEN' | 'CLOSED' | 'MERGED';
   merged: boolean;
   isDraft: boolean;
+  /** GitHub's MergeableState — `CONFLICTING` means unresolved merge
+   * conflicts. `UNKNOWN` is the transient pre-computed state. */
+  mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN' | null;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   ciStatus: CiStatus;
   ciUrl: string | null;
@@ -153,4 +158,6 @@ export interface TeamPR {
    * Older server builds omit them; treat undefined as "not enabled". */
   autoMergeEnabled?: boolean;
   mergeQueueQueued?: boolean;
+  /** True when GitHub reports the PR as having unresolved merge conflicts. */
+  hasConflicts?: boolean;
 }

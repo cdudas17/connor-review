@@ -88,6 +88,7 @@ export function useTeamPRs(opts: Options = {}) {
         labels: p.labels ?? [],
         createdAt: p.createdAt,
         addedAt: Date.parse(p.updatedAt) || Date.now(),
+        hasConflicts: !!p.hasConflicts,
       }));
       // Newest PRs first.
       tracked.sort((a, b) => b.addedAt - a.addedAt);

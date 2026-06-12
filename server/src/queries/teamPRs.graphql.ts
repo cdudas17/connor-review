@@ -13,6 +13,7 @@ export const TEAM_PR_SEARCH_QUERY = /* GraphQL */ `
           isDraft
           state
           merged
+          mergeable
           reviewDecision
           baseRefName
           headRefName

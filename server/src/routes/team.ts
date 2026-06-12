@@ -55,6 +55,10 @@ interface TeamPR {
   isDraft: boolean;
   state: 'OPEN' | 'CLOSED' | 'MERGED';
   merged: boolean;
+  /** True when GitHub reports the PR as CONFLICTING. UNKNOWN and MERGEABLE
+   * both map to false — UNKNOWN is the transient "not yet computed" state
+   * and we don't want to nag on it. */
+  hasConflicts: boolean;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   ciStatus: CiStatus;
   ciUrl: string | null;
@@ -116,6 +120,7 @@ interface SearchNode {
   isDraft: boolean;
   state: 'OPEN' | 'CLOSED' | 'MERGED';
   merged: boolean;
+  mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN' | null;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   baseRefName: string;
   headRefName: string;
@@ -188,6 +193,7 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
       isDraft: n.isDraft,
       state: n.state,
       merged: n.merged,
+      hasConflicts: n.mergeable === 'CONFLICTING',
       reviewDecision: n.reviewDecision,
       ciStatus: (n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
       ciUrl: extractBuildkiteCheckUrl(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
@@ -262,6 +268,7 @@ export async function registerTeamRoutes(app: FastifyInstance) {
           isDraft: !!n.isDraft,
           state: n.state!,
           merged: !!n.merged,
+          hasConflicts: n.mergeable === 'CONFLICTING',
           reviewDecision: n.reviewDecision ?? null,
           ciStatus: (n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
           ciUrl: extractBuildkiteCheckUrl(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
@@ -309,6 +316,7 @@ export async function registerTeamRoutes(app: FastifyInstance) {
           isDraft: !!n.isDraft,
           state: n.state!,
           merged: !!n.merged,
+          hasConflicts: n.mergeable === 'CONFLICTING',
           reviewDecision: n.reviewDecision ?? null,
           ciStatus: (n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
           ciUrl: extractBuildkiteCheckUrl(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),

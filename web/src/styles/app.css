@@ -327,6 +327,14 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
  * the existing `--gh-status-closed` red. */
 .gh-status-closed-icon { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid currentColor; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 .gh-status-closed-icon svg { display: block; }
+/* Merge-conflict signal. Amber/orange so it doesn't compete with the red
+ * Closed circle visually but still reads as "warning". Row variant is an
+ * 18px circle (matches Draft/Closed); header variant is a labeled pill so
+ * the drawer makes the conflict state unmistakable. */
+.gh-status-conflict { color: #d29922; }
+.gh-status-conflict-icon { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid currentColor; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.gh-status-conflict-icon svg { display: block; }
+.gh-status-conflict-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; }
 .gh-status-changes-requested { color: #d29922; }
 .gh-status-merged { color: #a371f7; }
 .gh-status-closed { color: #f85149; }

@@ -82,6 +82,7 @@ export function useAuthoredPRs(author: string, opts: Options = {}) {
         // full meta first.
         autoMergeEnabled: !!p.autoMergeEnabled,
         mergeQueueQueued: !!p.mergeQueueQueued,
+        hasConflicts: !!p.hasConflicts,
       }));
       tracked.sort((a, b) => b.addedAt - a.addedAt);
       setState({ prs: tracked, loading: false, error: null, errorDismissed: false, hasLoaded: true, lastFetchedAt: Date.now() });

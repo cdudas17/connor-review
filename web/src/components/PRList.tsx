@@ -4,6 +4,7 @@ import { StatusBadge } from './StatusBadge.js';
 import { GhStatusBadge } from './GhStatusBadge.js';
 import { CiBadge } from './CiBadge.js';
 import { ClaudeBadge } from './ClaudeBadge.js';
+import { ConflictBadge } from './ConflictBadge.js';
 import { LabelChips } from './LabelChips.js';
 import type { FilterMode } from './FilterToggle.js';
 import { GitMergeIcon, GitMergeQueueIcon, CopyIcon, CheckIcon } from '@primer/octicons-react';
@@ -132,6 +133,10 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, onToggleA
             </span>
             <span className="pr-badges">
               <ClaudeBadge state={claudeStateFor?.({ owner: p.owner, repo: p.repo, number: p.number }) ?? null} />
+              {/* Merge conflicts get the leading position in the left-of-CI
+                  cluster — they block forward progress regardless of CI or
+                  review state, so this is the first signal worth seeing. */}
+              <ConflictBadge hasConflicts={p.hasConflicts} />
               {/* Draft + Closed are the GhStatus values we surface left-of-CI
                   — Draft because it gates whether the PR is reviewable, Closed
                   because the PR is dead so its other badges (CI status, etc.)

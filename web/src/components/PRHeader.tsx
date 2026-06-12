@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { CiStatus, GhStatus, PullRequestMeta } from '../types.js';
 import { GhStatusBadge } from './GhStatusBadge.js';
 import { CiBadge } from './CiBadge.js';
+import { ConflictBadge } from './ConflictBadge.js';
 import { LabelChips } from './LabelChips.js';
 import { AssigneesRow } from './AssigneesRow.js';
 import { computeGhStatus } from '../lib/ghStatus.js';
@@ -51,6 +52,7 @@ export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl }: 
     <header className="pr-header">
       <div className="pr-header-title">
         <h2>{meta.title}</h2>
+        <ConflictBadge hasConflicts={meta.mergeable === 'CONFLICTING'} variant="header" />
         <GhStatusBadge status={status} />
         <CiBadge status={ci} url={ciUrl} />
       </div>

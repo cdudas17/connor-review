@@ -24,6 +24,10 @@ interface PullRequestMeta {
   state: 'OPEN' | 'CLOSED' | 'MERGED';
   merged: boolean;
   isDraft: boolean;
+  /** GitHub's MergeableState — `CONFLICTING` means the PR has unresolved
+   * merge conflicts. `UNKNOWN` is the transient "not yet computed" state
+   * and is rendered as "no conflict" client-side. */
+  mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN' | null;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   ciStatus: CiStatus;
   /** URL of the buildkite/zenpayroll check, if it exists on this PR. */
@@ -188,6 +192,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
     state: pr.state,
     merged: pr.merged,
     isDraft: !!pr.isDraft,
+    mergeable: pr.mergeable ?? null,
     reviewDecision: pr.reviewDecision ?? null,
     ciStatus: (pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
     ciUrl: extractBuildkiteCheckUrl(pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
