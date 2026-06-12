@@ -129,12 +129,12 @@ export function ReviewFooter({
               try { await onToggleAutoMerge(); }
               finally { setTogglingAutoMerge(false); }
             }}
+            aria-label={autoMergeEnabled ? 'Cancel merge when ready' : 'Enable merge when ready'}
             title={autoMergeEnabled
               ? "Cancel 'merge when ready' (auto-merge will no longer happen)"
               : "Enable 'merge when ready' (auto-merge once checks pass + approvals land)"}
           >
-            <GitMergeIcon />
-            <span>{togglingAutoMerge ? '…' : autoMergeEnabled ? 'Cancel merge when ready' : 'Merge when ready'}</span>
+            <GitMergeIcon size={18} />
           </button>
         )}
         {onMarkReady && (

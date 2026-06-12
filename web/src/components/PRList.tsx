@@ -132,8 +132,7 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, onToggleA
                   title={p.autoMergeEnabled ? 'Auto-merge enabled — click to cancel' : 'Enable merge when ready'}
                   aria-label={p.autoMergeEnabled ? 'Cancel merge when ready' : 'Enable merge when ready'}
                 >
-                  <GitMergeIcon />
-                  <span>{p.autoMergeEnabled ? 'Auto-merging' : 'Merge when ready'}</span>
+                  <GitMergeIcon size={16} />
                 </button>
               )}
             </span>
