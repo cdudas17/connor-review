@@ -203,8 +203,12 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
  * (CiBadge, gh-status-approved-icon) so the trailing cluster reads as a row
  * of equal-weight glyphs rather than a mix of text pills and icons. */
 .claude-badge { font-size: 0.75rem; width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid currentColor; background: transparent; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
-.claude-badge-loading { color: var(--accent); }
-.claude-badge-success { color: var(--accent); }
+/* Claude / Anthropic brand coral — matches the sparkle glyph in marketing /
+ * onboarding so the badge reads as 'this is Claude' rather than a generic
+ * accent-coloured chip. Error still uses the red `--err` since it conveys
+ * failure, not Claude-ness. */
+.claude-badge-loading { color: #d97757; }
+.claude-badge-success { color: #d97757; }
 .claude-badge-error { color: var(--err, #cf6679); }
 .claude-badge-spinner { width: 9px; height: 9px; border-width: 1.5px; margin: 0; }
 
