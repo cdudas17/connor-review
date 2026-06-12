@@ -773,10 +773,13 @@ export function App() {
         showCopyLink={tab === 'mine'}
         onToggleAutoMerge={tab === 'mine' ? (id) => {
           const target = activePRs.find((p) => p.owner === id.owner && p.repo === id.repo && p.number === id.number);
+          const isTrunk = (APP_CONFIG.trunkMergeRepos ?? []).includes(id.repo);
           // Optimistic flip. If the PR is already approved when enabling, also
           // assume it'll land straight in the merge queue (amber state) — that's
           // what GitHub does in practice. After the API call succeeds we refetch
-          // meta to confirm the actual state.
+          // meta to confirm the actual state. For Trunk repos GitHub doesn't
+          // surface the queue state, so we skip the refetch and let the
+          // optimistic flag carry until the next auto-refresh.
           const nextEnabled = !id.currentlyEnabled;
           const isApproved = target?.ghStatus === 'approved';
           const optimisticPatch = nextEnabled
@@ -787,10 +790,19 @@ export function App() {
           if (target && inMine) minePRs.update(target, optimisticPatch);
           if (target && inAdded) mineAddedPRs.update(target, optimisticPatch);
           const prRef = `${id.owner}/${id.repo}#${id.number}`;
-          (id.currentlyEnabled
-            ? api.disableAutoMerge(id.owner, id.repo, id.number)
-            : api.enableAutoMerge(id.owner, id.repo, id.number))
+          const apiCall = isTrunk
+            ? api.trunkMerge(id.owner, id.repo, id.number, { action: id.currentlyEnabled ? 'cancel' : 'enable' })
+            : (id.currentlyEnabled
+              ? api.disableAutoMerge(id.owner, id.repo, id.number)
+              : api.enableAutoMerge(id.owner, id.repo, id.number));
+          apiCall
             .then(async () => {
+              if (isTrunk) {
+                addToast('success', id.currentlyEnabled
+                  ? `Posted /trunk cancel on ${prRef}`
+                  : `Posted /trunk merge on ${prRef} — Trunk will manage the queue from here`);
+                return; // No GH state to refetch for Trunk repos.
+              }
               addToast('success', id.currentlyEnabled ? `Cancelled merge-when-ready for ${prRef}` : `Merge when ready enabled for ${prRef}`);
               // Refetch the PR meta to replace the optimistic flags with the
               // authoritative ones. GitHub is eventually-consistent here, so we
@@ -813,7 +825,9 @@ export function App() {
               const revert = { autoMergeEnabled: id.currentlyEnabled, mergeQueueQueued: !!target?.mergeQueueQueued };
               if (target && inMine) minePRs.update(target, revert);
               if (target && inAdded) mineAddedPRs.update(target, revert);
-              addToast('error', `Failed to toggle merge-when-ready for ${prRef}: ${(e as Error).message}`);
+              addToast('error', isTrunk
+                ? `Failed to post Trunk comment for ${prRef}: ${(e as Error).message}`
+                : `Failed to toggle merge-when-ready for ${prRef}: ${(e as Error).message}`);
             });
         } : undefined}
         {...(tab === 'my'

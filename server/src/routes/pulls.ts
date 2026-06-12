@@ -804,6 +804,31 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     },
   );
 
+  // Post the Trunk merge bot's slash command as a PR comment. For repos
+  // configured in `trunkMergeRepos`, the "Merge when ready" UI button routes
+  // here instead of GitHub's auto-merge mutation — Trunk owns the queue, so
+  // `/trunk merge` / `/trunk cancel` is the canonical interface.
+  app.post<{
+    Params: { owner: string; repo: string; number: string };
+    Body: { action: 'enable' | 'cancel' };
+  }>('/api/pulls/:owner/:repo/:number/trunk-merge', async (req, reply) => {
+    const params = parsePullParams(req.params);
+    const action = req.body?.action;
+    if (action !== 'enable' && action !== 'cancel') {
+      reply.code(400).send({ code: 'BAD_PARAMS', message: 'action must be "enable" or "cancel"' });
+      return;
+    }
+    const body = action === 'enable' ? '/trunk merge' : '/trunk cancel';
+    // Use gh pr comment so we don't have to thread the issue-comment GraphQL
+    // mutation. `--repo o/r` keeps the call repo-scoped regardless of cwd.
+    await ghExec([
+      'pr', 'comment', String(params.number),
+      '--repo', `${params.owner}/${params.repo}`,
+      '--body', body,
+    ]);
+    return { ok: true, action, body };
+  });
+
   // Ask Claude to resolve the PR's merge conflicts locally and push the
   // resolution back to GitHub. Safety-first: every git operation runs in a
   // throwaway worktree, Claude is constrained to Read/Edit only, and three

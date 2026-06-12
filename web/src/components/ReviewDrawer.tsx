@@ -227,13 +227,29 @@ export function ReviewDrawer(props: Props) {
   const toggleAutoMerge = useCallback(async () => {
     if (!current || !meta) return;
     const prRef = `${current.owner}/${current.repo}#${current.number}`;
-    const enabled = !!meta.autoMergeRequest;
+    const isTrunk = (APP_CONFIG.trunkMergeRepos ?? []).includes(current.repo);
+    // For Trunk repos we use our own optimistic flag because GitHub doesn't
+    // surface Trunk's queue state through `meta.autoMergeRequest`.
+    const enabled = isTrunk
+      ? (optimisticAutoMerge?.autoMergeEnabled ?? false)
+      : !!meta.autoMergeRequest;
     const isApproved = (meta.reviewDecision ?? null) === 'APPROVED';
     // Optimistic flip: enabling an approved PR → assume the queue picks it up.
     setOptimisticAutoMerge(enabled
       ? { autoMergeEnabled: false, mergeQueueQueued: false }
       : { autoMergeEnabled: true, mergeQueueQueued: isApproved });
     try {
+      if (isTrunk) {
+        await api.trunkMerge(current.owner, current.repo, current.number, {
+          action: enabled ? 'cancel' : 'enable',
+        });
+        onToast('success', enabled
+          ? `Posted /trunk cancel on ${prRef}`
+          : `Posted /trunk merge on ${prRef} — Trunk will manage the queue from here`);
+        // Skip reloadWithCatchup: GitHub doesn't reflect Trunk state, so the
+        // refetch would just clear our optimistic flag.
+        return;
+      }
       if (enabled) {
         await api.disableAutoMerge(current.owner, current.repo, current.number);
         onToast('success', `Cancelled merge-when-ready for ${prRef}`);
@@ -245,16 +261,23 @@ export function ReviewDrawer(props: Props) {
     } catch (e) {
       // Revert the optimistic visual; surface the failure.
       setOptimisticAutoMerge(null);
-      onToast('error', `Failed to toggle merge when ready for ${prRef}: ${(e as Error).message}`);
+      onToast('error', isTrunk
+        ? `Failed to post Trunk comment for ${prRef}: ${(e as Error).message}`
+        : `Failed to toggle merge when ready for ${prRef}: ${(e as Error).message}`);
     }
-  }, [current, meta, onToast, reloadWithCatchup]);
+  }, [current, meta, onToast, reloadWithCatchup, optimisticAutoMerge]);
 
   // Clear the optimistic override once a fresh meta arrives whose state agrees
   // with what we optimistically flipped to — or after ~3s as a hard fallback
   // for the eventual-consistency case where GitHub hasn't reflected the queue
   // entry yet but our amber state is the truth on the wire.
+  //
+  // For Trunk-managed repos meta.autoMergeRequest never updates (GitHub
+  // doesn't know about Trunk's queue), so we keep the optimistic state
+  // sticky for the whole drawer session.
   useEffect(() => {
-    if (!optimisticAutoMerge || !meta) return;
+    if (!optimisticAutoMerge || !meta || !current) return;
+    if ((APP_CONFIG.trunkMergeRepos ?? []).includes(current.repo)) return;
     const truthEnabled = meta.autoMergeRequest != null;
     if (truthEnabled === optimisticAutoMerge.autoMergeEnabled) {
       setOptimisticAutoMerge(null);
@@ -262,7 +285,7 @@ export function ReviewDrawer(props: Props) {
     }
     const t = setTimeout(() => setOptimisticAutoMerge(null), 3000);
     return () => clearTimeout(t);
-  }, [meta?.autoMergeRequest, meta?.mergeQueueEntry, optimisticAutoMerge]);
+  }, [meta?.autoMergeRequest, meta?.mergeQueueEntry, optimisticAutoMerge, current]);
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
@@ -487,7 +510,10 @@ export function ReviewDrawer(props: Props) {
           // The viewer ≈ the configured myPRsAuthor for normal users; we use
           // GitHub's own viewerCanEnableAutoMerge so we don't have to track
           // permission ourselves.
-          onToggleAutoMerge={(meta.viewerCanEnableAutoMerge || !!meta.autoMergeRequest || !!meta.mergeQueueEntry) && meta.state === 'OPEN' && !meta.merged ? toggleAutoMerge : undefined}
+          onToggleAutoMerge={(
+            (meta.viewerCanEnableAutoMerge || !!meta.autoMergeRequest || !!meta.mergeQueueEntry || (APP_CONFIG.trunkMergeRepos ?? []).includes(current.repo))
+            && meta.state === 'OPEN' && !meta.merged
+          ) ? toggleAutoMerge : undefined}
           autoMergeEnabled={optimisticAutoMerge?.autoMergeEnabled ?? !!meta.autoMergeRequest}
           mergeQueueQueued={optimisticAutoMerge?.mergeQueueQueued ?? !!meta.mergeQueueEntry}
           onAskClaude={() => {

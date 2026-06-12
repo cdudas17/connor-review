@@ -136,6 +136,21 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
+  /** Post a Trunk merge-bot slash command on the PR. Used for repos in
+   * `trunkMergeRepos` where Trunk owns the merge queue (e.g. Gusto/web).
+   * `action: 'enable'` posts `/trunk merge`; `'cancel'` posts `/trunk cancel`. */
+  trunkMerge(
+    owner: string,
+    repo: string,
+    number: number,
+    body: { action: 'enable' | 'cancel' },
+  ): Promise<{ ok: true; action: 'enable' | 'cancel'; body: string }> {
+    return call(`/api/pulls/${owner}/${repo}/${number}/trunk-merge`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
   /** Ask the server to auto-resolve this PR's merge conflicts in a local
    * worktree, gate the result through safety checks, and push back to
    * GitHub. `repoPath` must point at the local clone — derive from

@@ -41,6 +41,12 @@ export interface AppConfig {
   /** When set (e.g. 'Gusto'), the floating "My open issues" panel only fetches
    * issues from this GitHub org/user. Empty = no filter (everything `gh` can see). */
   myIssuesOwner: string;
+  /** Short repo names (matching the PR's GitHub repo name) where merging is
+   * managed by Trunk's merge bot rather than GitHub's built-in auto-merge.
+   * For these repos, clicking the "Merge when ready" button posts a
+   * `/trunk merge` PR comment instead of calling enablePullRequestAutoMerge,
+   * and the cancel action posts `/trunk cancel`. Example: ['web']. */
+  trunkMergeRepos: string[];
   /**
    * Auto-apply labels when you leave visible feedback on a PR authored by a specific user.
    * Keys are GitHub logins; values are the labels to add. Fired after a successful Comment,
@@ -63,6 +69,7 @@ const DEFAULTS: AppConfig = {
   markReadyAddLabels: [],
   markReadyRemoveLabels: [],
   myIssuesOwner: '',
+  trunkMergeRepos: [],
 };
 
 // Vite's import.meta.glob lets us optionally pull in config.local.ts if it

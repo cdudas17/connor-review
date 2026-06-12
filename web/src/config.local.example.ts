@@ -29,6 +29,11 @@ export const APP_CONFIG: Partial<AppConfig> = {
   // (e.g. 'Gusto'). Leave empty to include every issue gh can see.
   myIssuesOwner: '',
 
+  // Repos managed by Trunk's merge bot rather than GitHub auto-merge. For
+  // these, the "Merge when ready" button posts `/trunk merge` (or
+  // `/trunk cancel` to undo) instead of calling the GitHub mutation.
+  trunkMergeRepos: [], // e.g. ['web']
+
   // Local git checkouts that should power the "Local" tab. Short name → absolute
   // path. Each path must be a directory with a `.git` subdir. Diff is always
   // against the checkout's local `main`. Leave empty / omit to hide the tab.
