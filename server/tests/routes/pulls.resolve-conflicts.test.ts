@@ -98,7 +98,7 @@ function makeGitDispatch({
   pushFails?: boolean;
   mergeFails?: 'conflict' | 'hard' | false;
 }) {
-  return async (args: string[], opts: { cwd?: string }) => {
+  return async (args: string[], _opts: { cwd?: string }) => {
     const cmd = args[0];
     if (cmd === 'fetch') return '';
     if (cmd === 'worktree' && args[1] === 'add') {
@@ -245,14 +245,18 @@ describe('POST /api/pulls/:o/:r/:n/resolve-conflicts', () => {
     await app.close();
   });
 
-  it('OVERCOMMIT_DETECTED via status: Claude touches a file outside the conflict set → 409, no commit', async () => {
+  it('OVERCOMMIT_DETECTED via combined diff: --cc reports a file outside the conflict set → 409, no push', async () => {
     createdRepo = makeFakeRepo();
     mockedGh.mockResolvedValueOnce(META_RESPONSE);
+    // The merge commit's combined diff (--cc) reports README.md as having
+    // non-trivial resolution — that's our over-commit signal now. Auto-merged
+    // files don't appear here, only files where the merge result differs from
+    // a clean three-way merge.
     mockedGit.mockImplementation(makeGitDispatch({
       worktreeDirs: allWorktrees,
       conflictFiles: ['app/foo.rb'],
-      // Status shows an EXTRA file modified beyond the conflict set.
-      status: 'M  app/foo.rb\0M  README.md\0',
+      status: 'M  app/foo.rb\0',
+      diffTree: 'app/foo.rb\nREADME.md\n',
     }));
     mockedClaude.mockImplementation(async (_prompt: string, opts: { cwd: string }) => {
       mkdirSync(join(opts.cwd, 'app'), { recursive: true });
@@ -270,11 +274,44 @@ describe('POST /api/pulls/:o/:r/:n/resolve-conflicts', () => {
     expect(res.json().code).toBe('OVERCOMMIT_DETECTED');
     expect(res.json().files).toContain('README.md');
 
-    // No commit, no push.
-    const commitCall = mockedGit.mock.calls.find(([a]) => Array.isArray(a) && a[0] === 'commit');
-    expect(commitCall).toBeUndefined();
+    // Commit happened (we have to commit before we can check the merge shape),
+    // but no push.
     const pushCall = mockedGit.mock.calls.find(([a]) => Array.isArray(a) && a[0] === 'push');
     expect(pushCall).toBeUndefined();
+    await app.close();
+  });
+
+  it('does NOT false-positive on stale branches with thousands of auto-merged files', async () => {
+    createdRepo = makeFakeRepo();
+    mockedGh.mockResolvedValueOnce(META_RESPONSE);
+    // Simulates the bug we fixed: a stale branch where `git status` lists
+    // thousands of auto-merged paths in addition to the conflict files. The
+    // route used to compare this against the conflict set and abort. The
+    // combined-diff check (--cc) ignores auto-merged files, so this passes.
+    const conflictFiles = ['app/foo.rb'];
+    const lotsOfAutoMerged = Array.from({ length: 3826 }, (_, i) => `unrelated/${i}.ts`);
+    const status = [...conflictFiles, ...lotsOfAutoMerged].map((p) => `M  ${p}`).join('\0') + '\0';
+    mockedGit.mockImplementation(makeGitDispatch({
+      worktreeDirs: allWorktrees,
+      conflictFiles,
+      status,
+      // --cc returns just the conflict file — clean auto-merges don't show.
+      diffTree: 'app/foo.rb\n',
+    }));
+    mockedClaude.mockImplementation(async (_prompt: string, opts: { cwd: string }) => {
+      mkdirSync(join(opts.cwd, 'app'), { recursive: true });
+      writeFileSync(join(opts.cwd, 'app/foo.rb'), 'resolved\n');
+      return 'done\n';
+    });
+
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/resolve-conflicts',
+      payload: { repoPath: createdRepo },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ok).toBe(true);
     await app.close();
   });
 

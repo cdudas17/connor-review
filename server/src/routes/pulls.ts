@@ -907,22 +907,30 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         `You are resolving git merge conflicts in a local checkout of ${params.owner}/${params.repo}`,
         `for PR #${params.number} ("${meta.title}") by @${meta.authorLogin ?? 'unknown'}.`,
         '',
-        `The repo lives at ${worktreePath} and is your CWD. The branch ${headRef} has just`,
-        `attempted to merge ${remoteBase} and the following files have conflict markers:`,
+        `The repo lives at ${worktreePath} and is your CWD.`,
+        '',
+        `IMPORTANT: We are MERGING ${remoteBase} INTO the PR branch (${headRef}).`,
+        `This is a forward merge — origin/${baseRef} is the incoming side; ${headRef} is HEAD.`,
+        'We are NOT rebasing. The branch history is preserved; one new merge commit will land',
+        `on ${headRef} carrying both sides of the work forward.`,
+        '',
+        'The following files have conflict markers:',
         '',
         ...conflictFiles.map((f) => `  - ${f}`),
         '',
         'Your task:',
         '1. Open each file and resolve every conflict marker (<<<<<<<, =======, >>>>>>>).',
-        '2. Combine both sides so each intent is preserved. When the two intents genuinely',
-        "   contradict, prefer the PR's changes (the local side of the marker, marked HEAD).",
+        `2. Combine both sides so each intent is preserved. HEAD is the PR branch — when the`,
+        '   two sides genuinely contradict, prefer keeping the PR\'s changes intact while',
+        `   layering in compatible updates from origin/${baseRef}.`,
         '3. Do NOT modify any file not in the list above. Do NOT create or delete files.',
         '   Do NOT run any commands — no git, no shell. Use only Read and Edit.',
         '4. When you are done, briefly summarise which conflict you resolved in each file.',
         '   Do not propose follow-up changes.',
         '',
         'A subsequent verification step will reject the resolution if any conflict markers remain,',
-        'or if any file outside the list has been modified.',
+        'or if the resulting merge commit ends up changing files outside the conflict set in ways',
+        'that go beyond what the underlying three-way merge already does.',
       ].join('\n');
 
       try {
@@ -964,44 +972,30 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         return;
       }
 
-      // 9) Safety check #2 — Claude only touched files in the conflict set.
-      // `git status --porcelain` lines look like " M path", "?? path",
-      // "UU path", "R  oldPath -> newPath", etc. We parse the path token(s)
-      // and reject any path outside conflictFiles.
-      const statusOut = await gitExec(['status', '--porcelain', '-z'], { cwd: worktreePath });
-      // -z separates records with NUL and pathnames with NUL for renames.
+      // Stage ONLY the conflict files. We deliberately never stage anything
+      // else — auto-merged files were already staged by `git merge`, and any
+      // other working-tree changes Claude may have made (intentional or not)
+      // are left behind in the worktree and discarded on cleanup. This makes
+      // it mechanically impossible for an over-touched file to enter the
+      // commit, regardless of what Claude did.
       const conflictSet = new Set(conflictFiles);
-      const records = statusOut.split('\0').filter(Boolean);
-      const overcommit: string[] = [];
-      for (let i = 0; i < records.length; i++) {
-        const line = records[i];
-        // First two chars are XY status, then a space, then the path.
-        const path = line.slice(3);
-        // Rename / copy records are followed by the original path as the next record.
-        if (line.startsWith('R ') || line.startsWith('C ') || line.startsWith(' R') || line.startsWith(' C')) {
-          // Skip the next record (original path of the rename).
-          i++;
-        }
-        if (!conflictSet.has(path)) overcommit.push(path);
-      }
-      if (overcommit.length > 0) {
-        reply.code(409).send({
-          code: 'OVERCOMMIT_DETECTED',
-          message: `Claude modified ${overcommit.length} file(s) outside the conflict set; aborting.`,
-          files: overcommit,
-        });
-        return;
-      }
-
-      // 10) Stage explicit paths only.
       await gitExec(['add', '--', ...conflictFiles], { cwd: worktreePath });
 
-      // 11) Commit the merge resolution.
+      // Commit the merge resolution.
       await gitExec(['commit', '-m', `Resolve merge conflicts with ${baseRef}`], { cwd: worktreePath });
 
-      // 12) Safety check #3 — commit shape.
+      // Safety check #2 — commit shape.
+      //   a. exactly two parents (it's a real merge commit)
+      //   b. first parent == pre-merge HEAD of the PR branch
+      //   c. the COMBINED diff (`diff-tree --cc`) — which only lists files
+      //      where the merge resolution differs from a clean three-way merge —
+      //      is a subset of the conflict file set.
+      //
+      // Using `--cc` rather than the raw `diff-tree` is the load-bearing fix:
+      // a stale branch's clean auto-merge can touch thousands of files, none
+      // of which represent over-commit. The combined diff isolates *just* the
+      // bytes that came from a human (or Claude) judgement call.
       const parentsLine = (await gitExec(['rev-list', '--parents', '-n', '1', 'HEAD'], { cwd: worktreePath })).trim();
-      // Format: "<commit> <parent1> <parent2> ..."
       const parts = parentsLine.split(/\s+/).filter(Boolean);
       const commitSha = parts[0] ?? '';
       const parents = parts.slice(1);
@@ -1016,14 +1010,14 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         });
         return;
       }
-      const touchedRaw = (await gitExec(['diff-tree', '--no-commit-id', '--name-only', '-r', '-m', 'HEAD'], { cwd: worktreePath })).trim();
-      const touched = new Set(touchedRaw.split('\n').map((s) => s.trim()).filter(Boolean));
+      const combinedRaw = (await gitExec(['diff-tree', '--cc', '--no-commit-id', '--name-only', 'HEAD'], { cwd: worktreePath })).trim();
+      const combinedTouched = new Set(combinedRaw.split('\n').map((s) => s.trim()).filter(Boolean));
       const unexpected: string[] = [];
-      for (const p of touched) if (!conflictSet.has(p)) unexpected.push(p);
+      for (const p of combinedTouched) if (!conflictSet.has(p)) unexpected.push(p);
       if (unexpected.length > 0) {
         reply.code(409).send({
           code: 'OVERCOMMIT_DETECTED',
-          message: `Merge commit touches ${unexpected.length} file(s) outside the conflict set.`,
+          message: `Merge commit's combined diff includes ${unexpected.length} file(s) outside the conflict set.`,
           files: unexpected,
         });
         return;
