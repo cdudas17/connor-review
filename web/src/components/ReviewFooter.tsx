@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ReviewEvent } from '../types.js';
 import { EmojiTextarea } from './EmojiTextarea.js';
-import { GitMergeIcon } from '@primer/octicons-react';
+import { GitMergeIcon, GitMergeQueueIcon } from '@primer/octicons-react';
 
 interface Props {
   summary: string;
@@ -31,6 +31,9 @@ interface Props {
   onToggleAutoMerge?: () => Promise<void>;
   /** Current auto-merge state for the toggle's label + style. */
   autoMergeEnabled?: boolean;
+  /** True when the PR is actively in the repo's merge queue (a stricter state
+   * than autoMergeEnabled). Flips the toggle to its amber 'Queued to merge' look. */
+  mergeQueueQueued?: boolean;
 }
 
 function ChevronLeftIcon() {
@@ -81,7 +84,7 @@ export function LocalReviewFooter({
 export function ReviewFooter({
   summary, onSummaryChange, onSubmit, onReviewed, onPrev, onNextPR,
   canSubmit, canReviewed, canPrev, canNextPR, finishLabel, onMarkReady,
-  onAskClaude, claudeChatLoading, onToggleAutoMerge, autoMergeEnabled,
+  onAskClaude, claudeChatLoading, onToggleAutoMerge, autoMergeEnabled, mergeQueueQueued,
 }: Props) {
   const [markingReady, setMarkingReady] = useState(false);
   const [togglingAutoMerge, setTogglingAutoMerge] = useState(false);
@@ -111,24 +114,43 @@ export function ReviewFooter({
           </button>
         )}
         <button type="button" disabled={!canReviewed} onClick={onReviewed}>Reviewed</button>
-        {onToggleAutoMerge && (
-          <button
-            type="button"
-            className={`footer-auto-merge${autoMergeEnabled ? ' footer-auto-merge-on' : ''}`}
-            disabled={togglingAutoMerge}
-            onClick={async () => {
-              setTogglingAutoMerge(true);
-              try { await onToggleAutoMerge(); }
-              finally { setTogglingAutoMerge(false); }
-            }}
-            aria-label={autoMergeEnabled ? 'Cancel merge when ready' : 'Enable merge when ready'}
-            title={autoMergeEnabled
+        {onToggleAutoMerge && (() => {
+          // Three visual states matching the row pill:
+          //  - default: outlined green   (not enabled)
+          //  - on:       filled green     (auto-merge enabled, not yet queued)
+          //  - queued:   filled amber + queue icon (in the merge queue)
+          const cls = mergeQueueQueued
+            ? 'footer-auto-merge footer-auto-merge-queued'
+            : autoMergeEnabled
+              ? 'footer-auto-merge footer-auto-merge-on'
+              : 'footer-auto-merge';
+          const label = mergeQueueQueued
+            ? "Queued to merge — click to cancel"
+            : autoMergeEnabled
               ? "Cancel 'merge when ready' (auto-merge will no longer happen)"
-              : "Enable 'merge when ready' (auto-merge once checks pass + approvals land)"}
-          >
-            <GitMergeIcon size={18} />
-          </button>
-        )}
+              : "Enable 'merge when ready' (auto-merge once checks pass + approvals land)";
+          const aria = mergeQueueQueued
+            ? 'Cancel merge queue entry'
+            : autoMergeEnabled
+              ? 'Cancel merge when ready'
+              : 'Enable merge when ready';
+          return (
+            <button
+              type="button"
+              className={cls}
+              disabled={togglingAutoMerge}
+              onClick={async () => {
+                setTogglingAutoMerge(true);
+                try { await onToggleAutoMerge(); }
+                finally { setTogglingAutoMerge(false); }
+              }}
+              aria-label={aria}
+              title={label}
+            >
+              {mergeQueueQueued ? <GitMergeQueueIcon size={18} /> : <GitMergeIcon size={18} />}
+            </button>
+          );
+        })()}
         {onMarkReady && (
           <button
             type="button"

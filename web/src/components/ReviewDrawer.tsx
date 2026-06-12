@@ -434,8 +434,9 @@ export function ReviewDrawer(props: Props) {
           // The viewer ≈ the configured myPRsAuthor for normal users; we use
           // GitHub's own viewerCanEnableAutoMerge so we don't have to track
           // permission ourselves.
-          onToggleAutoMerge={(meta.viewerCanEnableAutoMerge || !!meta.autoMergeRequest) && meta.state === 'OPEN' && !meta.merged ? toggleAutoMerge : undefined}
+          onToggleAutoMerge={(meta.viewerCanEnableAutoMerge || !!meta.autoMergeRequest || !!meta.mergeQueueEntry) && meta.state === 'OPEN' && !meta.merged ? toggleAutoMerge : undefined}
           autoMergeEnabled={!!meta.autoMergeRequest}
+          mergeQueueQueued={!!meta.mergeQueueEntry}
           onAskClaude={() => {
             // Drain the summary textarea into the chat as the next user turn,
             // then clear it so the box is free for an actual review summary.

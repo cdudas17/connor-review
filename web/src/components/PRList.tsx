@@ -6,7 +6,7 @@ import { CiBadge } from './CiBadge.js';
 import { ClaudeBadge } from './ClaudeBadge.js';
 import { LabelChips } from './LabelChips.js';
 import type { FilterMode } from './FilterToggle.js';
-import { GitMergeIcon, CopyIcon, CheckIcon } from '@primer/octicons-react';
+import { GitMergeIcon, GitMergeQueueIcon, CopyIcon, CheckIcon } from '@primer/octicons-react';
 
 interface Identity {
   owner: string;
@@ -148,21 +148,33 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, onToggleA
                 <CopyLinkButton owner={p.owner} repo={p.repo} number={p.number} />
               )}
               {/* My PRs tab: per-row "Merge when ready" toggle. Clicking the
-                  button stops propagation so it doesn't also open the drawer. */}
-              {onToggleAutoMerge && p.ghStatus !== 'merged' && p.ghStatus !== 'closed' && (
-                <button
-                  type="button"
-                  className={`pr-row-automerge${p.autoMergeEnabled ? ' pr-row-automerge-on' : ''}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleAutoMerge({ owner: p.owner, repo: p.repo, number: p.number, currentlyEnabled: !!p.autoMergeEnabled });
-                  }}
-                  title={p.autoMergeEnabled ? 'Auto-merge enabled — click to cancel' : 'Enable merge when ready'}
-                  aria-label={p.autoMergeEnabled ? 'Cancel merge when ready' : 'Enable merge when ready'}
-                >
-                  <GitMergeIcon size={16} />
-                </button>
-              )}
+                  button stops propagation so it doesn't also open the drawer.
+                  Three visual states:
+                   - default: outlined green (not enabled)
+                   - on:       filled green   (auto-merge enabled, not yet queued)
+                   - queued:   filled amber + queue icon (in the merge queue) */}
+              {onToggleAutoMerge && p.ghStatus !== 'merged' && p.ghStatus !== 'closed' && (() => {
+                const queued = !!p.mergeQueueQueued;
+                const enabled = !!p.autoMergeEnabled;
+                const cls = queued ? 'pr-row-automerge pr-row-automerge-queued' : enabled ? 'pr-row-automerge pr-row-automerge-on' : 'pr-row-automerge';
+                const label = queued ? 'Queued to merge — click to cancel'
+                  : enabled ? 'Auto-merge enabled — click to cancel'
+                  : 'Enable merge when ready';
+                return (
+                  <button
+                    type="button"
+                    className={cls}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleAutoMerge({ owner: p.owner, repo: p.repo, number: p.number, currentlyEnabled: enabled || queued });
+                    }}
+                    title={label}
+                    aria-label={label}
+                  >
+                    {queued ? <GitMergeQueueIcon size={16} /> : <GitMergeIcon size={16} />}
+                  </button>
+                );
+              })()}
             </span>
           </li>
         );

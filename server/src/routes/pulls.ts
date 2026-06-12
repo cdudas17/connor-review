@@ -46,6 +46,10 @@ interface PullRequestMeta {
   /** Whether the viewer can flip auto-merge on. False for un-mergeable PRs
    * (already merged, conflicts, or org/repo policy). */
   viewerCanEnableAutoMerge: boolean;
+  /** Merge-queue entry — non-null when the PR is in the queue. Distinct from
+   * `autoMergeRequest`: a PR can have auto-merge enabled but not yet have
+   * been accepted into the queue. */
+  mergeQueueEntry: { position: number | null; state: string | null } | null;
 }
 
 interface PRLabel { name: string; color: string; }
@@ -256,6 +260,12 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
         }
       : null,
     viewerCanEnableAutoMerge: !!pr.viewerCanEnableAutoMerge,
+    mergeQueueEntry: pr.mergeQueueEntry
+      ? {
+          position: typeof pr.mergeQueueEntry.position === 'number' ? pr.mergeQueueEntry.position : null,
+          state: pr.mergeQueueEntry.state ?? null,
+        }
+      : null,
   };
 }
 

@@ -25,6 +25,13 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
           enabledBy { login }
         }
         viewerCanEnableAutoMerge
+        # Merge-queue entry — non-null when the PR has been accepted into the
+        # repo's merge queue (distinct from plain auto-merge waiting for
+        # checks). Lets the UI flip to the amber 'Queued to merge' state.
+        mergeQueueEntry {
+          position
+          state
+        }
         labels(first: 50) { nodes { name color } }
         assignees(first: 20) { nodes { login avatarUrl url } }
         reviews(first: 100) {

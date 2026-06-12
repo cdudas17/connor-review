@@ -347,6 +347,7 @@ export function App() {
       labels: meta.labels ?? [],
       createdAt: meta.createdAt,
       autoMergeEnabled: meta.autoMergeRequest != null,
+      mergeQueueQueued: meta.mergeQueueEntry != null,
     };
     myPRs.update(id, patch);
     mineAddedPRs.update(id, patch);

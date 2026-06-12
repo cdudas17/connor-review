@@ -42,6 +42,9 @@ export interface TrackedPR {
   /** Whether "merge when ready" is enabled. Refreshed from meta on drawer open
    * and after a toggle action; falls back to undefined for entries pre-feature. */
   autoMergeEnabled?: boolean;
+  /** Whether the PR is currently sitting in the repo's merge queue (a stricter
+   * state than autoMergeEnabled). Used for the amber "Queued to merge" visual. */
+  mergeQueueQueued?: boolean;
   /** Discriminator for entries that aren't GitHub PRs. Defaults to 'github' for back-compat. */
   source?: 'github' | 'local';
   /** For local entries: the branch name (the synthetic `number` is derived from it). */
@@ -78,6 +81,10 @@ export interface PullRequestMeta {
   autoMergeRequest?: { mergeMethod: 'MERGE' | 'SQUASH' | 'REBASE'; enabledBy: string | null; enabledAt: string | null } | null;
   /** Whether the viewer can enable auto-merge on this PR. */
   viewerCanEnableAutoMerge?: boolean;
+  /** Merge-queue entry — non-null when the PR is in the repo's merge queue.
+   * Distinct from auto-merge: a PR can be auto-merge-enabled but not yet in
+   * the queue. UI uses this to flip the toggle to its 'queued' visual state. */
+  mergeQueueEntry?: { position: number | null; state: string | null } | null;
   /** Discriminator. Defaults to 'github' when omitted. */
   source?: 'github' | 'local';
   /** For local entries: the configured repo name (matches the AppConfig.localRepos key). */

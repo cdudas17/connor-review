@@ -336,6 +336,9 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .footer-auto-merge svg { display: block; flex-shrink: 0; }
 .footer-auto-merge-on { background: var(--ok) !important; border-color: var(--ok) !important; color: #ffffff !important; }
 .footer-auto-merge-on:hover:not(:disabled) { background: var(--ok-hover, #28a35a) !important; border-color: var(--ok-hover, #28a35a) !important; }
+/* Queued in the merge queue — amber, matches GitHub's own visual. */
+.footer-auto-merge-queued { background: #bb8009 !important; border-color: #bb8009 !important; color: #ffffff !important; }
+.footer-auto-merge-queued:hover:not(:disabled) { background: #a06e07 !important; border-color: #a06e07 !important; }
 /* Per-row "Copy PR link" button — same 22×22 visual weight as the auto-merge
  * pill but in muted-grey so the two trailing actions aren't competing. */
 .pr-row-copy { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer; transition: color 80ms, background-color 80ms; }
@@ -348,6 +351,8 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .pr-row-automerge svg { display: block; flex-shrink: 0; }
 .pr-row-automerge-on { background: var(--ok); border-color: var(--ok); color: #ffffff; }
 .pr-row-automerge-on:hover { background: var(--ok-hover, #28a35a); border-color: var(--ok-hover, #28a35a); }
+.pr-row-automerge-queued { background: #bb8009; border-color: #bb8009; color: #ffffff; }
+.pr-row-automerge-queued:hover { background: #a06e07; border-color: #a06e07; }
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(13, 17, 23, 0.35); z-index: 10; cursor: pointer; }
 
 /* Floating notes pencil — always on screen, above the drawer. */
