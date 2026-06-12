@@ -18,6 +18,10 @@ interface Props {
    * When `onResolveConflicts` is set the badge becomes a button. */
   conflictState?: 'idle' | 'running' | 'failed' | undefined;
   onResolveConflicts?: () => void;
+  /** Total +/- counts computed from the unified diff. Renders as small green
+   * `+N` and red `-M` chips in the title row, GitHub-style. Undefined while
+   * the diff is still loading. */
+  diffStats?: { additions: number; deletions: number; files: number };
 }
 
 function CopyIcon({ size = 14 }: { size?: number }) {
@@ -36,7 +40,7 @@ function CheckIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl, conflictState, onResolveConflicts }: Props) {
+export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl, conflictState, onResolveConflicts, diffStats }: Props) {
   const status = latestGhStatus ?? computeGhStatus(meta);
   const ci = latestCiStatus !== undefined ? latestCiStatus : meta.ciStatus;
   const ciUrl = latestCiUrl !== undefined ? latestCiUrl : meta.ciUrl;
@@ -64,6 +68,16 @@ export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl, co
         />
         <GhStatusBadge status={status} />
         <CiBadge status={ci} url={ciUrl} />
+        {diffStats && (diffStats.additions > 0 || diffStats.deletions > 0) && (
+          <span
+            className="pr-header-diffstats has-tooltip"
+            data-tooltip={`${diffStats.files} file${diffStats.files === 1 ? '' : 's'} changed`}
+            aria-label={`${diffStats.additions} additions, ${diffStats.deletions} deletions across ${diffStats.files} file${diffStats.files === 1 ? '' : 's'}`}
+          >
+            <span className="pr-header-diffstats-add">+{diffStats.additions.toLocaleString()}</span>
+            <span className="pr-header-diffstats-del">−{diffStats.deletions.toLocaleString()}</span>
+          </span>
+        )}
       </div>
       <LabelChips labels={meta.labels ?? []} />
       <AssigneesRow assignees={meta.assignees ?? []} />

@@ -377,6 +377,12 @@ button.gh-status-conflict-pill:disabled { cursor: progress; opacity: 0.85; }
 .pr-header { padding-right: 40px; }
 .pr-header-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .pr-header-title h2 { margin: 0; word-break: break-word; overflow-wrap: anywhere; min-width: 0; }
+/* GitHub-style +N −M chip cluster. Lives at the end of the title row so the
+ * eye can read it the same way as on github.com. Tabular numerals so the
+ * minus and plus columns line up regardless of digit width. */
+.pr-header-diffstats { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
+.pr-header-diffstats-add { color: #3fb950; }
+.pr-header-diffstats-del { color: #f85149; }
 .footer-mark-ready { border-color: var(--ok) !important; color: var(--ok) !important; }
 .footer-mark-ready:hover:not(:disabled) { background: rgba(31, 136, 61, 0.15) !important; }
 /* Merge-when-ready toggle — icon-only, solid green square matching the

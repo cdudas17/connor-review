@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PRHeader } from './PRHeader.js';
 import { PRDescription } from './PRDescription.js';
 import { ReviewSummaryList } from './ReviewSummaryList.js';
@@ -8,6 +8,7 @@ import { ReviewFooter, LocalReviewFooter } from './ReviewFooter.js';
 import { ErrorToast } from './ErrorToast.js';
 import { ConflictResolutionCard } from './ConflictResolutionCard.js';
 import { usePRDetails } from '../hooks/usePRDetails.js';
+import { computeDiffStats } from '../lib/diffStats.js';
 import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
 import { api } from '../lib/api.js';
 import { maybeAutoLabelOnReview } from '../lib/autoLabel.js';
@@ -118,6 +119,9 @@ export function ReviewDrawer(props: Props) {
     conflictResolution, onResolveConflicts, onDismissConflictResolution,
   } = props;
   const { meta, diff, loading, error, reload } = usePRDetails(current);
+  // GitHub-style +N -M totals for the PR header. Memoised on diff identity
+  // because computeDiffStats is a linear scan over the raw diff string.
+  const diffStats = useMemo(() => computeDiffStats(diff), [diff]);
   const [summary, setSummary] = useState('');
   const drawerRef = useRef<HTMLElement | null>(null);
 
@@ -432,6 +436,7 @@ export function ReviewDrawer(props: Props) {
           : conflictResolution?.kind === 'failed' ? 'failed'
           : 'idle'}
         onResolveConflicts={meta.source === 'local' ? undefined : onResolveConflicts}
+        diffStats={diffStats}
       />
       {meta.source !== 'local' && <PRDescription bodyHtml={meta.bodyHtml} />}
       {meta.source !== 'local' && <ReviewSummaryList reviews={meta.reviews ?? []} />}
