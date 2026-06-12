@@ -228,10 +228,11 @@ export function ReviewDrawer(props: Props) {
     if (!current || !meta) return;
     const prRef = `${current.owner}/${current.repo}#${current.number}`;
     const isTrunk = (APP_CONFIG.trunkMergeRepos ?? []).includes(current.repo);
-    // For Trunk repos we use our own optimistic flag because GitHub doesn't
-    // surface Trunk's queue state through `meta.autoMergeRequest`.
+    // For Trunk repos the truth source is the Trunk CI check via
+    // `meta.trunkInQueue`. Fall through to the optimistic flag if it's set
+    // (handles the brief window between a click and Trunk's check appearing).
     const enabled = isTrunk
-      ? (optimisticAutoMerge?.autoMergeEnabled ?? false)
+      ? (optimisticAutoMerge?.autoMergeEnabled ?? !!meta.trunkInQueue)
       : !!meta.autoMergeRequest;
     const isApproved = (meta.reviewDecision ?? null) === 'APPROVED';
     // Optimistic flip: enabling an approved PR → assume the queue picks it up.
@@ -272,20 +273,23 @@ export function ReviewDrawer(props: Props) {
   // for the eventual-consistency case where GitHub hasn't reflected the queue
   // entry yet but our amber state is the truth on the wire.
   //
-  // For Trunk-managed repos meta.autoMergeRequest never updates (GitHub
-  // doesn't know about Trunk's queue), so we keep the optimistic state
-  // sticky for the whole drawer session.
+  // For Trunk-managed repos the truth source is `meta.trunkInQueue` (a CI
+  // check), not `meta.autoMergeRequest`. The optimistic state clears as soon
+  // as the Trunk check appears / disappears to match what the user clicked.
   useEffect(() => {
     if (!optimisticAutoMerge || !meta || !current) return;
-    if ((APP_CONFIG.trunkMergeRepos ?? []).includes(current.repo)) return;
-    const truthEnabled = meta.autoMergeRequest != null;
+    const isTrunk = (APP_CONFIG.trunkMergeRepos ?? []).includes(current.repo);
+    const truthEnabled = isTrunk ? !!meta.trunkInQueue : (meta.autoMergeRequest != null);
     if (truthEnabled === optimisticAutoMerge.autoMergeEnabled) {
       setOptimisticAutoMerge(null);
       return;
     }
-    const t = setTimeout(() => setOptimisticAutoMerge(null), 3000);
+    // For Trunk we wait longer (15s) because the queue check can take a beat
+    // to register after `/trunk merge` is posted. For GitHub auto-merge the
+    // existing 3s was fine.
+    const t = setTimeout(() => setOptimisticAutoMerge(null), isTrunk ? 15000 : 3000);
     return () => clearTimeout(t);
-  }, [meta?.autoMergeRequest, meta?.mergeQueueEntry, optimisticAutoMerge, current]);
+  }, [meta?.autoMergeRequest, meta?.mergeQueueEntry, meta?.trunkInQueue, optimisticAutoMerge, current]);
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
@@ -514,8 +518,8 @@ export function ReviewDrawer(props: Props) {
             (meta.viewerCanEnableAutoMerge || !!meta.autoMergeRequest || !!meta.mergeQueueEntry || (APP_CONFIG.trunkMergeRepos ?? []).includes(current.repo))
             && meta.state === 'OPEN' && !meta.merged
           ) ? toggleAutoMerge : undefined}
-          autoMergeEnabled={optimisticAutoMerge?.autoMergeEnabled ?? !!meta.autoMergeRequest}
-          mergeQueueQueued={optimisticAutoMerge?.mergeQueueQueued ?? !!meta.mergeQueueEntry}
+          autoMergeEnabled={optimisticAutoMerge?.autoMergeEnabled ?? (!!meta.autoMergeRequest || !!meta.trunkInQueue)}
+          mergeQueueQueued={optimisticAutoMerge?.mergeQueueQueued ?? (!!meta.mergeQueueEntry || !!meta.trunkInQueue)}
           onAskClaude={() => {
             // Drain the summary textarea into the chat as the next user turn,
             // then clear it so the box is free for an actual review summary.

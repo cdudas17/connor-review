@@ -180,8 +180,13 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictS
                    - on:       filled green   (auto-merge enabled, not yet queued)
                    - queued:   filled amber + queue icon (in the merge queue) */}
               {onToggleAutoMerge && p.ghStatus !== 'merged' && p.ghStatus !== 'closed' && (() => {
-                const queued = !!p.mergeQueueQueued;
-                const enabled = !!p.autoMergeEnabled;
+                // trunkInQueue is the authoritative "queued" signal for
+                // Trunk-managed repos (GitHub's mergeQueueEntry is always
+                // null there). It's also a stronger signal than autoMergeEnabled
+                // for non-Trunk repos when set, which it won't be — so this
+                // OR is safe everywhere.
+                const queued = !!p.mergeQueueQueued || !!p.trunkInQueue;
+                const enabled = !!p.autoMergeEnabled || !!p.trunkInQueue;
                 const cls = queued ? 'pr-row-automerge pr-row-automerge-queued' : enabled ? 'pr-row-automerge pr-row-automerge-on' : 'pr-row-automerge';
                 const label = queued ? 'Queued — click to cancel'
                   : enabled ? 'Cancel merge when ready'

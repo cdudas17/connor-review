@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { ghExec, GhCliError } from '../lib/ghExec.js';
 import { LRUCache } from '../lib/lruCache.js';
 import { BadParamsError, parsePullParams } from '../lib/parseRouteParams.js';
-import { extractBuildkiteCheckUrl } from '../lib/ciUrl.js';
+import { extractBuildkiteCheckUrl, detectTrunkInQueue } from '../lib/ciUrl.js';
 import { PULL_REQUEST_QUERY } from '../queries/pullRequest.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_MUTATION } from '../queries/addPullRequestReview.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION } from '../queries/addPullRequestReviewThread.graphql.js';
@@ -56,6 +56,12 @@ interface PullRequestMeta {
    * `autoMergeRequest`: a PR can have auto-merge enabled but not yet have
    * been accepted into the queue. */
   mergeQueueEntry: { position: number | null; state: string | null } | null;
+  /** True when the PR has an active Trunk merge-queue check run (status is
+   * QUEUED or IN_PROGRESS, name starts with "trunk"). Trunk surfaces queue
+   * state via a check run rather than GitHub's mergeQueueEntry, so this is
+   * the authoritative "in queue" signal for Trunk-managed repos. False
+   * (always) for repos that don't use Trunk. */
+  trunkInQueue: boolean;
 }
 
 interface PRLabel { name: string; color: string; }
@@ -273,6 +279,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
           state: pr.mergeQueueEntry.state ?? null,
         }
       : null,
+    trunkInQueue: detectTrunkInQueue(pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
   };
 }
 

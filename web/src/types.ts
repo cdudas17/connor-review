@@ -47,6 +47,9 @@ export interface TrackedPR {
   mergeQueueQueued?: boolean;
   /** True when GitHub reports the PR as having unresolved merge conflicts. */
   hasConflicts?: boolean;
+  /** True when the PR has an active Trunk merge-queue check. Authoritative
+   * "in queue" signal for Trunk-managed repos (Gusto/web, etc.). */
+  trunkInQueue?: boolean;
   /** Discriminator for entries that aren't GitHub PRs. Defaults to 'github' for back-compat. */
   source?: 'github' | 'local';
   /** For local entries: the branch name (the synthetic `number` is derived from it). */
@@ -90,6 +93,10 @@ export interface PullRequestMeta {
    * Distinct from auto-merge: a PR can be auto-merge-enabled but not yet in
    * the queue. UI uses this to flip the toggle to its 'queued' visual state. */
   mergeQueueEntry?: { position: number | null; state: string | null } | null;
+  /** True when the PR has an active Trunk merge-queue check. Trunk surfaces
+   * queue state via a CI check rather than GitHub's mergeQueueEntry, so this
+   * is the authoritative "in queue" signal for Trunk-managed repos. */
+  trunkInQueue?: boolean;
   /** Discriminator. Defaults to 'github' when omitted. */
   source?: 'github' | 'local';
   /** For local entries: the configured repo name (matches the AppConfig.localRepos key). */
@@ -160,4 +167,6 @@ export interface TeamPR {
   mergeQueueQueued?: boolean;
   /** True when GitHub reports the PR as having unresolved merge conflicts. */
   hasConflicts?: boolean;
+  /** True when this PR has an active Trunk merge-queue check. */
+  trunkInQueue?: boolean;
 }

@@ -354,6 +354,7 @@ export function App() {
       autoMergeEnabled: meta.autoMergeRequest != null,
       mergeQueueQueued: meta.mergeQueueEntry != null,
       hasConflicts: meta.mergeable === 'CONFLICTING',
+      trunkInQueue: !!meta.trunkInQueue,
     };
     myPRs.update(id, patch);
     mineAddedPRs.update(id, patch);
@@ -462,7 +463,7 @@ export function App() {
         for (const r of results) {
           if (r.status === 'fulfilled') {
             const { p, meta } = r.value;
-            mineAddedPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING' });
+            mineAddedPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING', trunkInQueue: !!meta.trunkInQueue });
           }
         }
       });

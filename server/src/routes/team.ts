@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import yaml from 'js-yaml';
 import { ghExec } from '../lib/ghExec.js';
 import { TEAM_PR_SEARCH_QUERY } from '../queries/teamPRs.graphql.js';
-import { extractBuildkiteCheckUrl } from '../lib/ciUrl.js';
+import { extractBuildkiteCheckUrl, detectTrunkInQueue } from '../lib/ciUrl.js';
 
 /**
  * Tiny TTL cache. Used to de-dupe overlapping calls to the same external API
@@ -73,6 +73,10 @@ interface TeamPR {
   // the default (not enabled, not queued) state.
   autoMergeEnabled: boolean;
   mergeQueueQueued: boolean;
+  /** True when the PR has an active Trunk merge-queue check (status QUEUED
+   * or IN_PROGRESS, name starts with "trunk"). Authoritative for Trunk
+   * repos, where GitHub's mergeQueueEntry is always null. */
+  trunkInQueue: boolean;
 }
 
 interface TalentFile {
@@ -205,6 +209,7 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
       updatedAt: n.updatedAt,
       autoMergeEnabled: n.autoMergeRequest != null,
       mergeQueueQueued: n.mergeQueueEntry != null,
+      trunkInQueue: detectTrunkInQueue(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
     }))
     .filter((p) => p.owner && p.repo);
 }
@@ -280,6 +285,7 @@ export async function registerTeamRoutes(app: FastifyInstance) {
           updatedAt: n.updatedAt ?? new Date().toISOString(),
           autoMergeEnabled: n.autoMergeRequest != null,
           mergeQueueQueued: n.mergeQueueEntry != null,
+          trunkInQueue: detectTrunkInQueue(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
         }))
         .filter((p) => p.owner && p.repo);
       const result = { author, prs };
@@ -328,6 +334,7 @@ export async function registerTeamRoutes(app: FastifyInstance) {
           updatedAt: n.updatedAt ?? new Date().toISOString(),
           autoMergeEnabled: n.autoMergeRequest != null,
           mergeQueueQueued: n.mergeQueueEntry != null,
+          trunkInQueue: detectTrunkInQueue(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
         }))
         .filter((p) => p.owner && p.repo);
       const result = { label, prs };

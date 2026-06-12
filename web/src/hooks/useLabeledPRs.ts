@@ -63,6 +63,7 @@ export function useLabeledPRs(label = 'needs-review') {
         createdAt: p.createdAt,
         addedAt: Date.parse(p.updatedAt) || Date.now(),
         hasConflicts: !!p.hasConflicts,
+        trunkInQueue: !!p.trunkInQueue,
       }));
       tracked.sort((a, b) => b.addedAt - a.addedAt);
       setState({ prs: tracked, loading: false, error: null, errorDismissed: false, hasLoaded: true, lastFetchedAt: Date.now() });
