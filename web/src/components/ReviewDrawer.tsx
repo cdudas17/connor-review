@@ -6,6 +6,7 @@ import { ConversationsList } from './ConversationsList.js';
 import { DiffViewer } from './DiffViewer.js';
 import { ReviewFooter, LocalReviewFooter } from './ReviewFooter.js';
 import { ErrorToast } from './ErrorToast.js';
+import { ConflictResolutionCard } from './ConflictResolutionCard.js';
 import { usePRDetails } from '../hooks/usePRDetails.js';
 import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
 import { api } from '../lib/api.js';
@@ -98,6 +99,12 @@ interface Props {
   onAskInlineClaudeForLine: (anchor: LocalThreadAnchor, draft: string) => void;
   /** Dismiss a local Claude thread (× on the card). */
   onDismissLocalClaudeThread: (anchor: LocalThreadAnchor) => void;
+  /** Current conflict-resolution entry for this PR (null when there's none). */
+  conflictResolution: import('../hooks/useConflictResolutions.js').ConflictResolutionEntry | null;
+  /** Fire / re-fire the resolve flow for the open PR. */
+  onResolveConflicts: () => void;
+  /** Clear the stored conflict-resolution entry (× on the card). */
+  onDismissConflictResolution: () => void;
 }
 
 export function ReviewDrawer(props: Props) {
@@ -108,6 +115,7 @@ export function ReviewDrawer(props: Props) {
     claudeChat, threadClaudeState, onAskClaudeChat, onClearClaudeChat,
     onAskThreadClaude, onDismissThreadClaude,
     localClaudeThreads, onAskInlineClaudeForLine, onDismissLocalClaudeThread,
+    conflictResolution, onResolveConflicts, onDismissConflictResolution,
   } = props;
   const { meta, diff, loading, error, reload } = usePRDetails(current);
   const [summary, setSummary] = useState('');
@@ -388,7 +396,16 @@ export function ReviewDrawer(props: Props) {
           so all review-action surfaces (summary list, conversations, footer
           publish buttons, inline comment composer) are hidden. The diff itself
           + file list + nav stay because that's what the user actually wants. */}
-      <PRHeader meta={meta} latestGhStatus={latestGhStatus} latestCiStatus={latestCiStatus} latestCiUrl={latestCiUrl} />
+      <PRHeader
+        meta={meta}
+        latestGhStatus={latestGhStatus}
+        latestCiStatus={latestCiStatus}
+        latestCiUrl={latestCiUrl}
+        conflictState={conflictResolution?.kind === 'running' ? 'running'
+          : conflictResolution?.kind === 'failed' ? 'failed'
+          : 'idle'}
+        onResolveConflicts={meta.source === 'local' ? undefined : onResolveConflicts}
+      />
       {meta.source !== 'local' && <PRDescription bodyHtml={meta.bodyHtml} />}
       {meta.source !== 'local' && <ReviewSummaryList reviews={meta.reviews ?? []} />}
       {meta.source !== 'local' && (
@@ -396,6 +413,13 @@ export function ReviewDrawer(props: Props) {
           chat={claudeChat}
           onAsk={onAskClaudeChat}
           onClear={onClearClaudeChat}
+        />
+      )}
+      {meta.source !== 'local' && conflictResolution && (
+        <ConflictResolutionCard
+          entry={conflictResolution}
+          onRetry={onResolveConflicts}
+          onDismiss={onDismissConflictResolution}
         />
       )}
       {meta.source !== 'local' && (

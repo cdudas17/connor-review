@@ -10,9 +10,11 @@ import { ADD_PULL_REQUEST_REVIEW_THREAD_REPLY_MUTATION } from '../queries/addPul
 import { SUBMIT_PULL_REQUEST_REVIEW_MUTATION } from '../queries/submitPullRequestReview.graphql.js';
 import { MARK_READY_FOR_REVIEW_MUTATION } from '../queries/markReadyForReview.graphql.js';
 import { claudeExec, ClaudeCliError } from '../lib/claudeExec.js';
+import { gitExec, GitCliError } from '../lib/gitExec.js';
 import { ENABLE_AUTO_MERGE_MUTATION, DISABLE_AUTO_MERGE_MUTATION } from '../queries/autoMerge.graphql.js';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
+import { tmpdir } from 'node:os';
 
 type CiStatus = 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' | null;
 
@@ -801,4 +803,253 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       return { autoMergeRequest: null };
     },
   );
+
+  // Ask Claude to resolve the PR's merge conflicts locally and push the
+  // resolution back to GitHub. Safety-first: every git operation runs in a
+  // throwaway worktree, Claude is constrained to Read/Edit only, and three
+  // independent checks gate the commit + push step. See route body for the
+  // full safety contract.
+  app.post<{
+    Params: { owner: string; repo: string; number: string };
+    Body: { repoPath?: string };
+  }>('/api/pulls/:owner/:repo/:number/resolve-conflicts', async (req, reply) => {
+    const params = parsePullParams(req.params);
+    const repoPath = (req.body?.repoPath ?? '').trim();
+    if (!repoPath) {
+      reply.code(400).send({ code: 'BAD_REPO_PATH', message: 'repoPath is required (configure localRepos for this repo)' });
+      return;
+    }
+    let absRepoPath: string;
+    try {
+      const abs = resolvePath(repoPath);
+      if (!existsSync(abs) || !statSync(abs).isDirectory() || !existsSync(resolvePath(abs, '.git'))) {
+        reply.code(400).send({ code: 'BAD_REPO_PATH', message: `Not a git checkout: ${abs}` });
+        return;
+      }
+      absRepoPath = abs;
+    } catch (e) {
+      reply.code(400).send({ code: 'BAD_REPO_PATH', message: (e as Error).message });
+      return;
+    }
+
+    const meta = metaCache.get(metaKey(params)) ?? (await fetchMeta(params.owner, params.repo, params.number));
+    const baseRef = meta.baseRefName;
+    const headRef = meta.headRefName;
+    const remoteHead = `origin/${headRef}`;
+    const remoteBase = `origin/${baseRef}`;
+
+    // Unique worktree path. We never reuse a path between attempts so a botched
+    // prior cleanup can't poison the next run.
+    const worktreePath = resolvePath(tmpdir(),
+      `connor-review-resolve-${params.owner}-${params.repo}-${params.number}-${Date.now()}`);
+
+    /** Best-effort cleanup; tolerated to fail (the worktree may already be in
+     * a state where remove --force can't run, e.g. external process holding a
+     * file). Logs the failure but doesn't surface to the user since the main
+     * route response carries the actionable info. */
+    const cleanup = async () => {
+      try { await gitExec(['merge', '--abort'], { cwd: worktreePath }); } catch { /* not in a merge */ }
+      try { await gitExec(['worktree', 'remove', '--force', worktreePath], { cwd: absRepoPath }); } catch (e) {
+        // Force-remove the dir if git won't (e.g. corrupted worktree metadata).
+        try {
+          if (existsSync(worktreePath)) {
+            const { rmSync } = await import('node:fs');
+            rmSync(worktreePath, { recursive: true, force: true });
+          }
+        } catch { /* give up */ }
+        console.warn(`[resolve-conflicts] worktree cleanup failed for ${worktreePath}:`, (e as Error).message);
+      }
+    };
+
+    try {
+      // 1) Make sure we have the latest base + head refs locally.
+      await gitExec(['fetch', 'origin', baseRef, headRef], { cwd: absRepoPath });
+
+      // 2+3) Create a worktree pinned at origin/<headRef> on a local branch
+      // matching the PR's branch name so we can push it back.
+      await gitExec(['worktree', 'add', '-B', headRef, worktreePath, remoteHead], { cwd: absRepoPath });
+
+      // Snapshot the pre-merge HEAD SHA so safety check #3 can verify the
+      // first parent of the merge commit matches it.
+      const preMergeHead = (await gitExec(['rev-parse', 'HEAD'], { cwd: worktreePath })).trim();
+
+      // 4) Attempt the merge. gitExec rejects on non-zero exit, but a merge
+      // with conflicts also exits non-zero — we have to distinguish from a
+      // hard failure by inspecting the resulting state.
+      let mergeFailed = false;
+      try {
+        await gitExec(['merge', '--no-edit', '--no-ff', remoteBase], { cwd: worktreePath });
+      } catch (e) {
+        if (!(e instanceof GitCliError)) throw e;
+        mergeFailed = true;
+      }
+
+      // 5) Snapshot the conflict file set. Empty means either a clean merge
+      // (no conflicts) or a non-conflict merge failure (e.g. base ref missing).
+      const conflictListRaw = (await gitExec(['diff', '--name-only', '--diff-filter=U'], { cwd: worktreePath })).trim();
+      const conflictFiles = conflictListRaw.split('\n').map((s) => s.trim()).filter(Boolean);
+
+      if (conflictFiles.length === 0) {
+        if (!mergeFailed) {
+          // Clean merge — push it. This is the trivial case (GitHub said
+          // CONFLICTING but the cached mergeable state was stale).
+          await gitExec(['push', 'origin', headRef], { cwd: worktreePath });
+          const sha = (await gitExec(['rev-parse', 'HEAD'], { cwd: worktreePath })).trim();
+          reply.send({ ok: true, commitSha: sha, trivial: true });
+          return;
+        }
+        reply.code(409).send({ code: 'MERGE_FAILED', message: 'git merge failed without reporting conflict files; aborting' });
+        return;
+      }
+
+      // 7) Hand the conflict files to Claude.
+      const prompt = [
+        `You are resolving git merge conflicts in a local checkout of ${params.owner}/${params.repo}`,
+        `for PR #${params.number} ("${meta.title}") by @${meta.authorLogin ?? 'unknown'}.`,
+        '',
+        `The repo lives at ${worktreePath} and is your CWD. The branch ${headRef} has just`,
+        `attempted to merge ${remoteBase} and the following files have conflict markers:`,
+        '',
+        ...conflictFiles.map((f) => `  - ${f}`),
+        '',
+        'Your task:',
+        '1. Open each file and resolve every conflict marker (<<<<<<<, =======, >>>>>>>).',
+        '2. Combine both sides so each intent is preserved. When the two intents genuinely',
+        "   contradict, prefer the PR's changes (the local side of the marker, marked HEAD).",
+        '3. Do NOT modify any file not in the list above. Do NOT create or delete files.',
+        '   Do NOT run any commands — no git, no shell. Use only Read and Edit.',
+        '4. When you are done, briefly summarise which conflict you resolved in each file.',
+        '   Do not propose follow-up changes.',
+        '',
+        'A subsequent verification step will reject the resolution if any conflict markers remain,',
+        'or if any file outside the list has been modified.',
+      ].join('\n');
+
+      try {
+        await claudeExec(prompt, {
+          cwd: worktreePath,
+          allowedTools: ['Read', 'Edit'],
+          permissionMode: 'acceptEdits',
+          timeoutMs: 15 * 60_000,
+        });
+      } catch (e) {
+        if (e instanceof ClaudeCliError) {
+          const status = e.code === 'CLAUDE_NOT_INSTALLED' ? 502 : e.code === 'TIMEOUT' ? 504 : 500;
+          reply.code(status).send({ code: e.code, message: e.message, stderr: e.stderr });
+          return;
+        }
+        throw e;
+      }
+
+      // 8) Safety check #1 — no residual markers in any conflict file.
+      const markerOffenders: string[] = [];
+      for (const rel of conflictFiles) {
+        const abs = resolvePath(worktreePath, rel);
+        if (!existsSync(abs)) {
+          // Claude deleted the file. That violates the contract.
+          markerOffenders.push(`${rel} (deleted by Claude)`);
+          continue;
+        }
+        const content = readFileSync(abs, 'utf8');
+        if (content.includes('<<<<<<<') || content.includes('=======\n') || content.includes('>>>>>>>')) {
+          markerOffenders.push(rel);
+        }
+      }
+      if (markerOffenders.length > 0) {
+        reply.code(409).send({
+          code: 'LEFTOVER_MARKERS',
+          message: `Conflict markers remain in ${markerOffenders.length} file(s) after Claude's edits.`,
+          files: markerOffenders,
+        });
+        return;
+      }
+
+      // 9) Safety check #2 — Claude only touched files in the conflict set.
+      // `git status --porcelain` lines look like " M path", "?? path",
+      // "UU path", "R  oldPath -> newPath", etc. We parse the path token(s)
+      // and reject any path outside conflictFiles.
+      const statusOut = await gitExec(['status', '--porcelain', '-z'], { cwd: worktreePath });
+      // -z separates records with NUL and pathnames with NUL for renames.
+      const conflictSet = new Set(conflictFiles);
+      const records = statusOut.split('\0').filter(Boolean);
+      const overcommit: string[] = [];
+      for (let i = 0; i < records.length; i++) {
+        const line = records[i];
+        // First two chars are XY status, then a space, then the path.
+        const path = line.slice(3);
+        // Rename / copy records are followed by the original path as the next record.
+        if (line.startsWith('R ') || line.startsWith('C ') || line.startsWith(' R') || line.startsWith(' C')) {
+          // Skip the next record (original path of the rename).
+          i++;
+        }
+        if (!conflictSet.has(path)) overcommit.push(path);
+      }
+      if (overcommit.length > 0) {
+        reply.code(409).send({
+          code: 'OVERCOMMIT_DETECTED',
+          message: `Claude modified ${overcommit.length} file(s) outside the conflict set; aborting.`,
+          files: overcommit,
+        });
+        return;
+      }
+
+      // 10) Stage explicit paths only.
+      await gitExec(['add', '--', ...conflictFiles], { cwd: worktreePath });
+
+      // 11) Commit the merge resolution.
+      await gitExec(['commit', '-m', `Resolve merge conflicts with ${baseRef}`], { cwd: worktreePath });
+
+      // 12) Safety check #3 — commit shape.
+      const parentsLine = (await gitExec(['rev-list', '--parents', '-n', '1', 'HEAD'], { cwd: worktreePath })).trim();
+      // Format: "<commit> <parent1> <parent2> ..."
+      const parts = parentsLine.split(/\s+/).filter(Boolean);
+      const commitSha = parts[0] ?? '';
+      const parents = parts.slice(1);
+      if (parents.length !== 2) {
+        reply.code(409).send({ code: 'OVERCOMMIT_DETECTED', message: `Expected a merge commit (2 parents), got ${parents.length}` });
+        return;
+      }
+      if (parents[0] !== preMergeHead) {
+        reply.code(409).send({
+          code: 'OVERCOMMIT_DETECTED',
+          message: `Merge commit's first parent (${parents[0]}) doesn't match pre-merge HEAD (${preMergeHead})`,
+        });
+        return;
+      }
+      const touchedRaw = (await gitExec(['diff-tree', '--no-commit-id', '--name-only', '-r', '-m', 'HEAD'], { cwd: worktreePath })).trim();
+      const touched = new Set(touchedRaw.split('\n').map((s) => s.trim()).filter(Boolean));
+      const unexpected: string[] = [];
+      for (const p of touched) if (!conflictSet.has(p)) unexpected.push(p);
+      if (unexpected.length > 0) {
+        reply.code(409).send({
+          code: 'OVERCOMMIT_DETECTED',
+          message: `Merge commit touches ${unexpected.length} file(s) outside the conflict set.`,
+          files: unexpected,
+        });
+        return;
+      }
+
+      // 13) Push.
+      try {
+        await gitExec(['push', 'origin', headRef], { cwd: worktreePath });
+      } catch (e) {
+        const stderr = e instanceof GitCliError ? e.stderr : (e as Error).message;
+        reply.code(502).send({ code: 'PUSH_FAILED', message: `git push failed: ${stderr.trim()}`, stderr });
+        return;
+      }
+
+      // Bust the meta cache so the next /api/pulls/... fetch reflects the
+      // newly-clean mergeable state.
+      metaCache.delete(metaKey(params));
+      reply.send({ ok: true, commitSha });
+    } catch (e) {
+      if (e instanceof GitCliError) {
+        reply.code(502).send({ code: 'MERGE_FAILED', message: e.message, stderr: e.stderr });
+        return;
+      }
+      throw e;
+    } finally {
+      await cleanup();
+    }
+  });
 }

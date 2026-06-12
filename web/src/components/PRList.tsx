@@ -43,6 +43,14 @@ interface Props {
   /** Per-PR Claude state aggregator (summary + threads). When provided, each row
    * renders a small badge indicating in-progress / saved-response / failed. */
   claudeStateFor?: (id: { owner: string; repo: string; number: number }) => { kind: 'loading' | 'error' | 'success' } | null;
+  /** Per-PR conflict-resolution state. When provided AND the PR has
+   * `hasConflicts`, the ConflictBadge becomes a button driven by
+   * `onResolveConflicts`. Distinct from `claudeStateFor` to keep the
+   * Claude badge clean of conflict-resolution activity. */
+  conflictStateFor?: (id: { owner: string; repo: string; number: number }) => { kind: 'running' | 'failed' | 'success' } | null;
+  /** Click handler for the conflict badge. Fire-and-forget; the hook
+   * reflects state changes via `conflictStateFor`. */
+  onResolveConflicts?: (id: { owner: string; repo: string; number: number }) => void;
   /** When set, each row renders a "Merge when ready" toggle button. Used on
    * the My PRs tab. The callback toggles auto-merge for that PR. */
   onToggleAutoMerge?: (id: { owner: string; repo: string; number: number; currentlyEnabled: boolean }) => void;
@@ -76,7 +84,7 @@ function CopyLinkButton({ owner, repo, number }: { owner: string; repo: string; 
   );
 }
 
-export function PRList({ prs, mode, onOpen, selection, claudeStateFor, onToggleAutoMerge, showCopyLink }: Props) {
+export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictStateFor, onResolveConflicts, onToggleAutoMerge, showCopyLink }: Props) {
   const filtered = mode === 'untouched-only' ? prs.filter((p) => p.status === 'untouched') : prs;
   if (filtered.length === 0) {
     return <p className="empty">No PRs to review.</p>;
@@ -136,7 +144,13 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, onToggleA
               {/* Merge conflicts get the leading position in the left-of-CI
                   cluster — they block forward progress regardless of CI or
                   review state, so this is the first signal worth seeing. */}
-              <ConflictBadge hasConflicts={p.hasConflicts} />
+              <ConflictBadge
+                hasConflicts={p.hasConflicts}
+                state={conflictStateFor?.({ owner: p.owner, repo: p.repo, number: p.number })?.kind === 'running' ? 'running'
+                  : conflictStateFor?.({ owner: p.owner, repo: p.repo, number: p.number })?.kind === 'failed' ? 'failed'
+                  : 'idle'}
+                onClick={onResolveConflicts ? () => onResolveConflicts({ owner: p.owner, repo: p.repo, number: p.number }) : undefined}
+              />
               {/* Draft + Closed + Approved are the GhStatus values we surface
                   left-of-CI — Draft gates reviewability, Closed flags the PR
                   is dead, and Approved is high-signal "ready to merge". Other

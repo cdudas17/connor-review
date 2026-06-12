@@ -16,6 +16,7 @@ import { ToastStack } from './components/ToastStack.js';
 import { useToasts } from './hooks/useToasts.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
 import { useClaudeResponses } from './hooks/useClaudeResponses.js';
+import { useConflictResolutions } from './hooks/useConflictResolutions.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
 import { useLabeledPRs } from './hooks/useLabeledPRs.js';
 import { useAuthoredPRs } from './hooks/useAuthoredPRs.js';
@@ -94,6 +95,10 @@ export function App() {
     // owner='local' + repo=<shortName> (which is also a localRepos key).
     repoPathFor: (target) => APP_CONFIG.localRepos?.[target.repo],
   });
+  // Conflict-resolution state — distinct from claudeResponses so the
+  // ClaudeBadge never reads this activity (per the user's "don't count
+  // toward the Claude badge" rule).
+  const conflictResolutions = useConflictResolutions();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [memberFilter, setMemberFilter] = useState<Set<string> | null>(null);
@@ -379,6 +384,45 @@ export function App() {
       return next;
     });
   }, []);
+
+  /** Fire the server-side conflict-resolution flow and patch list state.
+   * Used by both the row's ConflictBadge click and the drawer footer's
+   * "Try again" button. Returns nothing — UI reads state via
+   * conflictResolutions.stateFor. */
+  const resolveConflicts = useCallback(async (id: Identity) => {
+    const repoPath = APP_CONFIG.localRepos?.[id.repo];
+    if (!repoPath) {
+      addToast('error', `Configure localRepos["${id.repo}"] in config.local.ts to auto-resolve conflicts`);
+      return;
+    }
+    if (!conflictResolutions.start(id)) return; // concurrent click; already running
+    const prRef = `${id.owner}/${id.repo}#${id.number}`;
+    try {
+      const result = await api.resolveConflicts(id.owner, id.repo, id.number, { repoPath });
+      conflictResolutions.finishOk(id, result.commitSha);
+      addToast('success', `Resolved conflicts on ${prRef} — pushed ${result.commitSha.slice(0, 8)}`);
+      // Refresh the PR's meta so hasConflicts flips false on the row + drawer.
+      try {
+        const fresh = await api.getPullRequest(id.owner, id.repo, id.number, { fresh: true });
+        handleMetaLoaded(id, fresh);
+        // GitHub eventual consistency — re-fetch in 2s in case the push
+        // hasn't propagated yet.
+        setTimeout(async () => {
+          try {
+            const f2 = await api.getPullRequest(id.owner, id.repo, id.number, { fresh: true });
+            handleMetaLoaded(id, f2);
+          } catch { /* row will catch up on next auto-refresh */ }
+        }, 2000);
+      } catch { /* meta refetch is best-effort; the success state is already shown */ }
+    } catch (e) {
+      const err = e as ApiCallError;
+      const code = (err as ApiCallError & { code?: string }).code;
+      // Server may return a structured body for known errors (files list, etc.)
+      // — surface the message verbatim so the user can copy/paste filenames.
+      conflictResolutions.finishErr(id, err.message ?? String(e), code);
+      addToast('error', `Conflict resolution failed for ${prRef}: ${err.message ?? 'unknown error'}`);
+    }
+  }, [addToast, conflictResolutions, handleMetaLoaded]);
 
   const refreshAll = useCallback(async () => {
     if (refreshing) return;
@@ -719,6 +763,11 @@ export function App() {
         mode={mode}
         onOpen={setCurrent}
         claudeStateFor={claudeResponses.aggregateFor}
+        // ConflictBadge becomes interactive when a click handler is wired —
+        // we always pass these so any conflicting PR can be resolved from
+        // the row, regardless of tab.
+        conflictStateFor={(t) => conflictResolutions.stateFor(t)}
+        onResolveConflicts={(t) => resolveConflicts({ ...t })}
         // Only on the My PRs tab — those are PRs the viewer can typically merge.
         // Fire-and-forget toggle: optimistically flip the row, toast on failure.
         showCopyLink={tab === 'mine'}
@@ -822,6 +871,9 @@ export function App() {
             localClaudeThreads={claudeResponses.localThreadsForPR(current)}
             onAskInlineClaudeForLine={(anchor, draft) => claudeResponses.askInLocalThread(current, anchor, draft)}
             onDismissLocalClaudeThread={(anchor) => claudeResponses.dismissLocalThread(current, anchor)}
+            conflictResolution={conflictResolutions.stateFor(current)}
+            onResolveConflicts={() => resolveConflicts(current)}
+            onDismissConflictResolution={() => conflictResolutions.dismiss(current)}
           />
         );
       })()}

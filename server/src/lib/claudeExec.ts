@@ -23,6 +23,15 @@ export interface ClaudeExecOptions {
    * being reviewed (e.g. `~/workspace/zenpayroll`) instead of the connor-review
    * server dir. Caller is responsible for validating the path. */
   cwd?: string;
+  /** Restrict Claude to a specific set of tools (e.g. ['Read', 'Edit']) via
+   * the CLI's `--allowedTools` flag. Used by the conflict-resolution route to
+   * make sure Claude can't run arbitrary shell / git commands. Empty/undefined
+   * leaves the default allowlist (everything) in place. */
+  allowedTools?: string[];
+  /** Pass `--permission-mode <mode>` so the CLI applies edits non-interactively.
+   * Set to 'acceptEdits' for batch/headless flows where blocking on per-edit
+   * prompts would deadlock. */
+  permissionMode?: 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions';
 }
 
 /** Shells out to the user's local `claude` CLI in non-interactive mode and
@@ -35,8 +44,15 @@ export interface ClaudeExecOptions {
  */
 export function claudeExec(prompt: string, opts: ClaudeExecOptions = {}): Promise<string> {
   const timeoutMs = opts.timeoutMs ?? 300_000;
+  const args = ['-p'];
+  if (opts.allowedTools && opts.allowedTools.length > 0) {
+    args.push('--allowedTools', opts.allowedTools.join(','));
+  }
+  if (opts.permissionMode) {
+    args.push('--permission-mode', opts.permissionMode);
+  }
   return new Promise((resolve, reject) => {
-    const child = execFile('claude', ['-p'], { maxBuffer: 50 * 1024 * 1024, timeout: timeoutMs, cwd: opts.cwd }, (err, stdout, stderr) => {
+    const child = execFile('claude', args, { maxBuffer: 50 * 1024 * 1024, timeout: timeoutMs, cwd: opts.cwd }, (err, stdout, stderr) => {
       if (err) {
         const stderrStr = stderr.toString();
         const errno = (err as NodeJS.ErrnoException).code;

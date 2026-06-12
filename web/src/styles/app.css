@@ -330,11 +330,33 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 /* Merge-conflict signal. Amber/orange so it doesn't compete with the red
  * Closed circle visually but still reads as "warning". Row variant is an
  * 18px circle (matches Draft/Closed); header variant is a labeled pill so
- * the drawer makes the conflict state unmistakable. */
+ * the drawer makes the conflict state unmistakable. The pill is clickable
+ * when the parent passes onClick, so we strip native button chrome
+ * (background, padding) and put the cursor in pointer mode for that case. */
 .gh-status-conflict { color: #d29922; }
-.gh-status-conflict-icon { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid currentColor; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.gh-status-conflict-icon { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid currentColor; display: inline-flex; align-items: center; justify-content: center; line-height: 1; background: transparent; font: inherit; }
 .gh-status-conflict-icon svg { display: block; }
-.gh-status-conflict-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; }
+.gh-status-conflict-icon .loading-spinner { width: 10px; height: 10px; border-width: 1.5px; margin: 0; color: currentColor; }
+.gh-status-conflict-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; background: transparent; font: inherit; color: #d29922; }
+.gh-status-conflict-pill .loading-spinner { width: 10px; height: 10px; border-width: 1.5px; margin: 0; color: currentColor; }
+button.gh-status-conflict-icon:not(:disabled):hover,
+button.gh-status-conflict-pill:not(:disabled):hover { background: rgba(210, 153, 34, 0.12); cursor: pointer; }
+button.gh-status-conflict-icon:disabled,
+button.gh-status-conflict-pill:disabled { cursor: progress; opacity: 0.85; }
+
+/* Drawer-level conflict-resolution card. Slots between the Claude chat
+ * panel and the Conversations list. Persistent: a failed entry survives
+ * drawer reopens until the user dismisses it. */
+.conflict-card { margin: 12px 16px; border-radius: 8px; padding: 12px 14px; border: 1px solid var(--border); background: var(--bg-subtle); }
+.conflict-card-failed { border-color: #f85149; background: rgba(248, 81, 73, 0.06); }
+.conflict-card-running { border-color: #d29922; background: rgba(210, 153, 34, 0.06); }
+.conflict-card-success { border-color: var(--ok); background: rgba(31, 136, 61, 0.06); }
+.conflict-card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.conflict-card-header h3 { margin: 0; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+.conflict-card-actions { display: inline-flex; gap: 6px; }
+.conflict-card-retry, .conflict-card-dismiss { font-size: 12px; padding: 4px 10px; }
+.conflict-card-body { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.conflict-card-error { margin: 8px 0 0; padding: 8px; background: var(--bg); border-radius: 4px; font-size: 11px; line-height: 1.4; white-space: pre-wrap; overflow-x: auto; max-height: 200px; }
 .gh-status-changes-requested { color: #d29922; }
 .gh-status-merged { color: #a371f7; }
 .gh-status-closed { color: #f85149; }

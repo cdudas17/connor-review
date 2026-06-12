@@ -136,6 +136,24 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
+  /** Ask the server to auto-resolve this PR's merge conflicts in a local
+   * worktree, gate the result through safety checks, and push back to
+   * GitHub. `repoPath` must point at the local clone — derive from
+   * APP_CONFIG.localRepos. Server returns `{ ok, commitSha }` on success
+   * or one of the documented error codes (LEFTOVER_MARKERS,
+   * OVERCOMMIT_DETECTED, PUSH_FAILED, CLAUDE_NOT_INSTALLED, etc.). */
+  resolveConflicts(
+    owner: string,
+    repo: string,
+    number: number,
+    body: { repoPath: string },
+  ): Promise<{ ok: true; commitSha: string; trivial?: boolean }> {
+    return call(`/api/pulls/${owner}/${repo}/${number}/resolve-conflicts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
   /** The viewer's open GitHub issues (assigned + authored, most-recent first).
    * Pass `owner` (e.g. 'Gusto') to scope the search to a single GitHub org/user. */
   getMyIssues(opts?: { scope?: 'assigned' | 'authored' | 'either'; limit?: number; owner?: string }): Promise<{

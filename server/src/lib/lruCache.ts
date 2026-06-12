@@ -22,4 +22,6 @@ export class LRUCache<K, V> {
   }
 
   clear(): void { this.map.clear(); }
+
+  delete(key: K): void { this.map.delete(key); }
 }

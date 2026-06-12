@@ -14,6 +14,10 @@ interface Props {
   latestGhStatus?: GhStatus | null;
   latestCiStatus?: CiStatus;
   latestCiUrl?: string | null;
+  /** Conflict-resolution state + click handler for the header ConflictBadge.
+   * When `onResolveConflicts` is set the badge becomes a button. */
+  conflictState?: 'idle' | 'running' | 'failed' | undefined;
+  onResolveConflicts?: () => void;
 }
 
 function CopyIcon({ size = 14 }: { size?: number }) {
@@ -32,7 +36,7 @@ function CheckIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl }: Props) {
+export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl, conflictState, onResolveConflicts }: Props) {
   const status = latestGhStatus ?? computeGhStatus(meta);
   const ci = latestCiStatus !== undefined ? latestCiStatus : meta.ciStatus;
   const ciUrl = latestCiUrl !== undefined ? latestCiUrl : meta.ciUrl;
@@ -52,7 +56,12 @@ export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl }: 
     <header className="pr-header">
       <div className="pr-header-title">
         <h2>{meta.title}</h2>
-        <ConflictBadge hasConflicts={meta.mergeable === 'CONFLICTING'} variant="header" />
+        <ConflictBadge
+          hasConflicts={meta.mergeable === 'CONFLICTING'}
+          variant="header"
+          state={conflictState}
+          onClick={onResolveConflicts}
+        />
         <GhStatusBadge status={status} />
         <CiBadge status={ci} url={ciUrl} />
       </div>
