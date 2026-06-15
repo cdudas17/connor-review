@@ -221,6 +221,9 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 /* :shortcode: emoji autocomplete dropdown */
 .emoji-textarea { position: relative; }
 .emoji-suggestions { position: absolute; z-index: 70; margin: 0; padding: 4px; list-style: none; min-width: 240px; max-width: 320px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
+/* @-mention variant: same chrome as emoji popup, just tints the "@" prefix
+ * column in the accent colour so it reads as a different mode at a glance. */
+.emoji-suggestions-mention .emoji-suggestion-emoji { color: var(--accent); font-weight: 600; }
 .emoji-suggestions li { margin: 0; }
 .emoji-suggestion { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 10px; border: none; border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; font: inherit; font-size: 0.9rem; text-align: left; }
 .emoji-suggestion-active, .emoji-suggestion:hover { background: var(--accent); color: #fff; }

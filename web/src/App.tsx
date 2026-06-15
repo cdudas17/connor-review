@@ -18,6 +18,7 @@ import { useTrackedPRs } from './hooks/useTrackedPRs.js';
 import { useClaudeResponses } from './hooks/useClaudeResponses.js';
 import { useConflictResolutions } from './hooks/useConflictResolutions.js';
 import { useCiFixes } from './hooks/useCiFixes.js';
+import { MentionsProvider } from './contexts/MentionsContext.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
 import { useLabeledPRs } from './hooks/useLabeledPRs.js';
 import { useAuthoredPRs } from './hooks/useAuthoredPRs.js';
@@ -545,6 +546,7 @@ export function App() {
   const untouchedCount = (list: TrackedPR[]) => list.filter((p) => p.status === 'untouched').length;
 
   return (
+    <MentionsProvider value={teamPRs.members}>
     <main className="app">
       <header className="app-header">
         <h1>Connor Review</h1>
@@ -953,5 +955,6 @@ export function App() {
       <IssuesFab />
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </main>
+    </MentionsProvider>
   );
 }
