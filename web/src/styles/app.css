@@ -299,7 +299,10 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 /* Local 'approved' is rendered as a naked green check (same glyph as the
  * GH-side approved badge) — strip the pill chrome inherited from
  * .status-badge so the icon sits clean next to its neighbours. */
-.status-approved-icon { border: none; padding: 0; background: transparent; display: inline-flex; align-items: center; line-height: 1; }
+/* Match the GH-side approved icon's green (#3fb950) so the local + GH approved
+ * checks read as the same signal when both are present. `.status-approved`'s
+ * darker --ok stays for the pill variant; only the icon variant is overridden. */
+.status-approved-icon { border: none; padding: 0; background: transparent; color: #3fb950 !important; display: inline-flex; align-items: center; line-height: 1; }
 .status-approved-icon svg { display: block; }
 /* Local 'reviewed' is a comment glyph inside an outlined blue circle —
  * 18×18 to match the Claude badge so the trailing cluster reads as a row of
