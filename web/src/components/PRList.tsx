@@ -161,8 +161,12 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictS
               {/* StatusBadge returns null for 'untouched' (the default state),
                   so this just renders Reviewed / Approved chips when set. Sits
                   to the left of CI so my own state on the PR is the first
-                  signal in the cluster. */}
-              <StatusBadge status={p.status} />
+                  signal in the cluster. Suppress the local 'approved' badge
+                  when GitHub already shows its own approved check — otherwise
+                  the row renders two identical green checks. */}
+              {!(p.status === 'approved' && p.ghStatus === 'approved') && (
+                <StatusBadge status={p.status} />
+              )}
               <CiBadge status={p.ciStatus} url={p.ciUrl} />
               {p.ghStatus !== 'draft' && p.ghStatus !== 'closed' && p.ghStatus !== 'approved' && (
                 <GhStatusBadge status={p.ghStatus} />
