@@ -1254,17 +1254,39 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       // install passes without mutating the user's persistent trust store.
       // Honours their existing trusted paths too.
       const trustedPaths = [worktreePath, process.env.MISE_TRUSTED_CONFIG_PATHS].filter(Boolean).join(':');
-      const childEnv = { ...process.env, MISE_TRUSTED_CONFIG_PATHS: trustedPaths };
+      const childEnv = {
+        ...process.env,
+        MISE_TRUSTED_CONFIG_PATHS: trustedPaths,
+        // yarn classic and npm interactive prompts (e.g. "Are you sure you
+        // want to overwrite…?") can hang the install. CI=1 + the explicit
+        // env vars below make every tool we shell out to assume it's running
+        // headless and skip prompts.
+        CI: '1',
+        YARN_ENABLE_HARDENED_MODE: '0',
+        FORCE_COLOR: '0',
+        npm_config_yes: 'true',
+      };
       const runShell = (cmd: string, label: string, timeoutMs: number): Promise<void> => {
         return new Promise((res, rej) => {
           // `-il` keeps the env close to a real terminal so mise/rbenv hooks
           // fire. Stdin is closed below so even an interactive shell can't
           // hang waiting for input.
-          const child = execFile(userShell, ['-ilc', cmd], { cwd: worktreePath, env: childEnv, timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024 }, (err, _stdout, stderr) => {
+          const child = execFile(userShell, ['-ilc', cmd], { cwd: worktreePath, env: childEnv, timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
             if (err) {
               const killed = (err as NodeJS.ErrnoException & { killed?: boolean }).killed;
-              const tail = stderr?.toString().trim().slice(-2000) || (err as Error).message;
-              rej(new Error(`${label} ${killed ? 'timed out' : 'failed'}: ${tail}`));
+              const exitCode = (err as NodeJS.ErrnoException & { code?: number | string }).code;
+              // Combine stdout + stderr so we see the real error even when the
+              // tool prints failures to stdout (yarn 1 does this with --silent;
+              // sorbet does it too). Keep the last 2000 chars of each.
+              const stderrTail = (stderr?.toString().trim() ?? '').slice(-2000);
+              const stdoutTail = (stdout?.toString().trim() ?? '').slice(-2000);
+              const tail = [stderrTail && `stderr:\n${stderrTail}`, stdoutTail && `stdout:\n${stdoutTail}`].filter(Boolean).join('\n\n');
+              const explanation = killed
+                ? 'timed out'
+                : typeof exitCode === 'number'
+                  ? `exited ${exitCode}`
+                  : 'failed';
+              rej(new Error(`${label} ${explanation}\n  cmd: ${cmd}\n${tail || (err as Error).message}`));
               return;
             }
             res();
@@ -1278,9 +1300,13 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         catch (e) { installErrors.push((e as Error).message); }
       }
       if (hasPackageJson) {
+        // Dropped `--silent` — it swallowed the actual yarn error in the
+        // user's last attempt and left us with no signal. yarn classic and
+        // berry both accept plain `yarn install` (no flags), so use that.
+        // CI=1 (above) is what makes yarn pick its non-interactive mode.
         const installCmd = hasYarnLock
-          ? 'yarn install --non-interactive --silent'
-          : 'npm install --no-audit --no-fund --silent';
+          ? 'yarn install'
+          : 'npm install --no-audit --no-fund';
         try { await runShell(installCmd, 'yarn/npm install', 15 * 60_000); }
         catch (e) { installErrors.push((e as Error).message); }
       }
