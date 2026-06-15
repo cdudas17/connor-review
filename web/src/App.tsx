@@ -48,6 +48,13 @@ function describeApiError(err: ApiCallError, what: string): string {
   if (err.code === 'RATE_LIMITED' || err.status === 429) {
     return `${what}: hit GitHub's rate limit. Auto-refresh paused for 10 minutes; manual refresh still works.`;
   }
+  // GitHub's GraphQL backend returns 504 when our search query is too heavy
+  // for it to compute in time — common for large team PR lists. The raw `gh`
+  // CLI message is unactionable; rephrase to something the user can do
+  // something about.
+  if (/\bHTTP 504\b/i.test(err.message) || /couldn't respond to your request in time/i.test(err.message)) {
+    return `${what}: GitHub timed out (HTTP 504) — this query is heavy on their backend. The list will retry on the next auto-refresh; you can also hit Refresh manually.`;
+  }
   return `${what}: ${err.message}`;
 }
 

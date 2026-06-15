@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import yaml from 'js-yaml';
-import { ghExec } from '../lib/ghExec.js';
+import { ghExec, GhCliError } from '../lib/ghExec.js';
 import { TEAM_PR_SEARCH_QUERY } from '../queries/teamPRs.graphql.js';
 import { extractBuildkiteCheckUrl, detectTrunkInQueue } from '../lib/ciUrl.js';
 
@@ -9,17 +9,40 @@ import { extractBuildkiteCheckUrl, detectTrunkInQueue } from '../lib/ciUrl.js';
  * (e.g. the team-PR search when the auto-refresh tick races with a manual
  * Refresh) and to avoid hammering GitHub during a flurry of requests.
  */
+/** Two-tier cache:
+ *   - `get(k)` returns a value while it's fresh (within ttlMs).
+ *   - `getStale(k)` returns the value while it's still in the stale window
+ *     (within ttlMs + staleMs). Used as a fallback when an upstream refetch
+ *     fails transiently — better to serve slightly old data than blank the
+ *     page on a GitHub 504.
+ *   - Entries are dropped entirely only after both windows elapse, on the
+ *     next access. */
 class TtlCache<V> {
-  private readonly map = new Map<string, { value: V; expiresAt: number }>();
-  constructor(private readonly ttlMs: number) {}
+  private readonly map = new Map<string, { value: V; freshUntil: number; staleUntil: number; savedAt: number }>();
+  constructor(private readonly ttlMs: number, private readonly staleMs: number = 30 * 60_000) {}
   get(key: string): V | undefined {
     const hit = this.map.get(key);
     if (!hit) return undefined;
-    if (Date.now() > hit.expiresAt) { this.map.delete(key); return undefined; }
+    if (Date.now() > hit.staleUntil) { this.map.delete(key); return undefined; }
+    if (Date.now() > hit.freshUntil) return undefined; // expired but still in stale window
     return hit.value;
   }
+  /** Returns the value if it exists at all (fresh OR stale), and the age in ms.
+   * Callers use this to fall back when the upstream refetch fails. */
+  getStale(key: string): { value: V; ageMs: number } | undefined {
+    const hit = this.map.get(key);
+    if (!hit) return undefined;
+    if (Date.now() > hit.staleUntil) { this.map.delete(key); return undefined; }
+    return { value: hit.value, ageMs: Date.now() - hit.savedAt };
+  }
   set(key: string, value: V): void {
-    this.map.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+    const now = Date.now();
+    this.map.set(key, {
+      value,
+      freshUntil: now + this.ttlMs,
+      staleUntil: now + this.ttlMs + this.staleMs,
+      savedAt: now,
+    });
   }
   clear(): void { this.map.clear(); }
 }
@@ -109,10 +132,11 @@ async function _fetchTalentMembersFresh(repo: string, path: string): Promise<str
   return members.filter((m) => typeof m === 'string' && m.length > 0);
 }
 
-/** GitHub search caps `first` at 100. Active teams routinely exceed that, so we
- * paginate. 5 pages = 500 PRs — well above any realistic open-PR backlog for
- * one team, but bounded so a misconfigured query doesn't loop forever. */
-const MAX_SEARCH_PAGES = 5;
+/** We page in chunks of 50 (see TEAM_PR_SEARCH_QUERY — reduced from 100 to
+ * lighten the per-request load on GitHub's GraphQL layer). 10 pages = 500
+ * PRs, same upper bound as before, bounded so a misconfigured query doesn't
+ * loop forever. */
+const MAX_SEARCH_PAGES = 10;
 
 interface SearchNode {
   id: string;
@@ -232,11 +256,23 @@ export async function registerTeamRoutes(app: FastifyInstance) {
         const cached = teamSearchCache.get(cacheKey);
         if (cached) return cached;
       }
-      const members = await fetchTalentMembers(repo, path, { fresh });
-      const prs = await searchTeamPRs(members);
-      const result = { members, prs };
-      teamSearchCache.set(cacheKey, result);
-      return result;
+      try {
+        const members = await fetchTalentMembers(repo, path, { fresh });
+        const prs = await searchTeamPRs(members);
+        const result = { members, prs };
+        teamSearchCache.set(cacheKey, result);
+        return result;
+      } catch (err) {
+        // Transient upstream failure (HTTP 504 from GitHub being the common
+        // one for big team searches). Fall back to a stale cache entry if we
+        // have one — better to show the user yesterday's data with a notice
+        // than a blank page.
+        const stale = teamSearchCache.getStale(cacheKey);
+        if (stale && err instanceof GhCliError) {
+          return { ...stale.value, stale: true, staleAgeMs: stale.ageMs, staleReason: err.code };
+        }
+        throw err;
+      }
     },
   );
 
@@ -258,7 +294,16 @@ export async function registerTeamRoutes(app: FastifyInstance) {
         if (cached) return cached;
       }
       const q = ['is:pr', 'is:open', `author:${author}`].join(' ');
-      const nodes = await searchAllPages(q);
+      let nodes: SearchNode[];
+      try {
+        nodes = await searchAllPages(q);
+      } catch (err) {
+        const stale = authoredCache.getStale(author);
+        if (stale && err instanceof GhCliError) {
+          return { ...stale.value, stale: true, staleAgeMs: stale.ageMs, staleReason: err.code };
+        }
+        throw err;
+      }
       const prs: TeamPR[] = nodes
         // Keep drafts and approved-but-unmerged — author still owns the next move.
         .filter((n) => n && n.id && !n.merged && n.state === 'OPEN')
@@ -307,7 +352,16 @@ export async function registerTeamRoutes(app: FastifyInstance) {
       }
       // No draft filter — caller filters drafts vs ready-for-review client-side.
       const q = ['is:pr', 'is:open', `label:"${label}"`].join(' ');
-      const nodes = await searchAllPages(q);
+      let nodes: SearchNode[];
+      try {
+        nodes = await searchAllPages(q);
+      } catch (err) {
+        const stale = labeledCache.getStale(label);
+        if (stale && err instanceof GhCliError) {
+          return { ...stale.value, stale: true, staleAgeMs: stale.ageMs, staleReason: err.code };
+        }
+        throw err;
+      }
       const prs: TeamPR[] = nodes
         // Keep drafts for the oncall workflow — they are the ones that need triaging.
         .filter((n) => n && n.id && !n.merged && n.state === 'OPEN' && n.reviewDecision !== 'APPROVED')
