@@ -35,6 +35,11 @@ interface Identity {
 const noopAsync = async (_c: StagedInlineComment): Promise<void> => { /* local entries can't post inline comments */ };
 const noopReply = async (_threadId: string, _body: string): Promise<void> => { /* local entries have no threads */ };
 
+/** Global drawer preference: show vs. hide all review + Claude comments.
+ * Persisted as a single boolean (`'1'` / `'0'`) — applies to every PR until
+ * the user flips it again. */
+const COMMENTS_VISIBLE_STORAGE_KEY = 'connor-review.commentsVisible.v1';
+
 /** Material-design "refresh" icon. Defined inline using the EXACT same JSX
  * shape as CopyIcon / ChevronRightIcon in this codebase (numeric size prop,
  * 24×24 viewBox, single filled path) so it renders at the same fidelity. */
@@ -123,11 +128,20 @@ export function ReviewDrawer(props: Props) {
   // because computeDiffStats is a linear scan over the raw diff string.
   const diffStats = useMemo(() => computeDiffStats(diff), [diff]);
   const [summary, setSummary] = useState('');
-  // Show / hide all review + Claude comments in the drawer. Defaults to
-  // visible; the eye-icon toggle in the footer flips this for the current
-  // drawer session. Resets to visible when the user switches PRs (see effect
-  // below) so a hidden-state in PR A doesn't carry into PR B by surprise.
-  const [commentsVisible, setCommentsVisible] = useState(true);
+  // Show / hide all review + Claude comments in the drawer. Global preference
+  // — flipping it in any PR carries through to every other PR and survives
+  // page reloads via localStorage.
+  const [commentsVisible, setCommentsVisible] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem(COMMENTS_VISIBLE_STORAGE_KEY);
+      // Default to visible when no preference is stored.
+      return raw == null ? true : raw === '1';
+    } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(COMMENTS_VISIBLE_STORAGE_KEY, commentsVisible ? '1' : '0'); }
+    catch { /* quota / non-browser env — preference falls back to in-memory only */ }
+  }, [commentsVisible]);
   const drawerRef = useRef<HTMLElement | null>(null);
 
   /** Fire `reload()` now, then again ~2s later. GitHub's GraphQL has
@@ -146,11 +160,10 @@ export function ReviewDrawer(props: Props) {
 
   // When the drawer's PR changes (after Approve / Reviewed / nav arrows), reset
   // the scroll position so the new diff opens at the top instead of inheriting
-  // the previous PR's scroll. Also reset the comments-visible toggle so a
-  // hidden state from PR A doesn't carry into PR B by surprise.
+  // the previous PR's scroll. The comments-visible toggle is intentionally NOT
+  // reset here — it's a global preference (see COMMENTS_VISIBLE_STORAGE_KEY).
   useEffect(() => {
     if (drawerRef.current) drawerRef.current.scrollTop = 0;
-    setCommentsVisible(true);
   }, [current?.owner, current?.repo, current?.number]);
 
   // Reset summary draft when switching PRs.
