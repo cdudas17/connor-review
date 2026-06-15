@@ -475,7 +475,17 @@ export function App() {
     } catch (e) {
       const err = e as ApiCallError;
       const code = (err as ApiCallError & { code?: string }).code;
-      ciFixes.finishErr(id, err.message ?? String(e), code);
+      // Many of these errors (INSTALL_FAILED, PUSH_FAILED, …) carry the
+      // actionable stderr in `payload.details` / `payload.stderr`. Fold it
+      // into the persisted error so the user sees it in the drawer card
+      // instead of only the high-level toast message.
+      const detailsRaw = (err.payload && (err.payload.details || err.payload.stderr)) as unknown;
+      const detailsText = Array.isArray(detailsRaw) ? detailsRaw.join('\n\n')
+        : (typeof detailsRaw === 'string' && detailsRaw ? detailsRaw : '');
+      const fullError = detailsText
+        ? `${err.message ?? 'unknown error'}\n\n${detailsText}`
+        : err.message ?? String(e);
+      ciFixes.finishErr(id, fullError, code);
       addToast('error', `CI fix failed for ${prRef}: ${err.message ?? 'unknown error'}`);
     }
   }, [addToast, ciFixes, handleMetaLoaded]);

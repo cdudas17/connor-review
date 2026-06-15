@@ -1240,19 +1240,28 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       const hasGemfile = existsSync(resolvePath(worktreePath, 'Gemfile'));
       const hasPackageJson = existsSync(resolvePath(worktreePath, 'package.json'));
       const hasYarnLock = existsSync(resolvePath(worktreePath, 'yarn.lock'));
-      const { exec } = await import('node:child_process');
+      const { execFile } = await import('node:child_process');
+      // Use the user's login shell so per-project tool managers (mise / rbenv
+      // / nvm / volta / asdf) activate before we run `bundle` / `yarn`. Without
+      // this, Node's spawned env has a minimal PATH and `bundle install`
+      // fails with "command not found" or picks the wrong Ruby. `-l` sources
+      // login files; `-i` sources interactive files (.zshrc / .bashrc), which
+      // is where most tool managers register themselves on macOS.
+      const userShell = process.env.SHELL ?? '/bin/zsh';
       const runShell = (cmd: string, label: string, timeoutMs: number): Promise<void> => {
         return new Promise((res, rej) => {
-          const child = exec(cmd, { cwd: worktreePath, timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024 }, (err, _stdout, stderr) => {
+          // `-il` keeps the env close to a real terminal so mise/rbenv hooks
+          // fire. Stdin is closed below so even an interactive shell can't
+          // hang waiting for input.
+          const child = execFile(userShell, ['-ilc', cmd], { cwd: worktreePath, timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024 }, (err, _stdout, stderr) => {
             if (err) {
               const killed = (err as NodeJS.ErrnoException & { killed?: boolean }).killed;
-              rej(new Error(`${label} ${killed ? 'timed out' : 'failed'}: ${stderr?.toString().trim().slice(0, 800) || (err as Error).message}`));
+              const tail = stderr?.toString().trim().slice(-2000) || (err as Error).message;
+              rej(new Error(`${label} ${killed ? 'timed out' : 'failed'}: ${tail}`));
               return;
             }
             res();
           });
-          // Detach from any interactive stdin so installers can't hang on
-          // a prompt that we'd never answer.
           child.stdin?.end();
         });
       };

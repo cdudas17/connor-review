@@ -1,7 +1,15 @@
 import type { PullRequestMeta, ReviewEvent, StagedInlineComment, TeamPR } from '../types.js';
 
 export class ApiCallError extends Error {
-  constructor(public code: string, message: string, public status: number) {
+  constructor(
+    public code: string,
+    message: string,
+    public status: number,
+    /** Whole error body the server returned — preserves fields like
+     * `details` / `files` / `stderr` that the route includes when its
+     * top-level `message` is too short to be actionable. */
+    public payload: Record<string, unknown> = {},
+  ) {
     super(message);
   }
 }
@@ -9,9 +17,9 @@ export class ApiCallError extends Error {
 async function call<T>(input: string, init?: RequestInit): Promise<T> {
   const res = await fetch(input, init);
   if (!res.ok) {
-    let payload: { code?: string; message?: string } = {};
+    let payload: { code?: string; message?: string } & Record<string, unknown> = {};
     try { payload = await res.json(); } catch { /* ignore */ }
-    throw new ApiCallError(payload.code ?? 'UNKNOWN', payload.message ?? res.statusText, res.status);
+    throw new ApiCallError(payload.code ?? 'UNKNOWN', payload.message ?? res.statusText, res.status, payload);
   }
   const contentType = res.headers.get('content-type') ?? '';
   return contentType.includes('application/json') ? (res.json() as Promise<T>) : ((await res.text()) as unknown as T);
