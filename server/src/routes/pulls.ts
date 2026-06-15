@@ -15,6 +15,7 @@ import { ENABLE_AUTO_MERGE_MUTATION, DISABLE_AUTO_MERGE_MUTATION } from '../quer
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 
 type CiStatus = 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED' | null;
 
@@ -940,6 +941,29 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         return;
       }
 
+      // 6.5) Pre-Claude snapshot: hash the current contents of every file the
+      // merge touched (conflict files + auto-merged files + custom-driver
+      // results). After Claude runs we compare hashes for the NON-conflict
+      // subset — any drift there is over-commit by Claude. Git's own merge
+      // resolutions (renames, Gemfile.lock driver, etc.) are captured in this
+      // snapshot, so they don't false-positive.
+      const conflictSet = new Set(conflictFiles);
+      const statusOutPre = await gitExec(['status', '--porcelain', '-z'], { cwd: worktreePath });
+      const mergeStatusPaths = new Set<string>(
+        statusOutPre.split('\0').filter(Boolean).map((r) => r.slice(3)),
+      );
+      const hashFile = (rel: string): string | null => {
+        const abs = resolvePath(worktreePath, rel);
+        if (!existsSync(abs)) return null;
+        try {
+          // Buffer mode: handles binary files (lockfiles, images) without
+          // throwing on invalid UTF-8.
+          return createHash('sha256').update(readFileSync(abs)).digest('hex');
+        } catch { return null; }
+      };
+      const preHashes = new Map<string, string | null>();
+      for (const p of mergeStatusPaths) preHashes.set(p, hashFile(p));
+
       // 7) Hand the conflict files to Claude.
       const prompt = [
         `You are resolving git merge conflicts in a local checkout of ${params.owner}/${params.repo}`,
@@ -1010,13 +1034,50 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         return;
       }
 
-      // Stage ONLY the conflict files. We deliberately never stage anything
-      // else — auto-merged files were already staged by `git merge`, and any
-      // other working-tree changes Claude may have made (intentional or not)
-      // are left behind in the worktree and discarded on cleanup. This makes
-      // it mechanically impossible for an over-touched file to enter the
-      // commit, regardless of what Claude did.
-      const conflictSet = new Set(conflictFiles);
+      // 9) Safety check #2 — content hash diff against the pre-Claude
+      // snapshot. For every file in the merge's status set that's NOT in the
+      // conflict set, the hash must be unchanged after Claude returns. Any
+      // drift means Claude modified a file outside the conflict set.
+      //
+      // This replaces the earlier `git diff-tree --cc` check, which
+      // false-positived on files git itself produced a non-trivial resolution
+      // for (rename + modify, Gemfile.lock / yarn.lock with custom merge
+      // drivers, .gitattributes merge=union, etc.). Those files DO end up in
+      // `--cc` even when Claude never touched them, because the combined diff
+      // reflects "differs from a clean three-way merge" — git's own
+      // resolutions qualify. Hash comparison is precise: git's resolutions
+      // are baked into the pre-snapshot, so they read as unchanged.
+      const overcommit: string[] = [];
+      for (const [path, preHash] of preHashes) {
+        if (conflictSet.has(path)) continue; // expected to differ — that's the resolution
+        const postHash = hashFile(path);
+        if (postHash !== preHash) overcommit.push(path);
+      }
+      // Belt-and-suspenders: Claude's allowed-tool list is Read/Edit only, so
+      // it shouldn't be able to create new files. But if a path appears in
+      // post-merge status that wasn't in the pre-Claude snapshot AND isn't a
+      // conflict file, flag it.
+      const statusOutPost = await gitExec(['status', '--porcelain', '-z'], { cwd: worktreePath });
+      for (const record of statusOutPost.split('\0').filter(Boolean)) {
+        const path = record.slice(3);
+        if (conflictSet.has(path)) continue;
+        if (mergeStatusPaths.has(path)) continue; // already covered by the hash diff above
+        overcommit.push(path);
+      }
+      if (overcommit.length > 0) {
+        reply.code(409).send({
+          code: 'OVERCOMMIT_DETECTED',
+          message: `Claude modified ${overcommit.length} file(s) outside the conflict set; aborting.`,
+          files: overcommit,
+        });
+        return;
+      }
+
+      // Stage ONLY the conflict files. Auto-merged files were already staged
+      // by `git merge`; any other working-tree changes Claude may have made
+      // are left in the worktree and discarded on cleanup. Combined with the
+      // hash check above, this makes it doubly hard for an over-touched file
+      // to enter the commit.
       await gitExec(['add', '--', ...conflictFiles], { cwd: worktreePath });
 
       // Commit the merge resolution. `--no-verify` skips pre-commit /
@@ -1028,17 +1089,17 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       // dev workflow, not on an auto-resolve merge commit.
       await gitExec(['commit', '--no-verify', '-m', `Resolve merge conflicts with ${baseRef}`], { cwd: worktreePath });
 
-      // Safety check #2 — commit shape.
+      // Safety check #3 — commit shape:
       //   a. exactly two parents (it's a real merge commit)
       //   b. first parent == pre-merge HEAD of the PR branch
-      //   c. the COMBINED diff (`diff-tree --cc`) — which only lists files
-      //      where the merge resolution differs from a clean three-way merge —
-      //      is a subset of the conflict file set.
       //
-      // Using `--cc` rather than the raw `diff-tree` is the load-bearing fix:
-      // a stale branch's clean auto-merge can touch thousands of files, none
-      // of which represent over-commit. The combined diff isolates *just* the
-      // bytes that came from a human (or Claude) judgement call.
+      // We deliberately do NOT verify the file set of the commit here — the
+      // combined-diff (`--cc`) approach false-positived on git's own
+      // non-trivial resolutions (custom merge drivers, renames). The content-
+      // hash check (#2 above) already catches Claude over-commit at the file
+      // level; this check exists to catch rebase-style mistakes where the
+      // commit doesn't have the expected merge shape (one new commit, two
+      // parents, the first being the PR's pre-merge HEAD).
       const parentsLine = (await gitExec(['rev-list', '--parents', '-n', '1', 'HEAD'], { cwd: worktreePath })).trim();
       const parts = parentsLine.split(/\s+/).filter(Boolean);
       const commitSha = parts[0] ?? '';
@@ -1051,18 +1112,6 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         reply.code(409).send({
           code: 'OVERCOMMIT_DETECTED',
           message: `Merge commit's first parent (${parents[0]}) doesn't match pre-merge HEAD (${preMergeHead})`,
-        });
-        return;
-      }
-      const combinedRaw = (await gitExec(['diff-tree', '--cc', '--no-commit-id', '--name-only', 'HEAD'], { cwd: worktreePath })).trim();
-      const combinedTouched = new Set(combinedRaw.split('\n').map((s) => s.trim()).filter(Boolean));
-      const unexpected: string[] = [];
-      for (const p of combinedTouched) if (!conflictSet.has(p)) unexpected.push(p);
-      if (unexpected.length > 0) {
-        reply.code(409).send({
-          code: 'OVERCOMMIT_DETECTED',
-          message: `Merge commit's combined diff includes ${unexpected.length} file(s) outside the conflict set.`,
-          files: unexpected,
         });
         return;
       }

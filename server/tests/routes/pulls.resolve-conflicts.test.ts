@@ -35,7 +35,7 @@ vi.mock('../../src/lib/claudeExec.js', () => {
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { buildServer } from '../../src/index.js';
 import { ghExec } from '../../src/lib/ghExec.js';
 import { gitExec, GitCliError } from '../../src/lib/gitExec.js';
@@ -78,26 +78,30 @@ function makeFakeRepo(): string {
 }
 
 /** Common gitExec dispatcher — pass cases for each subcommand. The test
- * supplies the expected post-Claude state via `conflictFiles` (what
- * `diff --name-only --diff-filter=U` will return) and `status` (what
- * `status --porcelain -z` will return). Override per-test as needed. */
+ * supplies the conflict set + the `git status --porcelain -z` output. The
+ * `worktreeFiles` option lets a test pre-populate the worktree with stub
+ * file contents so the route's pre-Claude hash snapshot can read them; by
+ * default, every conflict file is created with a marker stub. */
 function makeGitDispatch({
   worktreeDirs,
   conflictFiles,
   status,
+  worktreeFiles,
   parentsLine,
-  diffTree,
   pushFails,
   mergeFails,
 }: {
   worktreeDirs: string[]; // mutated: route pushes the worktree path into this array
   conflictFiles: string[];
   status: string; // NUL-separated `git status --porcelain -z` output
+  /** Map of relative-path → file content. Written into the worktree during
+   * `worktree add`. Defaults to one entry per conflict file with marker stub. */
+  worktreeFiles?: Record<string, string>;
   parentsLine?: string; // override `rev-list --parents -n 1 HEAD` output
-  diffTree?: string; // override `diff-tree --name-only` output (defaults to conflictFiles joined)
   pushFails?: boolean;
   mergeFails?: 'conflict' | 'hard' | false;
 }) {
+  const MARKER_STUB = '<<<<<<< HEAD\nstub HEAD\n=======\nstub base\n>>>>>>> base\n';
   return async (args: string[], _opts: { cwd?: string }) => {
     const cmd = args[0];
     if (cmd === 'fetch') return '';
@@ -106,6 +110,14 @@ function makeGitDispatch({
       const path = args[4];
       worktreeDirs.push(path);
       mkdirSync(path, { recursive: true });
+      // Pre-populate the worktree so the route's hash snapshot has files to
+      // read. Default: each conflict file gets a marker stub.
+      const files = worktreeFiles ?? Object.fromEntries(conflictFiles.map((f) => [f, MARKER_STUB]));
+      for (const [rel, content] of Object.entries(files)) {
+        const abs = join(path, rel);
+        mkdirSync(dirname(abs), { recursive: true });
+        writeFileSync(abs, content);
+      }
       return '';
     }
     if (cmd === 'worktree' && args[1] === 'remove') return '';
@@ -130,9 +142,6 @@ function makeGitDispatch({
     if (cmd === 'commit') return '[feature abc1234] Resolve merge conflicts with main\n';
     if (cmd === 'rev-list' && args.includes('--parents')) {
       return parentsLine ?? 'sha-merge sha-pre-merge sha-main\n';
-    }
-    if (cmd === 'diff-tree' && args.includes('--name-only')) {
-      return diffTree ?? conflictFiles.join('\n');
     }
     if (cmd === 'push') {
       if (pushFails) throw new GitCliError('GIT_FAILED', 'push rejected', 'rejected by remote');
@@ -245,22 +254,26 @@ describe('POST /api/pulls/:o/:r/:n/resolve-conflicts', () => {
     await app.close();
   });
 
-  it('OVERCOMMIT_DETECTED via combined diff: --cc reports a file outside the conflict set → 409, no push', async () => {
+  it('OVERCOMMIT_DETECTED via content hash: Claude modifies a non-conflict file → 409, no push', async () => {
     createdRepo = makeFakeRepo();
     mockedGh.mockResolvedValueOnce(META_RESPONSE);
-    // The merge commit's combined diff (--cc) reports README.md as having
-    // non-trivial resolution — that's our over-commit signal now. Auto-merged
-    // files don't appear here, only files where the merge result differs from
-    // a clean three-way merge.
+    // README.md is an auto-merged file (in status but NOT a conflict file).
+    // Pre-Claude snapshot hashes its known auto-merged content. Claude then
+    // touches BOTH the conflict file (allowed) AND README.md (over-commit).
     mockedGit.mockImplementation(makeGitDispatch({
       worktreeDirs: allWorktrees,
       conflictFiles: ['app/foo.rb'],
-      status: 'M  app/foo.rb\0',
-      diffTree: 'app/foo.rb\nREADME.md\n',
+      status: 'M  app/foo.rb\0M  README.md\0',
+      worktreeFiles: {
+        'app/foo.rb': '<<<<<<< HEAD\nstub\n=======\nbase\n>>>>>>> base\n',
+        'README.md': 'auto-merged content from git\n',
+      },
     }));
     mockedClaude.mockImplementation(async (_prompt: string, opts: { cwd: string }) => {
       mkdirSync(join(opts.cwd, 'app'), { recursive: true });
       writeFileSync(join(opts.cwd, 'app/foo.rb'), 'resolved\n');
+      // ⚠️ Claude touches a non-conflict file — over-commit.
+      writeFileSync(join(opts.cwd, 'README.md'), 'overwritten by Claude\n');
       return 'done\n';
     });
 
@@ -274,8 +287,9 @@ describe('POST /api/pulls/:o/:r/:n/resolve-conflicts', () => {
     expect(res.json().code).toBe('OVERCOMMIT_DETECTED');
     expect(res.json().files).toContain('README.md');
 
-    // Commit happened (we have to commit before we can check the merge shape),
-    // but no push.
+    // No commit, no push — over-commit caught before staging.
+    const commitCall = mockedGit.mock.calls.find(([a]) => Array.isArray(a) && a[0] === 'commit');
+    expect(commitCall).toBeUndefined();
     const pushCall = mockedGit.mock.calls.find(([a]) => Array.isArray(a) && a[0] === 'push');
     expect(pushCall).toBeUndefined();
     await app.close();
@@ -284,23 +298,63 @@ describe('POST /api/pulls/:o/:r/:n/resolve-conflicts', () => {
   it('does NOT false-positive on stale branches with thousands of auto-merged files', async () => {
     createdRepo = makeFakeRepo();
     mockedGh.mockResolvedValueOnce(META_RESPONSE);
-    // Simulates the bug we fixed: a stale branch where `git status` lists
-    // thousands of auto-merged paths in addition to the conflict files. The
-    // route used to compare this against the conflict set and abort. The
-    // combined-diff check (--cc) ignores auto-merged files, so this passes.
+    // Stale-branch repro: status lists thousands of auto-merged paths in
+    // addition to the conflict files. The content-hash check should ignore
+    // them since their hashes don't change between pre- and post-Claude.
     const conflictFiles = ['app/foo.rb'];
     const lotsOfAutoMerged = Array.from({ length: 3826 }, (_, i) => `unrelated/${i}.ts`);
     const status = [...conflictFiles, ...lotsOfAutoMerged].map((p) => `M  ${p}`).join('\0') + '\0';
+    // Pre-populate each auto-merged file with stable content so its hash is
+    // identical pre- and post-Claude.
+    const worktreeFiles: Record<string, string> = {
+      'app/foo.rb': '<<<<<<< HEAD\nstub\n=======\nbase\n>>>>>>> base\n',
+    };
+    for (const p of lotsOfAutoMerged) worktreeFiles[p] = `auto-merged ${p}\n`;
     mockedGit.mockImplementation(makeGitDispatch({
       worktreeDirs: allWorktrees,
       conflictFiles,
       status,
-      // --cc returns just the conflict file — clean auto-merges don't show.
-      diffTree: 'app/foo.rb\n',
+      worktreeFiles,
     }));
     mockedClaude.mockImplementation(async (_prompt: string, opts: { cwd: string }) => {
       mkdirSync(join(opts.cwd, 'app'), { recursive: true });
       writeFileSync(join(opts.cwd, 'app/foo.rb'), 'resolved\n');
+      return 'done\n';
+    });
+
+    const app = await buildServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/pulls/Gusto/zenpayroll/1/resolve-conflicts',
+      payload: { repoPath: createdRepo },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ok).toBe(true);
+    await app.close();
+  });
+
+  it('does NOT false-positive when git used a custom merge driver (--cc would have flagged it)', async () => {
+    // Concrete repro for the user's PR 348501 symptom: Gemfile.lock was
+    // auto-resolved by Bundler's merge driver, so it ends up in the merge
+    // commit's combined diff (--cc) even though Claude never touched it.
+    // The content-hash check should NOT flag it because the pre-Claude
+    // snapshot already captured the driver's output.
+    createdRepo = makeFakeRepo();
+    mockedGh.mockResolvedValueOnce(META_RESPONSE);
+    mockedGit.mockImplementation(makeGitDispatch({
+      worktreeDirs: allWorktrees,
+      conflictFiles: ['app/foo.rb'],
+      status: 'M  app/foo.rb\0M  Gemfile.lock\0M  app/bar/renamed.ts\0',
+      worktreeFiles: {
+        'app/foo.rb': '<<<<<<< HEAD\nstub\n=======\nbase\n>>>>>>> base\n',
+        'Gemfile.lock': 'BUNDLED WITH\n  2.5.0\n',
+        'app/bar/renamed.ts': 'export const foo = 1;\n',
+      },
+    }));
+    mockedClaude.mockImplementation(async (_prompt: string, opts: { cwd: string }) => {
+      mkdirSync(join(opts.cwd, 'app'), { recursive: true });
+      writeFileSync(join(opts.cwd, 'app/foo.rb'), 'resolved\n');
+      // Claude does NOT touch Gemfile.lock or the renamed file.
       return 'done\n';
     });
 
