@@ -40,6 +40,13 @@ interface Props {
   /** Flip `commentsVisible`. Optional — when omitted the toggle isn't rendered
    * (e.g. local-branch footer, which has no comments to hide). */
   onToggleComments?: () => void;
+  /** Fire the "Fix failing CI" flow. Only rendered when provided AND there are
+   * failing checks on the PR (gated by the parent). */
+  onFixCi?: () => void;
+  /** When true, the Fix CI button shows its loading state. */
+  ciFixRunning?: boolean;
+  /** Number of failing checks (drives the tooltip text). */
+  failingCheckCount?: number;
 }
 
 function ChevronLeftIcon() {
@@ -92,6 +99,7 @@ export function ReviewFooter({
   canSubmit, canReviewed, canPrev, canNextPR, finishLabel, onMarkReady,
   onAskClaude, claudeChatLoading, onToggleAutoMerge, autoMergeEnabled, mergeQueueQueued,
   commentsVisible, onToggleComments,
+  onFixCi, ciFixRunning, failingCheckCount,
 }: Props) {
   const [markingReady, setMarkingReady] = useState(false);
   const [togglingAutoMerge, setTogglingAutoMerge] = useState(false);
@@ -118,6 +126,17 @@ export function ReviewFooter({
             title="Move your draft into the Claude chat panel above and ask Claude — doesn't post to GitHub"
           >
             {claudeChatLoading ? 'Asking…' : 'Ask Claude'}
+          </button>
+        )}
+        {onFixCi && (
+          <button
+            type="button"
+            className="btn-fix-ci"
+            disabled={!!ciFixRunning}
+            onClick={onFixCi}
+            title={`Spin up a worktree, install deps, and ask Claude to fix the ${failingCheckCount ?? ''} failing CI check${failingCheckCount === 1 ? '' : 's'} on this PR`}
+          >
+            {ciFixRunning ? 'Fixing CI…' : `Fix CI${failingCheckCount ? ` (${failingCheckCount})` : ''}`}
           </button>
         )}
         <button type="button" disabled={!canReviewed} onClick={onReviewed}>Reviewed</button>

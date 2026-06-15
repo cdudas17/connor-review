@@ -29,6 +29,46 @@ export function extractBuildkiteCheckUrl(contexts: RollupContextNode[] | undefin
 }
 
 /**
+ * Flatten the heterogeneous rollup contexts array (CheckRun OR StatusContext)
+ * into a uniform shape. Used by the "Fix failing CI" flow to give Claude a
+ * list of failing checks. `isFailure` is true for any state we'd visually
+ * flag as red: FAILURE / ERROR / CANCELLED / TIMED_OUT / ACTION_REQUIRED.
+ */
+export function flattenCiContexts(
+  contexts: RollupContextNode[] | undefined | null,
+): Array<{ name: string; state: string | null; url: string | null; isFailure: boolean }> {
+  if (!Array.isArray(contexts)) return [];
+  return contexts.map((c) => {
+    const isCheckRun = c?.__typename === 'CheckRun';
+    if (isCheckRun) {
+      // For check runs, "conclusion" is the terminal state; "status" tells
+      // us whether the check is still in progress. We surface conclusion when
+      // the check is done, status otherwise.
+      const concluded = c.status === 'COMPLETED';
+      const state = concluded ? (c.conclusion ?? null) : (c.status ?? null);
+      return {
+        name: c.name ?? '',
+        state,
+        url: c.detailsUrl ?? null,
+        isFailure: concluded && (
+          state === 'FAILURE' ||
+          state === 'ACTION_REQUIRED' ||
+          state === 'CANCELLED' ||
+          state === 'TIMED_OUT' ||
+          state === 'STARTUP_FAILURE'
+        ),
+      };
+    }
+    return {
+      name: c?.context ?? '',
+      state: c?.state ?? null,
+      url: c?.targetUrl ?? null,
+      isFailure: c?.state === 'FAILURE' || c?.state === 'ERROR',
+    };
+  }).filter((x) => x.name);
+}
+
+/**
  * Detect whether this PR has an active Trunk merge-queue check run. Trunk's
  * GitHub app posts a check whose name starts with "Trunk" (typically
  * "Trunk Merge") and stays in QUEUED / IN_PROGRESS while the PR is parked in

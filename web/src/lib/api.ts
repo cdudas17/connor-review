@@ -151,6 +151,29 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
+  /** Ask the server to fix the PR's currently failing CI builds in a local
+   * worktree: install deps, hand the failing-check list to Claude with
+   * Read/Edit/Write/Bash, then commit + push the result. Server returns
+   * `{ ok, commitSha, filesChanged, failingChecksFixed }` on success,
+   * `{ ok, noFailures: true }` if CI was already green, `{ ok, noChanges: true }`
+   * if Claude concluded no edits were necessary, or one of the documented
+   * error codes (INSTALL_FAILED, CLAUDE_NOT_INSTALLED, PUSH_FAILED, etc.). */
+  fixCi(
+    owner: string,
+    repo: string,
+    number: number,
+    body: { repoPath: string },
+  ): Promise<
+    | { ok: true; commitSha: string; filesChanged: string[]; failingChecksFixed: string[]; noFailures?: undefined; noChanges?: undefined }
+    | { ok: true; noFailures: true }
+    | { ok: true; noChanges: true }
+  > {
+    return call(`/api/pulls/${owner}/${repo}/${number}/fix-ci`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
   /** Ask the server to auto-resolve this PR's merge conflicts in a local
    * worktree, gate the result through safety checks, and push back to
    * GitHub. `repoPath` must point at the local clone — derive from

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { ghExec, GhCliError } from '../lib/ghExec.js';
 import { LRUCache } from '../lib/lruCache.js';
 import { BadParamsError, parsePullParams } from '../lib/parseRouteParams.js';
-import { extractBuildkiteCheckUrl, detectTrunkInQueue } from '../lib/ciUrl.js';
+import { extractBuildkiteCheckUrl, detectTrunkInQueue, flattenCiContexts } from '../lib/ciUrl.js';
 import { PULL_REQUEST_QUERY } from '../queries/pullRequest.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_MUTATION } from '../queries/addPullRequestReview.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION } from '../queries/addPullRequestReviewThread.graphql.js';
@@ -35,6 +35,11 @@ interface PullRequestMeta {
   ciStatus: CiStatus;
   /** URL of the buildkite/zenpayroll check, if it exists on this PR. */
   ciUrl: string | null;
+  /** Every status-check-rollup context for the PR's head commit, flattened
+   * into a uniform shape. Powers the "Fix failing CI" flow — Claude needs
+   * the failing check names + their detail URLs to know what to reproduce
+   * locally. `isFailure` is true for any non-success terminal state. */
+  ciContexts: Array<{ name: string; state: string | null; url: string | null; isFailure: boolean }>;
   baseRefName: string;
   headRefName: string;
   headSha: string;
@@ -205,6 +210,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
     reviewDecision: pr.reviewDecision ?? null,
     ciStatus: (pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
     ciUrl: extractBuildkiteCheckUrl(pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+    ciContexts: flattenCiContexts(pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
     baseRefName: pr.baseRefName,
     headRefName: pr.headRefName,
     headSha: pr.headRefOid,
@@ -1134,6 +1140,232 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     } catch (e) {
       if (e instanceof GitCliError) {
         reply.code(502).send({ code: 'MERGE_FAILED', message: e.message, stderr: e.stderr });
+        return;
+      }
+      throw e;
+    } finally {
+      await cleanup();
+    }
+  });
+
+  // Ask Claude to fix the PR's failing CI builds locally and push the
+  // result. Mirrors the resolve-conflicts route's pattern: throwaway
+  // worktree, safety-bounded prompt, --no-verify commit + push. Different
+  // failure mode: instead of mechanical conflict resolution we let Claude
+  // iterate on real test code, so the tool allow-list is broader (Bash,
+  // Write, Grep, Glob) and we pre-run dependency installs so tests can
+  // actually execute.
+  app.post<{
+    Params: { owner: string; repo: string; number: string };
+    Body: { repoPath?: string };
+  }>('/api/pulls/:owner/:repo/:number/fix-ci', async (req, reply) => {
+    const params = parsePullParams(req.params);
+    const repoPath = (req.body?.repoPath ?? '').trim();
+    if (!repoPath) {
+      reply.code(400).send({ code: 'BAD_REPO_PATH', message: 'repoPath is required (configure localRepos for this repo)' });
+      return;
+    }
+    let absRepoPath: string;
+    try {
+      const abs = resolvePath(repoPath);
+      if (!existsSync(abs) || !statSync(abs).isDirectory() || !existsSync(resolvePath(abs, '.git'))) {
+        reply.code(400).send({ code: 'BAD_REPO_PATH', message: `Not a git checkout: ${abs}` });
+        return;
+      }
+      absRepoPath = abs;
+    } catch (e) {
+      reply.code(400).send({ code: 'BAD_REPO_PATH', message: (e as Error).message });
+      return;
+    }
+
+    // Fetch fresh meta to make sure we operate on the PR's *current* head
+    // commit — stale rollup data could make us run Claude on already-fixed
+    // builds.
+    metaCache.delete(metaKey(params));
+    const meta = await fetchMeta(params.owner, params.repo, params.number);
+    const failing = (meta.ciContexts ?? []).filter((c) => c.isFailure);
+    if (failing.length === 0) {
+      reply.send({ ok: true, noFailures: true });
+      return;
+    }
+    const baseRef = meta.baseRefName;
+    const headRef = meta.headRefName;
+    const remoteHead = `origin/${headRef}`;
+    const worktreePath = resolvePath(tmpdir(),
+      `connor-review-fix-ci-${params.owner}-${params.repo}-${params.number}-${Date.now()}`);
+
+    const cleanup = async () => {
+      try { await gitExec(['worktree', 'remove', '--force', worktreePath], { cwd: absRepoPath }); } catch (e) {
+        try {
+          if (existsSync(worktreePath)) {
+            const { rmSync } = await import('node:fs');
+            rmSync(worktreePath, { recursive: true, force: true });
+          }
+        } catch { /* give up */ }
+        console.warn(`[fix-ci] worktree cleanup failed for ${worktreePath}:`, (e as Error).message);
+      }
+    };
+
+    try {
+      // 1) Fetch + worktree.
+      await gitExec(['fetch', 'origin', baseRef, headRef], { cwd: absRepoPath });
+      await gitExec(['worktree', 'add', '-B', headRef, worktreePath, remoteHead], { cwd: absRepoPath });
+
+      // 2) Prep step: install dependencies in the worktree. Pre-running these
+      // makes a huge difference — Claude otherwise wastes time (and timeout)
+      // re-running them itself, and sometimes hangs on interactive prompts.
+      // Each install gets a generous timeout because the first run after a
+      // worktree create has no cached gems/node_modules.
+      const hasGemfile = existsSync(resolvePath(worktreePath, 'Gemfile'));
+      const hasPackageJson = existsSync(resolvePath(worktreePath, 'package.json'));
+      const hasYarnLock = existsSync(resolvePath(worktreePath, 'yarn.lock'));
+      const { exec } = await import('node:child_process');
+      const runShell = (cmd: string, label: string, timeoutMs: number): Promise<void> => {
+        return new Promise((res, rej) => {
+          const child = exec(cmd, { cwd: worktreePath, timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024 }, (err, _stdout, stderr) => {
+            if (err) {
+              const killed = (err as NodeJS.ErrnoException & { killed?: boolean }).killed;
+              rej(new Error(`${label} ${killed ? 'timed out' : 'failed'}: ${stderr?.toString().trim().slice(0, 800) || (err as Error).message}`));
+              return;
+            }
+            res();
+          });
+          // Detach from any interactive stdin so installers can't hang on
+          // a prompt that we'd never answer.
+          child.stdin?.end();
+        });
+      };
+      const installErrors: string[] = [];
+      if (hasGemfile) {
+        try { await runShell('bundle install --quiet', 'bundle install', 15 * 60_000); }
+        catch (e) { installErrors.push((e as Error).message); }
+      }
+      if (hasPackageJson) {
+        const installCmd = hasYarnLock
+          ? 'yarn install --non-interactive --silent'
+          : 'npm install --no-audit --no-fund --silent';
+        try { await runShell(installCmd, 'yarn/npm install', 15 * 60_000); }
+        catch (e) { installErrors.push((e as Error).message); }
+      }
+      if (installErrors.length > 0) {
+        reply.code(502).send({
+          code: 'INSTALL_FAILED',
+          message: `Dependency install failed in the worktree — Claude can't run tests without it.`,
+          details: installErrors,
+        });
+        return;
+      }
+
+      // 3) Build the prompt. The failing-check list is the key signal —
+      // Claude uses the names to figure out which tests / linters to run.
+      const failingLines = failing.map((c) => `  - ${c.name}${c.state ? ` (${c.state})` : ''}${c.url ? `\n      ${c.url}` : ''}`);
+      const prompt = [
+        `You are fixing failing CI builds for PR #${params.number} ("${meta.title}") in ${params.owner}/${params.repo}.`,
+        '',
+        `The PR branch ${headRef} is checked out at:`,
+        `  ${worktreePath}`,
+        '',
+        'This is your CWD. Dependencies are ALREADY INSTALLED (bundle install + yarn install have already',
+        'run). Do NOT re-run them — they take a long time and there is no need.',
+        '',
+        `The following CI checks are currently failing on the PR's head commit (${meta.headSha}):`,
+        '',
+        ...failingLines,
+        '',
+        'Your task:',
+        '',
+        '1. Investigate which tests / linters / type checks are failing. Use the check names above to',
+        '   identify the relevant local test commands (e.g. `bin/rspec spec/path/to/failing_spec.rb`,',
+        '   `yarn jest path/to/test.test.ts`, `bundle exec rubocop file.rb`, `bundle exec srb tc`).',
+        '',
+        '2. Reproduce the failures locally by running the SPECIFIC failing test(s), not the full suite.',
+        '   Use NON-INTERACTIVE, NON-WATCH flags to avoid hangs:',
+        '     - jest: `--ci --no-watch --no-color`',
+        '     - rspec: `--no-color --format documentation` (no `--watch`)',
+        '     - rubocop / sorbet: their default non-interactive mode is fine',
+        '   Wrap any test invocation in a 120-second outer timeout (e.g. `timeout 120 bin/rspec ...`)',
+        '   so a misconfigured run cannot hang indefinitely.',
+        '',
+        '3. Once you have reproduced a failure, edit the relevant source files to make the test pass.',
+        '   Re-run only the same test to verify the fix.',
+        '',
+        '4. Repeat until every failing CI check above passes locally.',
+        '',
+        '5. When you are done, briefly summarise:',
+        '   - which checks were failing',
+        '   - which files you changed',
+        '   - which tests now pass',
+        '',
+        'You MAY use: Read, Edit, Write, Bash, Grep, Glob, LS.',
+        '',
+        'You MUST:',
+        '  - NOT run any git commands (no commit, no push, no rebase). A wrapper will commit and push',
+        '    your changes when you are done.',
+        '  - NOT install dependencies (already done — re-running `bundle install` / `yarn install`',
+        '    wastes minutes and risks lockfile churn).',
+        '  - NOT enable interactive / watch modes for any test runner.',
+        '  - NOT make changes unrelated to the failing CI checks. If a real fix requires broader',
+        '    refactoring than the failing tests warrant, stop and explain instead of writing code.',
+        '',
+        'After you finish, the wrapper will commit your working-tree changes with --no-verify and push',
+        'them to origin. If you made no changes, the wrapper will report that the PR needs no fixes from',
+        'you.',
+      ].join('\n');
+
+      // 4) Run Claude. Long timeout (30 min) because test iteration on a
+      // big repo can take a while.
+      try {
+        await claudeExec(prompt, {
+          cwd: worktreePath,
+          allowedTools: ['Read', 'Edit', 'Write', 'Bash', 'Grep', 'Glob', 'LS'],
+          permissionMode: 'acceptEdits',
+          timeoutMs: 30 * 60_000,
+        });
+      } catch (e) {
+        if (e instanceof ClaudeCliError) {
+          const status = e.code === 'CLAUDE_NOT_INSTALLED' ? 502 : e.code === 'TIMEOUT' ? 504 : 500;
+          reply.code(status).send({ code: e.code, message: e.message, stderr: e.stderr });
+          return;
+        }
+        throw e;
+      }
+
+      // 5) Was there any change to commit?
+      const statusOut = await gitExec(['status', '--porcelain', '-z'], { cwd: worktreePath });
+      const hasChanges = statusOut.split('\0').filter(Boolean).length > 0;
+      if (!hasChanges) {
+        reply.send({ ok: true, noChanges: true });
+        return;
+      }
+
+      // 6) Stage everything Claude touched. `git add -A` here is intentional
+      // — unlike resolve-conflicts, fix-ci legitimately spans whatever files
+      // a real test fix requires, and the worktree only contains Claude's
+      // own diff (we don't mix in any merge-staged content). Safety net: the
+      // user reviews the commit on GitHub.
+      await gitExec(['add', '-A'], { cwd: worktreePath });
+      await gitExec(['commit', '--no-verify', '-m', `Fix failing CI builds (${failing.length} check${failing.length === 1 ? '' : 's'})`], { cwd: worktreePath });
+
+      const commitSha = (await gitExec(['rev-parse', 'HEAD'], { cwd: worktreePath })).trim();
+
+      // Surface the files in the commit so the client can show what changed.
+      const filesChangedRaw = (await gitExec(['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'], { cwd: worktreePath })).trim();
+      const filesChanged = filesChangedRaw.split('\n').map((s) => s.trim()).filter(Boolean);
+
+      // 7) Push.
+      try {
+        await gitExec(['push', '--no-verify', 'origin', headRef], { cwd: worktreePath });
+      } catch (e) {
+        const stderr = e instanceof GitCliError ? e.stderr : (e as Error).message;
+        reply.code(502).send({ code: 'PUSH_FAILED', message: `git push failed: ${stderr.trim()}`, stderr });
+        return;
+      }
+
+      metaCache.delete(metaKey(params));
+      reply.send({ ok: true, commitSha, filesChanged, failingChecksFixed: failing.map((c) => c.name) });
+    } catch (e) {
+      if (e instanceof GitCliError) {
+        reply.code(502).send({ code: 'FIX_FAILED', message: e.message, stderr: e.stderr });
         return;
       }
       throw e;

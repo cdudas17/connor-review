@@ -17,6 +17,7 @@ import { useToasts } from './hooks/useToasts.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
 import { useClaudeResponses } from './hooks/useClaudeResponses.js';
 import { useConflictResolutions } from './hooks/useConflictResolutions.js';
+import { useCiFixes } from './hooks/useCiFixes.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
 import { useLabeledPRs } from './hooks/useLabeledPRs.js';
 import { useAuthoredPRs } from './hooks/useAuthoredPRs.js';
@@ -106,6 +107,8 @@ export function App() {
   // ClaudeBadge never reads this activity (per the user's "don't count
   // toward the Claude badge" rule).
   const conflictResolutions = useConflictResolutions();
+  // Same idea for the "Fix failing CI" flow — its own localStorage bucket.
+  const ciFixes = useCiFixes();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [memberFilter, setMemberFilter] = useState<Set<string> | null>(null);
@@ -431,6 +434,50 @@ export function App() {
       addToast('error', `Conflict resolution failed for ${prRef}: ${err.message ?? 'unknown error'}`);
     }
   }, [addToast, conflictResolutions, handleMetaLoaded]);
+
+  /** Fire the server-side fix-CI flow and patch list state on success. The
+   * server installs deps + runs Claude in a worktree with broader tools
+   * (Bash/Edit/Write/Grep/Glob/LS) and a long timeout. */
+  const fixCi = useCallback(async (id: Identity) => {
+    const repoPath = APP_CONFIG.localRepos?.[id.repo];
+    if (!repoPath) {
+      addToast('error', `Configure localRepos["${id.repo}"] in config.local.ts to fix CI`);
+      return;
+    }
+    if (!ciFixes.start(id)) return;
+    const prRef = `${id.owner}/${id.repo}#${id.number}`;
+    try {
+      const result = await api.fixCi(id.owner, id.repo, id.number, { repoPath });
+      if ('noFailures' in result && result.noFailures) {
+        ciFixes.finishNoFailures(id);
+        addToast('info', `${prRef} has no failing CI checks — nothing for Claude to fix`);
+        return;
+      }
+      if ('noChanges' in result && result.noChanges) {
+        ciFixes.finishNoChanges(id);
+        addToast('info', `Claude inspected ${prRef}'s failing checks and made no changes`);
+        return;
+      }
+      // The "ok: true" path with commit info.
+      const ok = result as Extract<typeof result, { commitSha: string }>;
+      ciFixes.finishOk(id, {
+        commitSha: ok.commitSha,
+        filesChanged: ok.filesChanged ?? [],
+        failingChecksFixed: ok.failingChecksFixed ?? [],
+      });
+      addToast('success', `Pushed CI fix on ${prRef} — ${ok.commitSha.slice(0, 8)} (${(ok.filesChanged ?? []).length} file${(ok.filesChanged ?? []).length === 1 ? '' : 's'})`);
+      // Refresh meta so the ciStatus + contexts update after CI re-runs.
+      try {
+        const fresh = await api.getPullRequest(id.owner, id.repo, id.number, { fresh: true });
+        handleMetaLoaded(id, fresh);
+      } catch { /* best-effort */ }
+    } catch (e) {
+      const err = e as ApiCallError;
+      const code = (err as ApiCallError & { code?: string }).code;
+      ciFixes.finishErr(id, err.message ?? String(e), code);
+      addToast('error', `CI fix failed for ${prRef}: ${err.message ?? 'unknown error'}`);
+    }
+  }, [addToast, ciFixes, handleMetaLoaded]);
 
   const refreshAll = useCallback(async () => {
     if (refreshing) return;
@@ -896,6 +943,9 @@ export function App() {
             conflictResolution={conflictResolutions.stateFor(current)}
             onResolveConflicts={() => resolveConflicts(current)}
             onDismissConflictResolution={() => conflictResolutions.dismiss(current)}
+            ciFix={ciFixes.stateFor(current)}
+            onFixCi={() => fixCi(current)}
+            onDismissCiFix={() => ciFixes.dismiss(current)}
           />
         );
       })()}

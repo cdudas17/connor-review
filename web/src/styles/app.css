@@ -128,6 +128,12 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 /* Ask-Claude button visual cue — slightly distinct from publish buttons. */
 .btn-ask-claude { border: 1px solid var(--accent) !important; color: var(--accent) !important; background: transparent !important; }
 .btn-ask-claude:hover:not(:disabled) { background: var(--bg-subtle) !important; }
+/* Fix-CI button — amber to indicate it's a recovery action. Matches the
+ * conflict / Trunk amber so the user reads it as "do this when something
+ * red needs fixing." Disabled state stays subdued. */
+.btn-fix-ci { border: 1px solid #d29922 !important; color: #d29922 !important; background: transparent !important; }
+.btn-fix-ci:hover:not(:disabled) { background: rgba(210, 153, 34, 0.12) !important; }
+.btn-fix-ci:disabled { opacity: 0.7; cursor: progress; }
 
 /* Inline local Claude thread — rendered on the diff, anchored to a line range.
  * Persisted per (PR, anchor), never sent to GitHub. Multi-turn.

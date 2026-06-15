@@ -7,6 +7,7 @@ import { DiffViewer } from './DiffViewer.js';
 import { ReviewFooter, LocalReviewFooter } from './ReviewFooter.js';
 import { ErrorToast } from './ErrorToast.js';
 import { ConflictResolutionCard } from './ConflictResolutionCard.js';
+import { CiFixCard } from './CiFixCard.js';
 import { usePRDetails } from '../hooks/usePRDetails.js';
 import { computeDiffStats } from '../lib/diffStats.js';
 import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
@@ -111,6 +112,12 @@ interface Props {
   onResolveConflicts: () => void;
   /** Clear the stored conflict-resolution entry (× on the card). */
   onDismissConflictResolution: () => void;
+  /** Current "Fix failing CI" entry for this PR (null when there's none). */
+  ciFix: import('../hooks/useCiFixes.js').CiFixEntry | null;
+  /** Fire / re-fire the CI-fix flow for the open PR. */
+  onFixCi: () => void;
+  /** Clear the stored CI-fix entry. */
+  onDismissCiFix: () => void;
 }
 
 export function ReviewDrawer(props: Props) {
@@ -122,6 +129,7 @@ export function ReviewDrawer(props: Props) {
     onAskThreadClaude, onDismissThreadClaude,
     localClaudeThreads, onAskInlineClaudeForLine, onDismissLocalClaudeThread,
     conflictResolution, onResolveConflicts, onDismissConflictResolution,
+    ciFix, onFixCi, onDismissCiFix,
   } = props;
   const { meta, diff, loading, error, reload } = usePRDetails(current);
   // GitHub-style +N -M totals for the PR header. Memoised on diff identity
@@ -474,6 +482,13 @@ export function ReviewDrawer(props: Props) {
           onDismiss={onDismissConflictResolution}
         />
       )}
+      {meta.source !== 'local' && ciFix && (
+        <CiFixCard
+          entry={ciFix}
+          onRetry={onFixCi}
+          onDismiss={onDismissCiFix}
+        />
+      )}
       {meta.source !== 'local' && commentsVisible && (
         <ConversationsList
           threads={meta.reviewThreads}
@@ -547,6 +562,15 @@ export function ReviewDrawer(props: Props) {
           mergeQueueQueued={optimisticAutoMerge?.mergeQueueQueued ?? (!!meta.mergeQueueEntry || !!meta.trunkInQueue)}
           commentsVisible={commentsVisible}
           onToggleComments={() => setCommentsVisible((v) => !v)}
+          onFixCi={(() => {
+            const failing = (meta.ciContexts ?? []).filter((c) => c.isFailure);
+            // Only expose the button when CI is actually red — otherwise it's
+            // a no-op surface that confuses people. Server still validates,
+            // but this keeps the button out of sight on green PRs.
+            return failing.length > 0 ? onFixCi : undefined;
+          })()}
+          ciFixRunning={ciFix?.kind === 'running'}
+          failingCheckCount={(meta.ciContexts ?? []).filter((c) => c.isFailure).length}
           onAskClaude={() => {
             // Drain the summary textarea into the chat as the next user turn,
             // then clear it so the box is free for an actual review summary.

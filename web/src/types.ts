@@ -72,6 +72,11 @@ export interface PullRequestMeta {
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   ciStatus: CiStatus;
   ciUrl: string | null;
+  /** Per-check CI rollup for the PR's head commit — flat shape with name,
+   * state, optional details URL, and `isFailure` for any non-success
+   * terminal state. Used by the "Fix failing CI" flow to count + label
+   * failing checks. */
+  ciContexts?: Array<{ name: string; state: string | null; url: string | null; isFailure: boolean }>;
   labels: PRLabel[];
   assignees: PRAssignee[];
   reviews: ReviewSummary[];
