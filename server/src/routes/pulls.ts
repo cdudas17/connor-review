@@ -1366,6 +1366,9 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         '    your changes when you are done.',
         '  - NOT install dependencies (already done — re-running `bundle install` / `yarn install`',
         '    wastes minutes and risks lockfile churn).',
+        '  - NOT modify Gemfile.lock, yarn.lock, package-lock.json, pnpm-lock.yaml, or any other',
+        '    lockfile. Lockfile changes belong in their own PR; the wrapper will discard any',
+        '    lockfile edits before committing.',
         '  - NOT enable interactive / watch modes for any test runner.',
         '  - NOT make changes unrelated to the failing CI checks. If a real fix requires broader',
         '    refactoring than the failing tests warrant, stop and explain instead of writing code.',
@@ -1391,6 +1394,29 @@ export async function registerPullsRoutes(app: FastifyInstance) {
           return;
         }
         throw e;
+      }
+
+      // 4.5) Revert any lockfile changes the install step may have produced.
+      // `bundle install` and `yarn install` routinely rewrite their lockfiles
+      // (BUNDLED WITH version, platform pins, etc.) when they run in a fresh
+      // worktree. We pre-install deps to give Claude something to test
+      // against — but the resulting lockfile noise should never enter a
+      // fix-CI commit. By reverting them here (before `git add`), only
+      // Claude's actual code edits can make it into the commit.
+      //
+      // If Claude legitimately needed to update a lockfile to fix CI, that
+      // intent is deliberately dropped here — lockfile changes belong in
+      // their own dedicated PR, not buried inside an auto-generated test fix.
+      const LOCKFILES = ['Gemfile.lock', 'yarn.lock', 'package-lock.json', 'pnpm-lock.yaml', 'bun.lockb'];
+      const presentLockfiles = LOCKFILES.filter((f) => existsSync(resolvePath(worktreePath, f)));
+      if (presentLockfiles.length > 0) {
+        try {
+          await gitExec(['checkout', 'HEAD', '--', ...presentLockfiles], { cwd: worktreePath });
+        } catch (e) {
+          // Not fatal — a lockfile path missing from HEAD is fine (newly
+          // added by Claude is rare but possible).
+          console.warn(`[fix-ci] couldn't revert lockfiles:`, (e as Error).message);
+        }
       }
 
       // 5) Was there any change to commit?
