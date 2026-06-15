@@ -879,8 +879,16 @@ export async function registerPullsRoutes(app: FastifyInstance) {
 
     // Unique worktree path. We never reuse a path between attempts so a botched
     // prior cleanup can't poison the next run.
+    const stamp = Date.now();
     const worktreePath = resolvePath(tmpdir(),
-      `connor-review-resolve-${params.owner}-${params.repo}-${params.number}-${Date.now()}`);
+      `connor-review-resolve-${params.owner}-${params.repo}-${params.number}-${stamp}`);
+    // Unique ephemeral branch name for the worktree. We never reuse the PR's
+    // own branch name because that branch may already be checked out in
+    // another worktree (e.g. the user's main repo or a `~/.work/worktrees/...`
+    // directory), and `git worktree add -B <branch>` refuses in that case.
+    // Pushing back to the remote uses an explicit `HEAD:<headRef>` refspec
+    // so the upstream branch name is unaffected.
+    const tempBranch = `connor-review-resolve-${params.number}-${stamp}`;
 
     /** Best-effort cleanup; tolerated to fail (the worktree may already be in
      * a state where remove --force can't run, e.g. external process holding a
@@ -898,15 +906,19 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         } catch { /* give up */ }
         console.warn(`[resolve-conflicts] worktree cleanup failed for ${worktreePath}:`, (e as Error).message);
       }
+      // Delete the ephemeral branch even if the worktree-remove failed —
+      // otherwise stale branches accumulate in the user's repo.
+      try { await gitExec(['branch', '-D', tempBranch], { cwd: absRepoPath }); } catch { /* not created or already gone */ }
     };
 
     try {
       // 1) Make sure we have the latest base + head refs locally.
       await gitExec(['fetch', 'origin', baseRef, headRef], { cwd: absRepoPath });
 
-      // 2+3) Create a worktree pinned at origin/<headRef> on a local branch
-      // matching the PR's branch name so we can push it back.
-      await gitExec(['worktree', 'add', '-B', headRef, worktreePath, remoteHead], { cwd: absRepoPath });
+      // 2+3) Create a worktree pinned at origin/<headRef> on an ephemeral
+      // local branch (NOT the PR's own branch name — that may be checked out
+      // elsewhere). We push back via an explicit refspec later.
+      await gitExec(['worktree', 'add', '-B', tempBranch, worktreePath, remoteHead], { cwd: absRepoPath });
 
       // Snapshot the pre-merge HEAD SHA so safety check #3 can verify the
       // first parent of the merge commit matches it.
@@ -938,7 +950,7 @@ export async function registerPullsRoutes(app: FastifyInstance) {
           // pre-commit / pre-push hooks (often `bundle exec rubocop`/`sorbet`
           // in monorepos), which aren't reachable from a fresh worktree.
           await gitExec(['commit', '--no-verify', '-m', `Merge ${baseRef} into ${headRef}`], { cwd: worktreePath });
-          await gitExec(['push', '--no-verify', 'origin', headRef], { cwd: worktreePath });
+          await gitExec(['push', '--no-verify', 'origin', `HEAD:${headRef}`], { cwd: worktreePath });
           const sha = (await gitExec(['rev-parse', 'HEAD'], { cwd: worktreePath })).trim();
           reply.send({ ok: true, commitSha: sha, trivial: true });
           return;
@@ -1124,9 +1136,11 @@ export async function registerPullsRoutes(app: FastifyInstance) {
 
       // 13) Push. `--no-verify` for the same reason as the commit step: the
       // user's pre-push hook chain (rubocop / sorbet / etc.) isn't reachable
-      // from a fresh worktree's PATH/gem env.
+      // from a fresh worktree's PATH/gem env. `HEAD:<headRef>` because the
+      // local branch we're on is a connor-review-* ephemeral; the upstream
+      // ref is still the PR's actual branch.
       try {
-        await gitExec(['push', '--no-verify', 'origin', headRef], { cwd: worktreePath });
+        await gitExec(['push', '--no-verify', 'origin', `HEAD:${headRef}`], { cwd: worktreePath });
       } catch (e) {
         const stderr = e instanceof GitCliError ? e.stderr : (e as Error).message;
         reply.code(502).send({ code: 'PUSH_FAILED', message: `git push failed: ${stderr.trim()}`, stderr });
@@ -1191,8 +1205,14 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     const baseRef = meta.baseRefName;
     const headRef = meta.headRefName;
     const remoteHead = `origin/${headRef}`;
+    const stamp = Date.now();
     const worktreePath = resolvePath(tmpdir(),
-      `connor-review-fix-ci-${params.owner}-${params.repo}-${params.number}-${Date.now()}`);
+      `connor-review-fix-ci-${params.owner}-${params.repo}-${params.number}-${stamp}`);
+    // Ephemeral local branch — see resolve-conflicts above for rationale.
+    // If the PR's actual branch is already checked out in another worktree
+    // (~/.work/worktrees/... is common), `git worktree add -B <branch>`
+    // refuses; using a unique name dodges that completely.
+    const tempBranch = `connor-review-fix-ci-${params.number}-${stamp}`;
 
     const cleanup = async () => {
       try { await gitExec(['worktree', 'remove', '--force', worktreePath], { cwd: absRepoPath }); } catch (e) {
@@ -1204,12 +1224,13 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         } catch { /* give up */ }
         console.warn(`[fix-ci] worktree cleanup failed for ${worktreePath}:`, (e as Error).message);
       }
+      try { await gitExec(['branch', '-D', tempBranch], { cwd: absRepoPath }); } catch { /* not created or already gone */ }
     };
 
     try {
       // 1) Fetch + worktree.
       await gitExec(['fetch', 'origin', baseRef, headRef], { cwd: absRepoPath });
-      await gitExec(['worktree', 'add', '-B', headRef, worktreePath, remoteHead], { cwd: absRepoPath });
+      await gitExec(['worktree', 'add', '-B', tempBranch, worktreePath, remoteHead], { cwd: absRepoPath });
 
       // 2) Prep step: install dependencies in the worktree. Pre-running these
       // makes a huge difference — Claude otherwise wastes time (and timeout)
@@ -1352,9 +1373,11 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       const filesChangedRaw = (await gitExec(['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'], { cwd: worktreePath })).trim();
       const filesChanged = filesChangedRaw.split('\n').map((s) => s.trim()).filter(Boolean);
 
-      // 7) Push.
+      // 7) Push. `HEAD:<headRef>` — the local branch we're on is a
+      // connor-review-* ephemeral; the upstream branch we update is still
+      // the PR's actual branch.
       try {
-        await gitExec(['push', '--no-verify', 'origin', headRef], { cwd: worktreePath });
+        await gitExec(['push', '--no-verify', 'origin', `HEAD:${headRef}`], { cwd: worktreePath });
       } catch (e) {
         const stderr = e instanceof GitCliError ? e.stderr : (e as Error).message;
         reply.code(502).send({ code: 'PUSH_FAILED', message: `git push failed: ${stderr.trim()}`, stderr });
