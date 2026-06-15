@@ -74,7 +74,7 @@ interface Props {
   viewedPaths: Set<string>;
   onViewedChange: (path: string, viewed: boolean) => void;
   onPendingReviewChange: (id: Identity, reviewId: string | null) => void;
-  onMetaLoaded?: (id: Identity, meta: PullRequestMeta) => void;
+  onMetaLoaded?: (id: Identity, meta: PullRequestMeta, fetchedAt: number) => void;
   onAdvance: (id: Identity, newStatus: PRStatus) => void;
   /** Move drawer to the previous PR in the list without changing status. */
   onNavigatePrev: () => void;
@@ -131,7 +131,7 @@ export function ReviewDrawer(props: Props) {
     conflictResolution, onResolveConflicts, onDismissConflictResolution,
     ciFix, onFixCi, onDismissCiFix,
   } = props;
-  const { meta, diff, loading, error, reload } = usePRDetails(current);
+  const { meta, diff, loading, error, reload, metaFetchedAt } = usePRDetails(current);
   // GitHub-style +N -M totals for the PR header. Memoised on diff identity
   // because computeDiffStats is a linear scan over the raw diff string.
   const diffStats = useMemo(() => computeDiffStats(diff), [diff]);
@@ -332,10 +332,13 @@ export function ReviewDrawer(props: Props) {
   }, [current, onClose]);
 
   // Push fresh meta back to the App so the PR row's ghStatus stays in sync.
+  // The fetched-at timestamp lets the App gate the patch — if the list
+  // auto-refresh already pulled newer data, the drawer's meta won't
+  // overwrite it.
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
-    if (current && meta && onMetaLoaded) onMetaLoaded(current, meta);
-  }, [current?.owner, current?.repo, current?.number, meta?.headSha]);
+    if (current && meta && onMetaLoaded) onMetaLoaded(current, meta, metaFetchedAt ?? Date.now());
+  }, [current?.owner, current?.repo, current?.number, meta?.headSha, metaFetchedAt]);
 
   if (!current) return null;
   // First-fetch states. On reloads of an already-loaded PR (posting a comment etc.)

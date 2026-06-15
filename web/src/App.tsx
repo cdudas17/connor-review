@@ -347,13 +347,18 @@ export function App() {
 
   const currentPendingReviewId = current ? (pendingReviews[prKey(current)] ?? null) : null;
 
-  const handleMetaLoaded = useCallback((id: Identity, meta: PullRequestMeta) => {
+  const handleMetaLoaded = useCallback((id: Identity, meta: PullRequestMeta, fetchedAt: number = Date.now()) => {
     // Push the freshest meta we got from the drawer fetch into whichever
     // list-level store actually owns this PR. Previously this only updated the
     // Added PRs list (`myPRs`); team/oncall/mine rows stayed stale until the
     // next 5-minute auto-refresh — so a freshly-added auto-label, a new thread,
     // or a CI flip wasn't visible in the row count or chips until you hit
     // Refresh manually.
+    //
+    // BUT: only patch a list row when the drawer's fetch is newer than the
+    // row's last refresh. If the list auto-refresh fired more recently, the
+    // list already has the source of truth — letting the drawer's older meta
+    // win would silently rewind the row (the "table defers to drawer" bug).
     const patch = {
       title: meta.title,
       authorLogin: meta.authorLogin,
@@ -366,12 +371,26 @@ export function App() {
       mergeQueueQueued: meta.mergeQueueEntry != null,
       hasConflicts: meta.mergeable === 'CONFLICTING',
       trunkInQueue: !!meta.trunkInQueue,
+      metaFetchedAt: fetchedAt,
     };
-    myPRs.update(id, patch);
-    mineAddedPRs.update(id, patch);
-    teamPRs.update(id, patch);
-    oncallPRs.update(id, patch);
-    minePRs.update(id, patch);
+    /** Newest-wins guard: a row whose `metaFetchedAt` is greater than the
+     * incoming `fetchedAt` was refreshed by the list more recently than this
+     * drawer fetch. Skip it — patching would overwrite newer data with
+     * older. Rows that have never been stamped (undefined) accept the patch
+     * since they have no claim to freshness. */
+    const isNewer = (rowFetchedAt: number | undefined): boolean =>
+      rowFetchedAt == null || rowFetchedAt <= fetchedAt;
+    const updateIfNewer = (
+      store: { prs: TrackedPR[]; update: (id: Identity, patch: Partial<TrackedPR>) => void },
+    ) => {
+      const row = store.prs.find((p) => same(p, id));
+      if (!row || isNewer(row.metaFetchedAt)) store.update(id, patch);
+    };
+    updateIfNewer(myPRs);
+    updateIfNewer(mineAddedPRs);
+    updateIfNewer(teamPRs);
+    updateIfNewer(oncallPRs);
+    updateIfNewer(minePRs);
 
     // Reflect any server-side pending review state into the client so the UI knows
     // to show "Add review comment" / "Finish your review" instead of "Start a review".
@@ -528,7 +547,7 @@ export function App() {
         for (const r of results) {
           if (r.status === 'fulfilled') {
             const { p, meta } = r.value;
-            mineAddedPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING', trunkInQueue: !!meta.trunkInQueue });
+            mineAddedPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING', trunkInQueue: !!meta.trunkInQueue, metaFetchedAt: Date.now() });
           }
         }
       });

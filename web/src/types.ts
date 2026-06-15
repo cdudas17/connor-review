@@ -50,6 +50,11 @@ export interface TrackedPR {
   /** True when the PR has an active Trunk merge-queue check. Authoritative
    * "in queue" signal for Trunk-managed repos (Gusto/web, etc.). */
   trunkInQueue?: boolean;
+  /** Epoch ms when the server-derived fields on this row were last refreshed
+   * (either by a list auto-refresh or a drawer meta fetch). Used to ensure
+   * the *most recent* data wins — a stale drawer fetch resolving after a
+   * newer list refresh no longer overwrites the row. */
+  metaFetchedAt?: number;
   /** Discriminator for entries that aren't GitHub PRs. Defaults to 'github' for back-compat. */
   source?: 'github' | 'local';
   /** For local entries: the branch name (the synthetic `number` is derived from it). */

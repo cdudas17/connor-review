@@ -17,6 +17,10 @@ interface Result {
   diff: string | null;
   error: ApiCallError | null;
   reload: () => void;
+  /** Epoch ms when the current `meta` was fetched. Used by the App to
+   * decide whether the drawer's data should overwrite a list row — if the
+   * list refreshed more recently, the list wins. */
+  metaFetchedAt: number | null;
 }
 
 function sameId(a: Id | null, b: Id | null) {
@@ -26,6 +30,7 @@ function sameId(a: Id | null, b: Id | null) {
 
 export function usePRDetails(id: Id | null): Result {
   const [meta, setMeta] = useState<PullRequestMeta | null>(null);
+  const [metaFetchedAt, setMetaFetchedAt] = useState<number | null>(null);
   const [diff, setDiff] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ApiCallError | null>(null);
@@ -41,6 +46,7 @@ export function usePRDetails(id: Id | null): Result {
     const isNewPr = !sameId(id, lastIdRef.current);
     if (isNewPr) {
       setMeta(null);
+      setMetaFetchedAt(null);
       setDiff(null);
     }
     lastIdRef.current = id;
@@ -63,12 +69,12 @@ export function usePRDetails(id: Id | null): Result {
     fetcher
       .then(([m, d]) => {
         if (cancelled) return;
-        setMeta(m); setDiff(d);
+        setMeta(m); setDiff(d); setMetaFetchedAt(Date.now());
       })
       .catch((e) => { if (!cancelled) setError(e as ApiCallError); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [id?.owner, id?.repo, id?.number, id?.source, id?.localPath, id?.branch, reloadKey]);
 
-  return { meta, diff, loading, error, reload: () => setReloadKey((k) => k + 1) };
+  return { meta, diff, loading, error, reload: () => setReloadKey((k) => k + 1), metaFetchedAt };
 }
