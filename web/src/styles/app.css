@@ -526,7 +526,7 @@ button.gh-status-conflict-pill:disabled { cursor: progress; opacity: 0.85; }
 .issues-list-labels { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 .issues-list-label { font-size: 0.7rem; padding: 1px 6px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); background: var(--bg-subtle); }
 .issues-list-label-more { font-size: 0.7rem; color: var(--muted); align-self: center; }
-.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 70vw; min-width: 720px; background: var(--bg); border-left: 1px solid var(--border); box-shadow: -8px 0 32px rgba(0,0,0,0.18); overflow: auto; padding: 16px 24px 120px; z-index: 11; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 70vw; min-width: 720px; background: var(--bg); border-left: 1px solid var(--border); box-shadow: -8px 0 32px rgba(0,0,0,0.18); overflow: auto; overscroll-behavior: contain; padding: 16px 24px 120px; z-index: 11; }
 /* The close × and refresh both sit in the top-right corner, same visual weight,
  * with a small gap between. Both use the same hit-target size, same border,
  * same background.
