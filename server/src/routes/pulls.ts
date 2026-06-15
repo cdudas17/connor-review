@@ -1248,12 +1248,19 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       // login files; `-i` sources interactive files (.zshrc / .bashrc), which
       // is where most tool managers register themselves on macOS.
       const userShell = process.env.SHELL ?? '/bin/zsh';
+      // mise refuses to load configs in unknown paths and aborts the
+      // surrounding command — every fresh worktree under /tmp counts as
+      // "unknown". Pre-trust this run's worktree via the env var so the
+      // install passes without mutating the user's persistent trust store.
+      // Honours their existing trusted paths too.
+      const trustedPaths = [worktreePath, process.env.MISE_TRUSTED_CONFIG_PATHS].filter(Boolean).join(':');
+      const childEnv = { ...process.env, MISE_TRUSTED_CONFIG_PATHS: trustedPaths };
       const runShell = (cmd: string, label: string, timeoutMs: number): Promise<void> => {
         return new Promise((res, rej) => {
           // `-il` keeps the env close to a real terminal so mise/rbenv hooks
           // fire. Stdin is closed below so even an interactive shell can't
           // hang waiting for input.
-          const child = execFile(userShell, ['-ilc', cmd], { cwd: worktreePath, timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024 }, (err, _stdout, stderr) => {
+          const child = execFile(userShell, ['-ilc', cmd], { cwd: worktreePath, env: childEnv, timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024 }, (err, _stdout, stderr) => {
             if (err) {
               const killed = (err as NodeJS.ErrnoException & { killed?: boolean }).killed;
               const tail = stderr?.toString().trim().slice(-2000) || (err as Error).message;

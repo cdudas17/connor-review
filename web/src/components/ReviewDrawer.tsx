@@ -467,14 +467,10 @@ export function ReviewDrawer(props: Props) {
         diffStats={diffStats}
       />
       {meta.source !== 'local' && <PRDescription bodyHtml={meta.bodyHtml} />}
-      {meta.source !== 'local' && <ReviewSummaryList reviews={meta.reviews ?? []} />}
-      {meta.source !== 'local' && (
-        <ClaudeChatPanel
-          chat={claudeChat}
-          onAsk={onAskClaudeChat}
-          onClear={onClearClaudeChat}
-        />
-      )}
+      {/* The two Claude-driven fix-status cards sit immediately below the PR
+          description so they're impossible to miss when something needs the
+          user's attention (running / failed / pushed). Review history +
+          Claude chat live below them. */}
       {meta.source !== 'local' && conflictResolution && (
         <ConflictResolutionCard
           entry={conflictResolution}
@@ -487,6 +483,14 @@ export function ReviewDrawer(props: Props) {
           entry={ciFix}
           onRetry={onFixCi}
           onDismiss={onDismissCiFix}
+        />
+      )}
+      {meta.source !== 'local' && <ReviewSummaryList reviews={meta.reviews ?? []} />}
+      {meta.source !== 'local' && (
+        <ClaudeChatPanel
+          chat={claudeChat}
+          onAsk={onAskClaudeChat}
+          onClear={onClearClaudeChat}
         />
       )}
       {meta.source !== 'local' && commentsVisible && (
