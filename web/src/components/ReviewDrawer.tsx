@@ -123,6 +123,11 @@ export function ReviewDrawer(props: Props) {
   // because computeDiffStats is a linear scan over the raw diff string.
   const diffStats = useMemo(() => computeDiffStats(diff), [diff]);
   const [summary, setSummary] = useState('');
+  // Show / hide all review + Claude comments in the drawer. Defaults to
+  // visible; the eye-icon toggle in the footer flips this for the current
+  // drawer session. Resets to visible when the user switches PRs (see effect
+  // below) so a hidden-state in PR A doesn't carry into PR B by surprise.
+  const [commentsVisible, setCommentsVisible] = useState(true);
   const drawerRef = useRef<HTMLElement | null>(null);
 
   /** Fire `reload()` now, then again ~2s later. GitHub's GraphQL has
@@ -141,9 +146,11 @@ export function ReviewDrawer(props: Props) {
 
   // When the drawer's PR changes (after Approve / Reviewed / nav arrows), reset
   // the scroll position so the new diff opens at the top instead of inheriting
-  // the previous PR's scroll.
+  // the previous PR's scroll. Also reset the comments-visible toggle so a
+  // hidden state from PR A doesn't carry into PR B by surprise.
   useEffect(() => {
     if (drawerRef.current) drawerRef.current.scrollTop = 0;
+    setCommentsVisible(true);
   }, [current?.owner, current?.repo, current?.number]);
 
   // Reset summary draft when switching PRs.
@@ -454,7 +461,7 @@ export function ReviewDrawer(props: Props) {
           onDismiss={onDismissConflictResolution}
         />
       )}
-      {meta.source !== 'local' && (
+      {meta.source !== 'local' && commentsVisible && (
         <ConversationsList
           threads={meta.reviewThreads}
           onReply={reply}
@@ -465,7 +472,7 @@ export function ReviewDrawer(props: Props) {
       )}
       <DiffViewer
         diff={diff}
-        threads={meta.source === 'local' ? [] : meta.reviewThreads}
+        threads={(meta.source === 'local' || !commentsVisible) ? [] : meta.reviewThreads}
         hasPendingReview={meta.source !== 'local' && pendingReviewId != null}
         pr={{
           owner: current.owner,
@@ -483,7 +490,7 @@ export function ReviewDrawer(props: Props) {
         commentsEnabled={meta.source !== 'local'}
         // Inline composer Ask Claude: persisted local-only thread anchored to the line range.
         onAskInlineClaude={meta.source === 'local' ? undefined : onAskInlineClaudeForLine}
-        localClaudeThreads={meta.source === 'local' ? [] : localClaudeThreads}
+        localClaudeThreads={(meta.source === 'local' || !commentsVisible) ? [] : localClaudeThreads}
         onAskLocalThread={meta.source === 'local' ? undefined : onAskInlineClaudeForLine}
         onDismissLocalThread={meta.source === 'local' ? undefined : onDismissLocalClaudeThread}
         // InlineThreadCard Ask Claude: persisted at App level. Drawer hands the threadId + draft to the parent.
@@ -525,6 +532,8 @@ export function ReviewDrawer(props: Props) {
           ) ? toggleAutoMerge : undefined}
           autoMergeEnabled={optimisticAutoMerge?.autoMergeEnabled ?? (!!meta.autoMergeRequest || !!meta.trunkInQueue)}
           mergeQueueQueued={optimisticAutoMerge?.mergeQueueQueued ?? (!!meta.mergeQueueEntry || !!meta.trunkInQueue)}
+          commentsVisible={commentsVisible}
+          onToggleComments={() => setCommentsVisible((v) => !v)}
           onAskClaude={() => {
             // Drain the summary textarea into the chat as the next user turn,
             // then clear it so the box is free for an actual review summary.

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ReviewEvent } from '../types.js';
 import { EmojiTextarea } from './EmojiTextarea.js';
-import { GitMergeIcon, GitMergeQueueIcon } from '@primer/octicons-react';
+import { GitMergeIcon, GitMergeQueueIcon, EyeIcon, EyeClosedIcon } from '@primer/octicons-react';
 
 interface Props {
   summary: string;
@@ -34,6 +34,12 @@ interface Props {
   /** True when the PR is actively in the repo's merge queue (a stricter state
    * than autoMergeEnabled). Flips the toggle to its amber 'Queued to merge' look. */
   mergeQueueQueued?: boolean;
+  /** Whether review/Claude comments are currently visible in the drawer.
+   * Toggled by the eye icon next to the nav arrows. */
+  commentsVisible?: boolean;
+  /** Flip `commentsVisible`. Optional — when omitted the toggle isn't rendered
+   * (e.g. local-branch footer, which has no comments to hide). */
+  onToggleComments?: () => void;
 }
 
 function ChevronLeftIcon() {
@@ -85,6 +91,7 @@ export function ReviewFooter({
   summary, onSummaryChange, onSubmit, onReviewed, onPrev, onNextPR,
   canSubmit, canReviewed, canPrev, canNextPR, finishLabel, onMarkReady,
   onAskClaude, claudeChatLoading, onToggleAutoMerge, autoMergeEnabled, mergeQueueQueued,
+  commentsVisible, onToggleComments,
 }: Props) {
   const [markingReady, setMarkingReady] = useState(false);
   const [togglingAutoMerge, setTogglingAutoMerge] = useState(false);
@@ -167,6 +174,17 @@ export function ReviewFooter({
           </button>
         )}
         <div className="review-footer-nav">
+          {onToggleComments && (
+            <button
+              type="button"
+              className={`review-footer-arrow has-tooltip${commentsVisible === false ? ' review-footer-arrow-active' : ''}`}
+              onClick={onToggleComments}
+              aria-label={commentsVisible === false ? 'Show all comments' : 'Hide all comments'}
+              data-tooltip={commentsVisible === false ? 'Show all comments' : 'Hide all comments'}
+            >
+              {commentsVisible === false ? <EyeClosedIcon size={14} /> : <EyeIcon size={14} />}
+            </button>
+          )}
           <button type="button" className="review-footer-arrow" disabled={!canPrev} onClick={onPrev} aria-label="Previous PR" title="Previous PR">
             <ChevronLeftIcon />
           </button>

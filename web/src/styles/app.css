@@ -732,6 +732,9 @@ button.gh-status-conflict-pill:disabled { cursor: progress; opacity: 0.85; }
 .review-footer-nav { margin-left: auto; display: inline-flex; gap: 4px; }
 .review-footer-arrow { padding: 6px 10px !important; display: inline-flex; align-items: center; justify-content: center; }
 .review-footer-arrow svg { display: block; }
+/* Eye-icon toggle: tint slightly when comments are HIDDEN so the muted
+ * state is visible at a glance. */
+.review-footer-arrow-active { color: var(--accent) !important; border-color: var(--accent) !important; }
 .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; z-index: 50; }
 .modal { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; min-width: 320px; max-width: 480px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
