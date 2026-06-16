@@ -9,6 +9,7 @@ import { ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION } from '../queries/addPullReque
 import { ADD_PULL_REQUEST_REVIEW_THREAD_REPLY_MUTATION } from '../queries/addPullRequestReviewThreadReply.graphql.js';
 import { SUBMIT_PULL_REQUEST_REVIEW_MUTATION } from '../queries/submitPullRequestReview.graphql.js';
 import { MARK_READY_FOR_REVIEW_MUTATION } from '../queries/markReadyForReview.graphql.js';
+import { CLOSE_PULL_REQUEST_MUTATION } from '../queries/closePullRequest.graphql.js';
 import { claudeExec, ClaudeCliError } from '../lib/claudeExec.js';
 import { gitExec, GitCliError } from '../lib/gitExec.js';
 import { ENABLE_AUTO_MERGE_MUTATION, DISABLE_AUTO_MERGE_MUTATION } from '../queries/autoMerge.graphql.js';
@@ -742,6 +743,26 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       throw e;
     }
   });
+
+  // Close the PR on GitHub (without merging). The client gates this behind a
+  // confirm prompt; the underlying mutation is idempotent — closing an
+  // already-closed PR is a no-op upstream. The cached meta is dropped so the
+  // next fetch reflects state='CLOSED'.
+  app.post<{ Params: { owner: string; repo: string; number: string } }>(
+    '/api/pulls/:owner/:repo/:number/close',
+    async (req) => {
+      const params = parsePullParams(req.params);
+      const meta = metaCache.get(metaKey(params)) ?? (await fetchMeta(params.owner, params.repo, params.number));
+      await ghExec(['api', 'graphql', '--input', '-'], {
+        input: JSON.stringify({
+          query: CLOSE_PULL_REQUEST_MUTATION,
+          variables: { pullRequestId: meta.id },
+        }),
+      });
+      metaCache.set(metaKey(params), { ...meta, state: 'CLOSED', merged: false });
+      return { ok: true, state: 'CLOSED' };
+    },
+  );
 
   // Flip a draft PR to ready-for-review. Invalidates the cached meta so the
   // next /api/pulls/... fetch reflects the new state.

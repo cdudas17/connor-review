@@ -397,6 +397,11 @@ button.gh-status-conflict-pill:disabled { cursor: progress; opacity: 0.85; }
 .pr-header-diffstats-del { color: #f85149; }
 .footer-mark-ready { border-color: var(--ok) !important; color: var(--ok) !important; }
 .footer-mark-ready:hover:not(:disabled) { background: rgba(31, 136, 61, 0.15) !important; }
+/* Close-PR is destructive (though reversible) — red outline + soft wash on
+ * hover so it reads as "different category" from the green / blue actions. */
+.footer-close-pr { border-color: #f85149 !important; color: #f85149 !important; }
+.footer-close-pr:hover:not(:disabled) { background: rgba(248, 81, 73, 0.12) !important; }
+.footer-close-pr:disabled { opacity: 0.7; cursor: progress; }
 /* Merge-when-ready toggle — icon-only, solid green square matching the
  * GitHub UI style. Both surfaces (drawer footer + PR row) share the same
  * visual treatment; the row uses a smaller size.

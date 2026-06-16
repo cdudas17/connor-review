@@ -47,6 +47,9 @@ interface Props {
   ciFixRunning?: boolean;
   /** Number of failing checks (drives the tooltip text). */
   failingCheckCount?: number;
+  /** Close the PR on GitHub without merging. Footer renders a destructive-
+   * styled button when provided; the parent gates with a confirm prompt. */
+  onClosePR?: () => Promise<void>;
 }
 
 function ChevronLeftIcon() {
@@ -100,9 +103,11 @@ export function ReviewFooter({
   onAskClaude, claudeChatLoading, onToggleAutoMerge, autoMergeEnabled, mergeQueueQueued,
   commentsVisible, onToggleComments,
   onFixCi, ciFixRunning, failingCheckCount,
+  onClosePR,
 }: Props) {
   const [markingReady, setMarkingReady] = useState(false);
   const [togglingAutoMerge, setTogglingAutoMerge] = useState(false);
+  const [closing, setClosing] = useState(false);
   const canAskClaude = !!onAskClaude && summary.trim().length > 0 && !claudeChatLoading;
   return (
     <footer className="review-footer">
@@ -190,6 +195,21 @@ export function ReviewFooter({
             title="Flip this draft PR to ready for review"
           >
             {markingReady ? 'Marking…' : 'Mark ready for review'}
+          </button>
+        )}
+        {onClosePR && (
+          <button
+            type="button"
+            className="footer-close-pr"
+            disabled={closing}
+            onClick={async () => {
+              setClosing(true);
+              try { await onClosePR(); }
+              finally { setClosing(false); }
+            }}
+            title="Close this PR on GitHub without merging (you can reopen it later)"
+          >
+            {closing ? 'Closing…' : 'Close PR'}
           </button>
         )}
         <div className="review-footer-nav">

@@ -144,6 +144,11 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
+  /** Close the PR on GitHub without merging. Idempotent — closing an
+   * already-closed PR is a no-op. */
+  closePR(owner: string, repo: string, number: number): Promise<{ ok: true; state: 'CLOSED' }> {
+    return call(`/api/pulls/${owner}/${repo}/${number}/close`, { method: 'POST' });
+  },
   /** Post a Trunk merge-bot slash command on the PR. Used for repos in
    * `trunkMergeRepos` where Trunk owns the merge queue (e.g. Gusto/web).
    * `action: 'enable'` posts `/trunk merge`; `'cancel'` posts `/trunk cancel`. */

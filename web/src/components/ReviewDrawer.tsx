@@ -249,6 +249,24 @@ export function ReviewDrawer(props: Props) {
     }
   }, [current, onToast, reloadWithCatchup]);
 
+  /** Close the PR on GitHub. Gated by a native confirm() since this is a
+   * destructive action (though reversible — GitHub keeps closed PRs around
+   * and they can be reopened). reloadWithCatchup picks up the new state. */
+  const closePR = useCallback(async () => {
+    if (!current) return;
+    const prRef = `${current.owner}/${current.repo}#${current.number}`;
+    if (typeof window !== 'undefined' && !window.confirm(`Close ${prRef} without merging? It can be reopened on GitHub.`)) {
+      return;
+    }
+    try {
+      await api.closePR(current.owner, current.repo, current.number);
+      onToast('success', `Closed ${prRef}`);
+      reloadWithCatchup();
+    } catch (e) {
+      onToast('error', `Failed to close ${prRef}: ${(e as Error).message}`);
+    }
+  }, [current, onToast, reloadWithCatchup]);
+
   // Optimistic override for the merge-when-ready footer button. When the user
   // clicks the toggle we flip the visual immediately (and assume an approved PR
   // will land in the merge queue), then `reloadWithCatchup` re-fetches meta and
@@ -556,6 +574,7 @@ export function ReviewDrawer(props: Props) {
           canNextPR={canNavigateNext && canNext}
           finishLabel={pendingReviewId ? 'Finish your review' : null}
           onMarkReady={meta.isDraft ? markReady : undefined}
+          onClosePR={meta.state === 'OPEN' && !meta.merged ? closePR : undefined}
           // Show the auto-merge toggle when GitHub says the viewer can use it
           // OR when auto-merge is already enabled (so they can cancel it).
           // The viewer ≈ the configured myPRsAuthor for normal users; we use
