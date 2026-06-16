@@ -12,26 +12,36 @@ interface Props {
   status: CiStatus;
   /** Optional URL to the underlying build (e.g. buildkite). Linkified when CI isn't green. */
   url?: string | null;
+  /** When true, the badge replaces its icon with a spinner — used to signal
+   * an in-flight "Fix CI" run is targeting this PR. Color stays tied to the
+   * underlying `status` so the user still sees what's currently red. */
+  fixing?: boolean;
 }
 
-export function CiBadge({ status, url }: Props) {
+export function CiBadge({ status, url, fixing }: Props) {
   if (status == null) return null;
   const c = CONFIG[status];
   const showLink = url && status !== 'SUCCESS';
+  const title = fixing
+    ? `CI: ${status.toLowerCase()} — Claude is fixing this`
+    : `CI: ${status.toLowerCase()}`;
   const content = (
     <>
-      <span className="ci-icon" aria-hidden="true">{c.icon}</span>
+      {fixing
+        ? <span className="loading-spinner ci-badge-spinner" aria-hidden="true" />
+        : <span className="ci-icon" aria-hidden="true">{c.icon}</span>}
       {c.label}
     </>
   );
+  const cls = `ci-badge ${c.cls}${fixing ? ' ci-badge-fixing' : ''}`;
   if (showLink) {
     return (
       <a
-        className={`ci-badge ci-badge-link ${c.cls}`}
+        className={`${cls} ci-badge-link`}
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        title={`CI: ${status.toLowerCase()} — open build`}
+        title={fixing ? title : `CI: ${status.toLowerCase()} — open build`}
         onClick={(e) => e.stopPropagation()}
       >
         {content}
@@ -39,7 +49,7 @@ export function CiBadge({ status, url }: Props) {
     );
   }
   return (
-    <span className={`ci-badge ${c.cls}`} title={`CI: ${status.toLowerCase()}`}>
+    <span className={cls} title={title}>
       {content}
     </span>
   );

@@ -378,6 +378,10 @@ button.gh-status-conflict-pill:disabled { cursor: progress; opacity: 0.85; }
 .ci-badge-link { cursor: pointer; }
 .ci-badge-link:hover { background: rgba(255, 255, 255, 0.05); text-decoration: underline; }
 .ci-icon { font-size: 0.85em; line-height: 1; }
+/* Spinner overlay variant — swaps the static icon when a fix-CI run is in
+ * flight for this PR. Color is inherited from the underlying ci-* class so
+ * the badge still reads as red/yellow/etc. underneath. */
+.ci-badge-fixing .ci-badge-spinner { width: 9px; height: 9px; border-width: 1.5px; margin: 0; color: currentColor; }
 .ci-success { color: #3fb950; }
 .ci-failure { color: #f85149; }
 .ci-error { color: #f85149; }

@@ -51,6 +51,9 @@ interface Props {
   /** Click handler for the conflict badge. Fire-and-forget; the hook
    * reflects state changes via `conflictStateFor`. */
   onResolveConflicts?: (id: { owner: string; repo: string; number: number }) => void;
+  /** Per-PR fix-CI state. When 'running', the CiBadge replaces its icon
+   * with a spinner so the row signals an in-flight fix attempt. */
+  ciFixStateFor?: (id: { owner: string; repo: string; number: number }) => { kind: 'running' | 'failed' | 'success' | 'no-failures' | 'no-changes' } | null;
   /** When set, each row renders a "Merge when ready" toggle button. Used on
    * the My PRs tab. The callback toggles auto-merge for that PR. */
   onToggleAutoMerge?: (id: { owner: string; repo: string; number: number; currentlyEnabled: boolean }) => void;
@@ -84,7 +87,7 @@ function CopyLinkButton({ owner, repo, number }: { owner: string; repo: string; 
   );
 }
 
-export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictStateFor, onResolveConflicts, onToggleAutoMerge, showCopyLink }: Props) {
+export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictStateFor, onResolveConflicts, ciFixStateFor, onToggleAutoMerge, showCopyLink }: Props) {
   const filtered = mode === 'untouched-only' ? prs.filter((p) => p.status === 'untouched') : prs;
   if (filtered.length === 0) {
     return <p className="empty">No PRs to review.</p>;
@@ -167,7 +170,11 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictS
               {!(p.status === 'approved' && p.ghStatus === 'approved') && (
                 <StatusBadge status={p.status} />
               )}
-              <CiBadge status={p.ciStatus} url={p.ciUrl} />
+              <CiBadge
+                status={p.ciStatus}
+                url={p.ciUrl}
+                fixing={ciFixStateFor?.({ owner: p.owner, repo: p.repo, number: p.number })?.kind === 'running'}
+              />
               {p.ghStatus !== 'draft' && p.ghStatus !== 'closed' && p.ghStatus !== 'approved' && (
                 <GhStatusBadge status={p.ghStatus} />
               )}

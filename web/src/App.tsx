@@ -854,6 +854,7 @@ export function App() {
         // the row, regardless of tab.
         conflictStateFor={(t) => conflictResolutions.stateFor(t)}
         onResolveConflicts={(t) => resolveConflicts({ ...t })}
+        ciFixStateFor={(t) => ciFixes.stateFor(t)}
         // Only on the My PRs tab — those are PRs the viewer can typically merge.
         // Fire-and-forget toggle: optimistically flip the row, toast on failure.
         showCopyLink={tab === 'mine'}
