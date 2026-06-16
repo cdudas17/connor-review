@@ -16,13 +16,23 @@ export function CiFixCard({
     return (
       <section className="conflict-card conflict-card-running">
         <header className="conflict-card-header">
-          <span className="loading-spinner" aria-hidden="true" />
-          <h3>Claude is fixing the failing CI builds…</h3>
+          <h3>
+            <span className="loading-spinner" aria-hidden="true" />
+            Claude is fixing the failing CI builds…
+          </h3>
+          {/* Always-available escape hatch: if the server died mid-run, the
+              tab was closed before the response landed, or anything else
+              stranded the state in localStorage, Dismiss clears it locally.
+              The server side (if still alive) finishes regardless and the
+              next meta refresh picks up any pushed changes. */}
+          <button type="button" className="conflict-card-dismiss" onClick={onDismiss}>Dismiss</button>
         </header>
         <p className="conflict-card-body">
           This installs dependencies in a fresh worktree, then iterates on the failing tests.
           Big repos can take several minutes. Leave the drawer open or close it — the result
-          shows up here either way.
+          shows up here either way. If this has been running far longer than expected, click
+          Dismiss to clear the state; the server run (if still alive) will complete in the
+          background.
         </p>
       </section>
     );

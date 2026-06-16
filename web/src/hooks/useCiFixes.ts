@@ -42,10 +42,26 @@ function saveStore(store: Record<string, CiFixEntry>) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }
   catch { /* quota exceeded; fine */ }
 }
+/** A running entry older than this is treated as crashed and auto-flipped
+ * to failed. The fix-CI route's own outer timeout is 30 minutes, so any
+ * `running` lingering past ~45 min has lost its server-side counterpart
+ * (process restart, browser tab closed before the response landed, etc.). */
+const STALE_RUNNING_MS = 45 * 60 * 1000;
+
 function sweep(store: Record<string, CiFixEntry>, now: number): Record<string, CiFixEntry> {
   const cutoff = now - MAX_AGE_MS;
   const fresh = Object.entries(store)
     .filter(([, v]) => (v.savedAt ?? 0) > cutoff)
+    .map(([k, v]): [string, CiFixEntry] => {
+      // Stale-running rescue: if a tab closed mid-run or the server crashed
+      // mid-request, the persisted state would otherwise stay 'running'
+      // forever. Convert to a failed entry on next mount so the user sees
+      // the escape hatch + Try-again button.
+      if (v.kind === 'running' && (now - (v.savedAt ?? 0)) > STALE_RUNNING_MS) {
+        return [k, { kind: 'failed', error: 'Run was abandoned — no server response within 45 minutes. The server-side run may still complete; check the PR for new commits.', code: 'STALE', savedAt: now }];
+      }
+      return [k, v];
+    })
     .sort(([, a], [, b]) => (a.savedAt ?? 0) - (b.savedAt ?? 0));
   if (fresh.length <= MAX_ENTRIES) return Object.fromEntries(fresh);
   return Object.fromEntries(fresh.slice(fresh.length - MAX_ENTRIES));
