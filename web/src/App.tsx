@@ -111,6 +111,10 @@ export function App() {
   // Same idea for the "Fix failing CI" flow — its own localStorage bucket.
   const ciFixes = useCiFixes();
   const [refreshing, setRefreshing] = useState(false);
+  // Bumped after server-side mutations that may invalidate the drawer's
+  // cached meta + diff (e.g. fix-CI push). The drawer watches this and
+  // re-runs its `usePRDetails` fetch when it changes.
+  const [drawerReloadNonce, setDrawerReloadNonce] = useState(0);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [memberFilter, setMemberFilter] = useState<Set<string> | null>(null);
   // Team tab: when true, hide any PR whose CI rollup isn't SUCCESS (red, pending,
@@ -486,11 +490,26 @@ export function App() {
         failingChecksFixed: ok.failingChecksFixed ?? [],
       });
       addToast('success', `Pushed CI fix on ${prRef} — ${ok.commitSha.slice(0, 8)} (${(ok.filesChanged ?? []).length} file${(ok.filesChanged ?? []).length === 1 ? '' : 's'})`);
-      // Refresh meta so the ciStatus + contexts update after CI re-runs.
-      try {
-        const fresh = await api.getPullRequest(id.owner, id.repo, id.number, { fresh: true });
-        handleMetaLoaded(id, fresh);
-      } catch { /* best-effort */ }
+      // Refresh everything that could've changed after the push:
+      //   1. The drawer (if open on this PR) — bump the nonce to force a
+      //      fresh `usePRDetails` fetch so the new commit + diff render
+      //      instead of the pre-fix view.
+      //   2. The list-level meta for this PR — immediate fetch + a couple of
+      //      delayed re-fetches because GitHub's CI rollup takes 10-30s to
+      //      reflect the new run that the push just triggered.
+      setDrawerReloadNonce((n) => n + 1);
+      const syncMeta = async () => {
+        try {
+          const fresh = await api.getPullRequest(id.owner, id.repo, id.number, { fresh: true });
+          handleMetaLoaded(id, fresh);
+        } catch { /* best-effort */ }
+      };
+      syncMeta();
+      // GitHub kicks off a fresh CI run a few seconds after the push lands;
+      // the rollup state lags. Two delayed re-fetches cover most cases without
+      // hammering the API.
+      setTimeout(syncMeta, 10_000);
+      setTimeout(syncMeta, 30_000);
     } catch (e) {
       const err = e as ApiCallError;
       const code = (err as ApiCallError & { code?: string }).code;
@@ -948,6 +967,7 @@ export function App() {
             current={current}
             prs={activePRs}
             pendingReviewId={currentPendingReviewId}
+            reloadNonce={drawerReloadNonce}
             latestGhStatus={tracked?.ghStatus}
             latestCiStatus={tracked?.ciStatus}
             latestCiUrl={tracked?.ciUrl}

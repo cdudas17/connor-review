@@ -67,6 +67,10 @@ interface Props {
   current: Identity | null;
   prs: TrackedPR[];
   pendingReviewId: string | null;
+  /** App-controlled counter — bump to force a fresh meta + diff fetch in the
+   * drawer after a server-side mutation that may have changed the PR (e.g.
+   * fix-CI push). Drawer-internal `reloadWithCatchup` is unaffected. */
+  reloadNonce?: number;
   /** Latest CI / GH status from the auto-refreshing list — overrides drawer-fetched meta. */
   latestGhStatus?: GhStatus | null;
   latestCiStatus?: CiStatus;
@@ -130,11 +134,26 @@ export function ReviewDrawer(props: Props) {
     localClaudeThreads, onAskInlineClaudeForLine, onDismissLocalClaudeThread,
     conflictResolution, onResolveConflicts, onDismissConflictResolution,
     ciFix, onFixCi, onDismissCiFix,
+    reloadNonce,
   } = props;
   const { meta, diff, loading, error, reload, metaFetchedAt } = usePRDetails(current);
   // GitHub-style +N -M totals for the PR header. Memoised on diff identity
   // because computeDiffStats is a linear scan over the raw diff string.
   const diffStats = useMemo(() => computeDiffStats(diff), [diff]);
+  // External reload: parent bumps `reloadNonce` after a server-side mutation
+  // (e.g. fix-CI push) and we refetch meta + diff. Ignore the initial 0 so
+  // we don't double-fetch on first render.
+  const initialReloadNonceRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (initialReloadNonceRef.current === undefined) {
+      initialReloadNonceRef.current = reloadNonce;
+      return;
+    }
+    if (reloadNonce !== initialReloadNonceRef.current) {
+      initialReloadNonceRef.current = reloadNonce;
+      reload();
+    }
+  }, [reloadNonce, reload]);
   const [summary, setSummary] = useState('');
   // Show / hide all review + Claude comments in the drawer. Global preference
   // — flipping it in any PR carries through to every other PR and survives
