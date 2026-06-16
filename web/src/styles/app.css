@@ -419,8 +419,11 @@ button.gh-status-conflict-pill:disabled { cursor: progress; opacity: 0.85; }
 .footer-auto-merge { display: inline-flex !important; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0 !important; border: 1px solid var(--ok) !important; border-radius: 6px !important; background: transparent !important; color: var(--ok) !important; cursor: pointer; }
 .footer-auto-merge:hover:not(:disabled) { background: rgba(31, 136, 61, 0.12) !important; }
 .footer-auto-merge svg { display: block; flex-shrink: 0; }
-.footer-auto-merge-on { background: rgba(31, 136, 61, 0.14) !important; border-color: var(--ok) !important; color: var(--ok) !important; }
-.footer-auto-merge-on:hover:not(:disabled) { background: rgba(31, 136, 61, 0.22) !important; }
+/* Enabled "merge when ready" — solid green pill with a white merge icon so
+ * the active state reads as a filled-in variant of the default outlined
+ * button. Stronger visual than the prior faint wash. */
+.footer-auto-merge-on { background: var(--ok) !important; border-color: var(--ok) !important; color: #ffffff !important; }
+.footer-auto-merge-on:hover:not(:disabled) { background: var(--ok-hover, #28a35a) !important; border-color: var(--ok-hover, #28a35a) !important; }
 /* Queued in the merge queue — amber, matches GitHub's own visual. */
 .footer-auto-merge-queued { background: rgba(187, 128, 9, 0.14) !important; border-color: #bb8009 !important; color: #bb8009 !important; }
 .footer-auto-merge-queued:hover:not(:disabled) { background: rgba(187, 128, 9, 0.22) !important; }
@@ -434,8 +437,10 @@ button.gh-status-conflict-pill:disabled { cursor: progress; opacity: 0.85; }
 .pr-row-automerge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 1px solid var(--ok); border-radius: 5px; background: transparent; color: var(--ok); cursor: pointer; }
 .pr-row-automerge:hover { background: rgba(31, 136, 61, 0.12); }
 .pr-row-automerge svg { display: block; flex-shrink: 0; }
-.pr-row-automerge-on { background: rgba(31, 136, 61, 0.14); border-color: var(--ok); color: var(--ok); }
-.pr-row-automerge-on:hover { background: rgba(31, 136, 61, 0.22); }
+/* Enabled "merge when ready" — solid green pill so the active state reads
+ * as a filled-in variant of the default outlined button. */
+.pr-row-automerge-on { background: var(--ok); border-color: var(--ok); color: #ffffff; }
+.pr-row-automerge-on:hover { background: var(--ok-hover, #28a35a); border-color: var(--ok-hover, #28a35a); }
 .pr-row-automerge-queued { background: rgba(187, 128, 9, 0.14); border-color: #bb8009; color: #bb8009; }
 .pr-row-automerge-queued:hover { background: rgba(187, 128, 9, 0.22); }
 
