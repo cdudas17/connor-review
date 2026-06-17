@@ -121,21 +121,29 @@ export function App() {
   // unpins an issue) so newly-pinned entries warm up immediately.
   useEffect(() => {
     if (tab !== 'issues') return;
-    for (const key of pinnedIssues.pinned) {
-      // Key format: `${owner}/${repo}#${number}` — parse defensively.
-      const hashIdx = key.lastIndexOf('#');
-      if (hashIdx <= 0) continue;
-      const ownerRepo = key.slice(0, hashIdx);
-      const numStr = key.slice(hashIdx + 1);
-      const slashIdx = ownerRepo.indexOf('/');
-      if (slashIdx <= 0) continue;
-      const owner = ownerRepo.slice(0, slashIdx);
-      const repo = ownerRepo.slice(slashIdx + 1);
-      const number = parseInt(numStr, 10);
-      if (!owner || !repo || !Number.isFinite(number)) continue;
-      void prefetchIssue({ owner, repo, number });
+    for (const i of Object.values(pinnedIssues.pinned)) {
+      void prefetchIssue({ owner: i.owner, repo: i.repo, number: i.number });
     }
   }, [tab, pinnedIssues.pinned]);
+  // Keep pinned-issue snapshots fresh: every time `myIssues.issues` lands,
+  // reconcile titles/labels/updatedAt for any pinned entries that appear in
+  // the new fetch. Non-pinned items are ignored by the hook.
+  useEffect(() => {
+    if (!myIssues.hasLoaded || myIssues.issues.length === 0) return;
+    pinnedIssues.reconcile(myIssues.issues.map((i) => {
+      const slash = i.repository.indexOf('/');
+      const owner = slash > 0 ? i.repository.slice(0, slash) : '';
+      const repo = slash > 0 ? i.repository.slice(slash + 1) : '';
+      return {
+        owner, repo, number: i.number,
+        repository: i.repository,
+        title: i.title,
+        authorLogin: i.authorLogin,
+        labels: i.labels,
+        updatedAt: i.updatedAt,
+      };
+    }));
+  }, [myIssues.issues, myIssues.hasLoaded, pinnedIssues]);
   const [addError, setAddError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [pendingReviews, setPendingReviews] = useState<Record<string, string>>({});
@@ -927,33 +935,68 @@ export function App() {
               onDismiss={() => { /* hook doesn't expose dismiss — refresh button will retry */ }}
             />
           )}
-          {myIssues.hasLoaded && myIssues.issues.length === 0 && !myIssues.error && (
-            <p className="empty">No open issues.</p>
-          )}
-          {myIssues.issues.length > 0 && (() => {
-            // Stable sort: pinned issues first (in their order from the
-            // hook's sorted set), unpinned after in the order the server
-            // returned them (most-recently-updated first). Both halves keep
-            // server order — we only re-bucket.
-            const pinned = myIssues.issues.filter((i) => {
-              const [o, r] = i.repository.split('/');
-              return o && r && pinnedIssues.isPinned(pinnedIssueKey({ owner: o, repo: r, number: i.number }));
-            });
+          {(() => {
+            // Pinned section is always sourced from localStorage (the
+            // `usePinnedIssues` snapshots), so it survives a fetch returning
+            // zero issues / dropping a pinned entry from its window. The
+            // reconcile effect above keeps each snapshot's title / labels /
+            // updatedAt fresh whenever the issue re-appears in the fetch.
+            const pinnedItems = Object.values(pinnedIssues.pinned)
+              .sort((a, b) => b.pinnedAt - a.pinnedAt); // most-recently-pinned first
+            const pinnedKeys = new Set(pinnedItems.map((p) => pinnedIssueKey(p)));
             const rest = myIssues.issues.filter((i) => {
-              const [o, r] = i.repository.split('/');
-              return !(o && r && pinnedIssues.isPinned(pinnedIssueKey({ owner: o, repo: r, number: i.number })));
+              const slash = i.repository.indexOf('/');
+              if (slash <= 0) return true;
+              const k = pinnedIssueKey({ owner: i.repository.slice(0, slash), repo: i.repository.slice(slash + 1), number: i.number });
+              return !pinnedKeys.has(k);
             });
-            const sorted = [...pinned, ...rest];
+            const showEmptyMessage = myIssues.hasLoaded && !myIssues.error && pinnedItems.length === 0 && rest.length === 0;
+            if (showEmptyMessage) return <p className="empty">No open issues.</p>;
+            if (pinnedItems.length === 0 && rest.length === 0) return null;
             return (
               <ul className="issue-list">
-                {sorted.map((i) => {
-                  const [owner, repo] = i.repository.split('/');
+                {/* Pinned section — driven by the hook's snapshot store. */}
+                {pinnedItems.map((p) => {
+                  const key = pinnedIssueKey(p);
+                  return (
+                    <li
+                      key={`pinned:${key}`}
+                      className="issue-row issue-row-pinned"
+                      onClick={() => setCurrentIssue({ owner: p.owner, repo: p.repo, number: p.number })}
+                    >
+                      <span className="pr-text">
+                        <span className="pr-title-row">
+                          <span className="pr-title">{p.title}</span>
+                          {p.labels.length > 0 && (
+                            <LabelChips labels={p.labels.map((name) => ({ name, color: '888888' }))} max={4} />
+                          )}
+                        </span>
+                        <span className="pr-meta">
+                          {p.repository}#{p.number}{p.authorLogin ? ` · ${p.authorLogin}` : ''}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="issue-pin-button issue-pin-active"
+                        onClick={(e) => { e.stopPropagation(); pinnedIssues.unpin(key); }}
+                        aria-label="Unpin issue"
+                        title="Unpin"
+                      >
+                        <PinIcon size={14} />
+                      </button>
+                    </li>
+                  );
+                })}
+                {/* Non-pinned section — current fetch minus pinned keys. */}
+                {rest.map((i) => {
+                  const slash = i.repository.indexOf('/');
+                  const owner = slash > 0 ? i.repository.slice(0, slash) : '';
+                  const repo = slash > 0 ? i.repository.slice(slash + 1) : '';
                   const key = owner && repo ? pinnedIssueKey({ owner, repo, number: i.number }) : '';
-                  const isPinned = key ? pinnedIssues.isPinned(key) : false;
                   return (
                     <li
                       key={`${i.repository}#${i.number}`}
-                      className={`issue-row${isPinned ? ' issue-row-pinned' : ''}`}
+                      className="issue-row"
                       onClick={() => owner && repo ? setCurrentIssue({ owner, repo, number: i.number }) : null}
                     >
                       <span className="pr-text">
@@ -967,13 +1010,24 @@ export function App() {
                           {i.repository}#{i.number} · {i.authorLogin ?? 'unknown'}
                         </span>
                       </span>
-                      {key && (
+                      {key && owner && repo && (
                         <button
                           type="button"
-                          className={`issue-pin-button${isPinned ? ' issue-pin-active' : ''}`}
-                          onClick={(e) => { e.stopPropagation(); pinnedIssues.toggle(key); }}
-                          aria-label={isPinned ? 'Unpin issue' : 'Pin issue to the top'}
-                          title={isPinned ? 'Unpin' : 'Pin to top'}
+                          className="issue-pin-button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            pinnedIssues.toggle({
+                              owner, repo, number: i.number,
+                              repository: i.repository,
+                              title: i.title,
+                              authorLogin: i.authorLogin,
+                              labels: i.labels,
+                              updatedAt: i.updatedAt,
+                              pinnedAt: Date.now(),
+                            });
+                          }}
+                          aria-label="Pin issue to the top"
+                          title="Pin to top"
                         >
                           <PinIcon size={14} />
                         </button>
