@@ -573,9 +573,8 @@ button.ci-badge { cursor: pointer; }
 .ci-checks-drawer { width: 56vw; min-width: 560px; }
 .ci-checks-header { margin: 0 0 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .ci-checks-header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
-.ci-checks-header-row h2 { margin: 0; font-size: 18px; }
+.ci-checks-header-row h2 { margin: 0; font-size: 18px; line-height: 1.2; }
 .ci-checks-fix-ci { font-size: 12px !important; padding: 4px 12px !important; }
-.ci-checks-header h2 { margin: 0 0 6px; font-size: 18px; }
 .ci-checks-summary { margin: 0; font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
 .ci-checks-summary-failure { color: #f85149; font-weight: 600; }
 .ci-checks-summary-success { color: #3fb950; font-weight: 600; }
