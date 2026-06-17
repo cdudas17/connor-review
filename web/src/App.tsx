@@ -904,14 +904,20 @@ export function App() {
 
       {authRequired && <AuthRequiredBanner onDismiss={() => setAuthRequired(false)} />}
 
-      {/* Bulk-delete bar — shown on the Added tab (everything is selectable) and on
-          the My PRs tab (only pasted entries are selectable). */}
-      {(tab === 'my' || tab === 'mine') && (() => {
-        const isSelectable = tab === 'my'
-          ? () => true
-          : (id: Identity) => mineAddedPRs.prs.some((p) => same(p, id));
-        const selectableVisible = visiblePRs.filter((p) => isSelectable({ owner: p.owner, repo: p.repo, number: p.number }));
+      {/* Bulk-action bar — selection is available on every GitHub-PR tab so
+          you can multi-select + copy links anywhere. Delete only renders on
+          Added / mineAdded (the only tabs where rows are local state); on
+          team / oncall / minePRs, Delete is suppressed and just Copy shows. */}
+      {(tab === 'my' || tab === 'mine' || tab === 'team' || tab === 'oncall') && (() => {
+        // Selection eligibility: any row across all GitHub-PR tabs.
+        const selectableVisible = visiblePRs;
         if (selectableVisible.length === 0) return null;
+        // Delete is only meaningful for locally-tracked entries.
+        const canDelete = tab === 'my'
+          ? selectedKeys.size > 0
+          : tab === 'mine'
+            ? Array.from(selectedKeys).some((k) => mineAddedPRs.prs.some((p) => prKey(p) === k))
+            : false;
         return (
           <BulkActionsBar
             selectedCount={selectedKeys.size}
@@ -919,7 +925,23 @@ export function App() {
             allSelected={selectableVisible.length > 0 && selectableVisible.every((p) => selectedKeys.has(prKey(p)))}
             onSelectAll={() => setSelectedKeys(new Set(selectableVisible.map(prKey)))}
             onClear={clearSelection}
-            onDelete={deleteSelected}
+            onDelete={canDelete ? deleteSelected : undefined}
+            onCopyLinks={async () => {
+              // Resolve each selected key to a github.com URL, in the order the
+              // PRs currently appear in the visible list (so the clipboard
+              // output matches what the user sees).
+              const lines = visiblePRs
+                .filter((p) => selectedKeys.has(prKey(p)))
+                .map((p) => `https://github.com/${p.owner}/${p.repo}/pull/${p.number}`);
+              if (lines.length === 0) return;
+              const text = lines.join('\n');
+              try {
+                await navigator.clipboard.writeText(text);
+                addToast('success', `Copied ${lines.length} PR link${lines.length === 1 ? '' : 's'} to clipboard`);
+              } catch (e) {
+                addToast('error', `Couldn't copy to clipboard: ${(e as Error).message}`);
+              }
+            }}
           />
         );
       })()}
@@ -1115,15 +1137,14 @@ export function App() {
                 : `Failed to toggle merge-when-ready for ${prRef}: ${(e as Error).message}`);
             });
         } : undefined}
-        {...(tab === 'my'
+        {...(tab === 'my' || tab === 'team' || tab === 'oncall'
           ? { selection: { selectedKeys, onToggle: toggleSelect } }
           : tab === 'mine'
           ? {
-              selection: {
-                selectedKeys,
-                onToggle: toggleSelect,
-                isSelectable: (id) => mineAddedPRs.prs.some((p) => same(p, id)),
-              },
+              // Every row on My PRs is selectable so the Copy-links bulk
+              // action covers both authored + pasted entries; the bulk-bar
+              // gates Delete to the pasted subset on its own.
+              selection: { selectedKeys, onToggle: toggleSelect },
             }
           : {})}
       />}
