@@ -15,6 +15,8 @@ import { NotesFab } from './components/NotesFab.js';
 import { IssueDrawer } from './components/IssueDrawer.js';
 import { useMyIssues } from './hooks/useMyIssues.js';
 import { CiChecksDrawer } from './components/CiChecksDrawer.js';
+import { usePinnedIssues, pinnedIssueKey } from './hooks/usePinnedIssues.js';
+import { PinIcon, PinSlashIcon } from '@primer/octicons-react';
 import { ToastStack } from './components/ToastStack.js';
 import { useToasts } from './hooks/useToasts.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
@@ -110,6 +112,7 @@ export function App() {
   // CiBadge anywhere (row or drawer header). Independent from the PR drawer
   // so a CI-checks click on a row doesn't dismiss the open PR drawer.
   const [ciChecksTarget, setCiChecksTarget] = useState<{ owner: string; repo: string; number: number } | null>(null);
+  const pinnedIssues = usePinnedIssues();
   const [addError, setAddError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [pendingReviews, setPendingReviews] = useState<Record<string, string>>({});
@@ -904,32 +907,60 @@ export function App() {
           {myIssues.hasLoaded && myIssues.issues.length === 0 && !myIssues.error && (
             <p className="empty">No open issues.</p>
           )}
-          {myIssues.issues.length > 0 && (
-            <ul className="issue-list">
-              {myIssues.issues.map((i) => {
-                const [owner, repo] = i.repository.split('/');
-                return (
-                  <li
-                    key={`${i.repository}#${i.number}`}
-                    className="issue-row"
-                    onClick={() => owner && repo ? setCurrentIssue({ owner, repo, number: i.number }) : null}
-                  >
-                    <span className="pr-text">
-                      <span className="pr-title-row">
-                        <span className="pr-title">{i.title}</span>
-                        {i.labels.length > 0 && (
-                          <LabelChips labels={i.labels.map((name) => ({ name, color: '888888' }))} max={4} />
-                        )}
+          {myIssues.issues.length > 0 && (() => {
+            // Stable sort: pinned issues first (in their order from the
+            // hook's sorted set), unpinned after in the order the server
+            // returned them (most-recently-updated first). Both halves keep
+            // server order — we only re-bucket.
+            const pinned = myIssues.issues.filter((i) => {
+              const [o, r] = i.repository.split('/');
+              return o && r && pinnedIssues.isPinned(pinnedIssueKey({ owner: o, repo: r, number: i.number }));
+            });
+            const rest = myIssues.issues.filter((i) => {
+              const [o, r] = i.repository.split('/');
+              return !(o && r && pinnedIssues.isPinned(pinnedIssueKey({ owner: o, repo: r, number: i.number })));
+            });
+            const sorted = [...pinned, ...rest];
+            return (
+              <ul className="issue-list">
+                {sorted.map((i) => {
+                  const [owner, repo] = i.repository.split('/');
+                  const key = owner && repo ? pinnedIssueKey({ owner, repo, number: i.number }) : '';
+                  const isPinned = key ? pinnedIssues.isPinned(key) : false;
+                  return (
+                    <li
+                      key={`${i.repository}#${i.number}`}
+                      className={`issue-row${isPinned ? ' issue-row-pinned' : ''}`}
+                      onClick={() => owner && repo ? setCurrentIssue({ owner, repo, number: i.number }) : null}
+                    >
+                      <span className="pr-text">
+                        <span className="pr-title-row">
+                          <span className="pr-title">{i.title}</span>
+                          {i.labels.length > 0 && (
+                            <LabelChips labels={i.labels.map((name) => ({ name, color: '888888' }))} max={4} />
+                          )}
+                        </span>
+                        <span className="pr-meta">
+                          {i.repository}#{i.number} · {i.authorLogin ?? 'unknown'}
+                        </span>
                       </span>
-                      <span className="pr-meta">
-                        {i.repository}#{i.number} · {i.authorLogin ?? 'unknown'}
-                      </span>
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                      {key && (
+                        <button
+                          type="button"
+                          className={`issue-pin-button${isPinned ? ' issue-pin-active' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); pinnedIssues.toggle(key); }}
+                          aria-label={isPinned ? 'Unpin issue' : 'Pin issue to the top'}
+                          title={isPinned ? 'Unpin' : 'Pin to top'}
+                        >
+                          {isPinned ? <PinSlashIcon size={14} /> : <PinIcon size={14} />}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            );
+          })()}
         </section>
       )}
 

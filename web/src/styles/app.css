@@ -544,9 +544,20 @@ button.ci-badge { cursor: pointer; }
  * IssueDrawer with the rendered body. */
 .issues-tab { display: block; }
 .issue-list { list-style: none; padding: 0; margin: 8px 0 32px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.issue-row { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.issue-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
 .issue-row:last-child { border-bottom: none; }
 .issue-row:hover { background: var(--bg-subtle); }
+/* Pinned rows get a faint tint and a left-edge accent stripe so they read
+ * as elevated above the rest without taking up extra layout. */
+.issue-row-pinned { background: rgba(88, 166, 255, 0.06); box-shadow: inset 3px 0 0 var(--accent); }
+.issue-row-pinned:hover { background: rgba(88, 166, 255, 0.12); }
+/* Pin toggle: hidden until hover for unpinned rows so the list stays calm,
+ * always visible (and accent-coloured) for pinned ones. */
+.issue-pin-button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; opacity: 0; transition: opacity 80ms, color 80ms, border-color 80ms; }
+.issue-row:hover .issue-pin-button { opacity: 1; }
+.issue-pin-button:hover { color: var(--fg); }
+.issue-pin-active { opacity: 1 !important; color: var(--accent) !important; border-color: var(--accent) !important; }
+.issue-pin-button svg { display: block; }
 /* Issue drawer — reuses .drawer chrome with a slightly different state pill. */
 .issue-state-badge { font-size: 0.75rem; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; font-weight: 500; }
 .issue-state-open { color: #3fb950; }
