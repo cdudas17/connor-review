@@ -556,7 +556,9 @@ button.ci-badge { cursor: pointer; }
 .issue-pin-button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; opacity: 0; transition: opacity 80ms, color 80ms, border-color 80ms; }
 .issue-row:hover .issue-pin-button { opacity: 1; }
 .issue-pin-button:hover { color: var(--fg); }
-.issue-pin-active { opacity: 1 !important; color: var(--accent) !important; border-color: var(--accent) !important; }
+/* Active = pinned. Soft accent wash behind the pin so the icon reads as
+ * "filled in" rather than just a recolored outline. */
+.issue-pin-active { opacity: 1 !important; background: rgba(88, 166, 255, 0.15) !important; color: var(--accent) !important; border-color: var(--accent) !important; }
 .issue-pin-button svg { display: block; }
 /* Issue drawer — reuses .drawer chrome with a slightly different state pill. */
 .issue-state-badge { font-size: 0.75rem; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; font-weight: 500; }

@@ -16,7 +16,7 @@ import { IssueDrawer } from './components/IssueDrawer.js';
 import { useMyIssues } from './hooks/useMyIssues.js';
 import { CiChecksDrawer } from './components/CiChecksDrawer.js';
 import { usePinnedIssues, pinnedIssueKey } from './hooks/usePinnedIssues.js';
-import { PinIcon, PinSlashIcon } from '@primer/octicons-react';
+import { PinIcon } from '@primer/octicons-react';
 import { ToastStack } from './components/ToastStack.js';
 import { useToasts } from './hooks/useToasts.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
@@ -952,7 +952,7 @@ export function App() {
                           aria-label={isPinned ? 'Unpin issue' : 'Pin issue to the top'}
                           title={isPinned ? 'Unpin' : 'Pin to top'}
                         >
-                          {isPinned ? <PinSlashIcon size={14} /> : <PinIcon size={14} />}
+                          <PinIcon size={14} />
                         </button>
                       )}
                     </li>
