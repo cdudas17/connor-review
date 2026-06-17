@@ -1076,7 +1076,12 @@ export function App() {
 
       <IssueDrawer current={currentIssue} onClose={() => setCurrentIssue(null)} />
 
-      <CiChecksDrawer target={ciChecksTarget} onClose={() => setCiChecksTarget(null)} />
+      <CiChecksDrawer
+        target={ciChecksTarget}
+        onClose={() => setCiChecksTarget(null)}
+        onFixCi={ciChecksTarget ? () => fixCi(ciChecksTarget) : undefined}
+        ciFixRunning={ciChecksTarget ? ciFixes.stateFor(ciChecksTarget)?.kind === 'running' : false}
+      />
 
       {current && (() => {
         const tracked = activePRs.find((p) => same(p, current));

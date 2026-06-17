@@ -39,6 +39,14 @@ interface Props {
    * drawer still re-fetches once mounted to pick up any drift. */
   contexts?: CiContext[];
   onClose: () => void;
+  /** When provided AND there are failing checks, the header gains a "Fix CI"
+   * button that fires the same Claude-driven fix flow as the drawer footer.
+   * Pass `undefined` for local-branch PRs or any case where the action
+   * shouldn't be offered. */
+  onFixCi?: () => void;
+  /** Set to true to render the button in its disabled / running state
+   * (used while a fix-CI run is already in flight for this PR). */
+  ciFixRunning?: boolean;
 }
 
 /** Click-target for the CI badge. Opens a right-side drawer listing every
@@ -46,7 +54,7 @@ interface Props {
  * passing. Each row shows the check's state icon, name, and a Details
  * link when one's available. Mirrors GitHub's "Some checks were not
  * successful" panel. */
-export function CiChecksDrawer({ target, contexts: seedContexts, onClose }: Props) {
+export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixCi, ciFixRunning }: Props) {
   const [contexts, setContexts] = useState<CiContext[] | null>(seedContexts ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +101,20 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose }: Prop
           <CloseIcon size={18} />
         </button>
         <header className="ci-checks-header">
-          <h2>CI checks</h2>
+          <div className="ci-checks-header-row">
+            <h2>CI checks</h2>
+            {onFixCi && grouped && grouped.failure.length > 0 && (
+              <button
+                type="button"
+                className="btn-fix-ci ci-checks-fix-ci"
+                disabled={!!ciFixRunning}
+                onClick={onFixCi}
+                title={`Spin up a worktree, install deps, and ask Claude to fix the ${grouped.failure.length} failing check${grouped.failure.length === 1 ? '' : 's'}`}
+              >
+                {ciFixRunning ? 'Fixing CI…' : `Fix CI (${grouped.failure.length})`}
+              </button>
+            )}
+          </div>
           <p className="ci-checks-summary">
             {grouped
               ? <>
