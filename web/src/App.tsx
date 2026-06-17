@@ -14,6 +14,7 @@ import { OncallStateFilter, type OncallState } from './components/OncallStateFil
 import { NotesFab } from './components/NotesFab.js';
 import { IssueDrawer } from './components/IssueDrawer.js';
 import { useMyIssues } from './hooks/useMyIssues.js';
+import { CiChecksDrawer } from './components/CiChecksDrawer.js';
 import { ToastStack } from './components/ToastStack.js';
 import { useToasts } from './hooks/useToasts.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
@@ -100,6 +101,10 @@ export function App() {
   // Identity of the open issue (Issues tab). Held parallel to `current` so
   // the PR + issue drawer states are independent.
   const [currentIssue, setCurrentIssue] = useState<{ owner: string; repo: string; number: number } | null>(null);
+  // PR whose CI-checks breakdown drawer is open. Set when the user clicks a
+  // CiBadge anywhere (row or drawer header). Independent from the PR drawer
+  // so a CI-checks click on a row doesn't dismiss the open PR drawer.
+  const [ciChecksTarget, setCiChecksTarget] = useState<{ owner: string; repo: string; number: number } | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [pendingReviews, setPendingReviews] = useState<Record<string, string>>({});
@@ -934,6 +939,7 @@ export function App() {
         conflictStateFor={(t) => conflictResolutions.stateFor(t)}
         onResolveConflicts={(t) => resolveConflicts({ ...t })}
         ciFixStateFor={(t) => ciFixes.stateFor(t)}
+        onOpenCiChecks={(t) => setCiChecksTarget(t)}
         // Only on the My PRs tab — those are PRs the viewer can typically merge.
         // Fire-and-forget toggle: optimistically flip the row, toast on failure.
         showCopyLink={tab === 'mine'}
@@ -1011,6 +1017,8 @@ export function App() {
 
       <IssueDrawer current={currentIssue} onClose={() => setCurrentIssue(null)} />
 
+      <CiChecksDrawer target={ciChecksTarget} onClose={() => setCiChecksTarget(null)} />
+
       {current && (() => {
         const tracked = activePRs.find((p) => same(p, current));
         const idx = activePRs.findIndex((p) => same(p, current));
@@ -1060,6 +1068,7 @@ export function App() {
             ciFix={ciFixes.stateFor(current)}
             onFixCi={() => fixCi(current)}
             onDismissCiFix={() => ciFixes.dismiss(current)}
+            onOpenCiChecks={() => setCiChecksTarget({ owner: current.owner, repo: current.repo, number: current.number })}
           />
         );
       })()}

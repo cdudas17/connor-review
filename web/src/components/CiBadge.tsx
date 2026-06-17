@@ -20,9 +20,14 @@ interface Props {
    * renders "✓ N/M" / "✗ N/M" in GitHub-status-page style; otherwise the
    * badge falls back to the plain "CI" label. */
   counts?: { passed: number; total: number };
+  /** When set, clicking the badge fires this callback (used to open a
+   * per-check breakdown drawer). Overrides the click-through to `url` —
+   * users can still reach the underlying build via the per-check Details
+   * links inside the drawer. */
+  onClick?: () => void;
 }
 
-export function CiBadge({ status, url, fixing, counts }: Props) {
+export function CiBadge({ status, url, fixing, counts, onClick }: Props) {
   if (status == null) return null;
   const c = CONFIG[status];
   const showLink = url && status !== 'SUCCESS';
@@ -40,6 +45,21 @@ export function CiBadge({ status, url, fixing, counts }: Props) {
     </>
   );
   const cls = `ci-badge ${c.cls}${fixing ? ' ci-badge-fixing' : ''}`;
+  // onClick takes precedence over the link variant — clicking opens the
+  // per-check breakdown drawer; each check inside has its own Details
+  // link. e.stopPropagation so a row's own click handler doesn't fire too.
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className={`${cls} ci-badge-link`}
+        title={title}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+      >
+        {content}
+      </button>
+    );
+  }
   if (showLink) {
     return (
       <a

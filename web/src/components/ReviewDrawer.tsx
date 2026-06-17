@@ -122,6 +122,9 @@ interface Props {
   onFixCi: () => void;
   /** Clear the stored CI-fix entry. */
   onDismissCiFix: () => void;
+  /** Click handler for the CI badge in the drawer header — opens the
+   * per-check breakdown drawer. */
+  onOpenCiChecks?: () => void;
 }
 
 export function ReviewDrawer(props: Props) {
@@ -135,6 +138,7 @@ export function ReviewDrawer(props: Props) {
     conflictResolution, onResolveConflicts, onDismissConflictResolution,
     ciFix, onFixCi, onDismissCiFix,
     reloadNonce,
+    onOpenCiChecks,
   } = props;
   const { meta, diff, loading, error, reload, metaFetchedAt } = usePRDetails(current);
   // GitHub-style +N -M totals for the PR header. Memoised on diff identity
@@ -505,6 +509,7 @@ export function ReviewDrawer(props: Props) {
           : 'idle'}
         onResolveConflicts={meta.source === 'local' ? undefined : onResolveConflicts}
         diffStats={diffStats}
+        onOpenCiChecks={meta.source === 'local' ? undefined : onOpenCiChecks}
       />
       {meta.source !== 'local' && <PRDescription bodyHtml={meta.bodyHtml} />}
       {/* The two Claude-driven fix-status cards sit immediately below the PR

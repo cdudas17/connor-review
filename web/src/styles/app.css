@@ -374,7 +374,8 @@ button.gh-status-conflict-pill:disabled { cursor: progress; opacity: 0.85; }
 .gh-status-closed { color: #f85149; }
 
 /* CI / status-check rollup badge */
-.ci-badge { font-size: 0.75rem; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; background: transparent; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; text-decoration: none; }
+.ci-badge { font-size: 0.75rem; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; background: transparent; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; text-decoration: none; font: inherit; font-size: 0.75rem; font-weight: 500; }
+button.ci-badge { cursor: pointer; }
 .ci-badge-link { cursor: pointer; }
 .ci-badge-link:hover { background: rgba(255, 255, 255, 0.05); text-decoration: underline; }
 .ci-icon { font-size: 0.85em; line-height: 1; }
@@ -552,6 +553,30 @@ button.gh-status-conflict-pill:disabled { cursor: progress; opacity: 0.85; }
 .issue-state-closed { color: #a371f7; }
 .issue-body { margin-top: 16px; padding: 16px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 8px; }
 .issue-body-empty { color: var(--muted); font-style: italic; margin-top: 16px; }
+
+/* CI checks drawer — opened by clicking the CiBadge. Reuses .drawer chrome
+ * but keeps its own header + list structure since the content is much more
+ * uniform than the PR drawer. */
+.ci-checks-drawer { width: 56vw; min-width: 560px; }
+.ci-checks-header { margin: 0 0 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.ci-checks-header h2 { margin: 0 0 6px; font-size: 18px; }
+.ci-checks-summary { margin: 0; font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.ci-checks-summary-failure { color: #f85149; font-weight: 600; }
+.ci-checks-summary-success { color: #3fb950; font-weight: 600; }
+.ci-checks-target { margin: 4px 0 0; font-size: 11px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.ci-checks-list { list-style: none; padding: 0; margin: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.ci-checks-item { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.ci-checks-item:last-child { border-bottom: none; }
+.ci-checks-state-icon { font-weight: 700; text-align: center; line-height: 1; }
+.ci-checks-failure .ci-checks-state-icon { color: #f85149; }
+.ci-checks-success .ci-checks-state-icon { color: #3fb950; }
+.ci-checks-pending .ci-checks-state-icon { color: #d29922; }
+.ci-checks-skipped .ci-checks-state-icon { color: var(--muted); }
+.ci-checks-item-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ci-checks-item-name { font-size: 13px; color: var(--fg); font-weight: 500; word-break: break-word; }
+.ci-checks-item-status { font-size: 11px; color: var(--muted); }
+.ci-checks-item-details { font-size: 12px; color: var(--accent); text-decoration: none; }
+.ci-checks-item-details:hover { text-decoration: underline; }
 .issues-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1 1 auto; }
 .issues-list-item { border-bottom: 1px solid var(--border); }
 .issues-list-item:last-child { border-bottom: none; }

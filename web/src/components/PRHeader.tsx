@@ -22,6 +22,8 @@ interface Props {
    * `+N` and red `-M` chips in the title row, GitHub-style. Undefined while
    * the diff is still loading. */
   diffStats?: { additions: number; deletions: number; files: number };
+  /** Click handler for the CI badge — opens the per-check breakdown drawer. */
+  onOpenCiChecks?: () => void;
 }
 
 function CopyIcon({ size = 14 }: { size?: number }) {
@@ -40,7 +42,7 @@ function CheckIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl, conflictState, onResolveConflicts, diffStats }: Props) {
+export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl, conflictState, onResolveConflicts, diffStats, onOpenCiChecks }: Props) {
   const status = latestGhStatus ?? computeGhStatus(meta);
   const ci = latestCiStatus !== undefined ? latestCiStatus : meta.ciStatus;
   const ciUrl = latestCiUrl !== undefined ? latestCiUrl : meta.ciUrl;
@@ -67,7 +69,7 @@ export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl, co
           onClick={onResolveConflicts}
         />
         <GhStatusBadge status={status} />
-        <CiBadge status={ci} url={ciUrl} counts={meta.ciCounts} />
+        <CiBadge status={ci} url={ciUrl} counts={meta.ciCounts} onClick={onOpenCiChecks} />
         {diffStats && (diffStats.additions > 0 || diffStats.deletions > 0) && (
           <span
             className="pr-header-diffstats has-tooltip"
