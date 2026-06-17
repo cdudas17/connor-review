@@ -94,6 +94,11 @@ export function App() {
     enabled: issuesTabEverSeen,
     scope: 'either',
     owner: APP_CONFIG.myIssuesOwner || undefined,
+    // Auto-refresh every 5 min while the tab is visible, matching the PR
+    // tabs. Combined with the hook's localStorage hydration this means
+    // the Issues tab feels instant on reload and stays current without
+    // manual intervention.
+    autoRefreshMs: 5 * 60 * 1000,
   });
   useEffect(() => { if (tab === 'issues') setIssuesTabEverSeen(true); }, [tab]);
   const [mode, setMode] = useState<FilterMode>('all');

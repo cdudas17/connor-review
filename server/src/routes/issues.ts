@@ -2,6 +2,21 @@ import type { FastifyInstance } from 'fastify';
 import { ghExec, GhCliError } from '../lib/ghExec.js';
 import { ISSUE_DETAIL_QUERY } from '../queries/issue.graphql.js';
 
+/** Short-lived in-memory cache for the /api/issues/mine endpoint. Each
+ * call shells out to `gh search issues` (~2-5s), so absorbing repeat hits
+ * from the client's auto-refresh / tab visit + manual refresh is worth a
+ * small per-process cache. Keyed on the full {scope, owner, limit} tuple
+ * so different config buckets don't collide. */
+const myIssuesCache = new Map<string, { value: unknown; expiresAt: number }>();
+const MY_ISSUES_TTL_MS = 60 * 1000;
+
+/** Test-only helper: drop the in-memory cache between cases so a cached
+ * success from one test doesn't short-circuit the next test's mocked
+ * ghExec failure path. */
+export function __resetIssuesCaches(): void {
+  myIssuesCache.clear();
+}
+
 export interface MyIssue {
   number: number;
   title: string;
@@ -43,6 +58,13 @@ export async function registerIssuesRoutes(app: FastifyInstance) {
       // single GitHub owner (e.g. `Gusto`). Trim to be defensive against
       // accidental whitespace; empty / undefined means "no filter".
       const owner = (req.query.owner ?? '').trim();
+      // Cache hit — return immediately. Each `gh search issues` is multi-
+      // second; this absorbs the client's auto-refresh + tab-visit duplication.
+      const cacheKey = `${scope}::${owner}::${limit}`;
+      const cached = myIssuesCache.get(cacheKey);
+      if (cached && cached.expiresAt > Date.now()) {
+        return cached.value;
+      }
       // IMPORTANT: gh search issues does NOT accept `is:open` / `is:issue`
       // inside the query string — those qualifiers come back as zero-result
       // searches. Use the dedicated flags instead (`--state`, `--author`,
@@ -94,7 +116,9 @@ export async function registerIssuesRoutes(app: FastifyInstance) {
           });
         }
         issues.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
-        return { issues, scope, limit };
+        const result = { issues, scope, limit };
+        myIssuesCache.set(cacheKey, { value: result, expiresAt: Date.now() + MY_ISSUES_TTL_MS });
+        return result;
       } catch (e) {
         if (e instanceof GhCliError) {
           const status = e.code === 'AUTH_REQUIRED' ? 401

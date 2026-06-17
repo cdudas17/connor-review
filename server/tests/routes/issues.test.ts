@@ -13,11 +13,12 @@ vi.mock('../../src/lib/ghExec.js', () => {
 
 import { buildServer } from '../../src/index.js';
 import { ghExec, GhCliError } from '../../src/lib/ghExec.js';
+import { __resetIssuesCaches } from '../../src/routes/issues.js';
 
 const mocked = ghExec as unknown as ReturnType<typeof vi.fn>;
 
 describe('GET /api/issues/mine', () => {
-  beforeEach(() => mocked.mockReset());
+  beforeEach(() => { mocked.mockReset(); __resetIssuesCaches(); });
 
   it('runs two scoped gh search calls for scope=either and merges results most-recent first', async () => {
     // First call: assigned. Returns one issue.
