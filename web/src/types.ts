@@ -52,6 +52,9 @@ export interface TrackedPR {
   trunkInQueue?: boolean;
   /** Pass / total CI rollup counts for the GitHub-style "✓ N/M" badge. */
   ciCounts?: { passed: number; total: number };
+  /** GitHub logins whose LATEST review on this PR is APPROVED. Surfaced in
+   * the approved-checkmark tooltip. */
+  approvers?: string[];
   /** Epoch ms when the server-derived fields on this row were last refreshed
    * (either by a list auto-refresh or a drawer meta fetch). Used to ensure
    * the *most recent* data wins — a stale drawer fetch resolving after a
@@ -86,6 +89,8 @@ export interface PullRequestMeta {
   ciContexts?: Array<{ name: string; state: string | null; url: string | null; isFailure: boolean }>;
   /** Pass / total counts across the rollup contexts (e.g. "9 of 10 passing"). */
   ciCounts?: { passed: number; total: number };
+  /** GitHub logins whose LATEST review on this PR is APPROVED. */
+  approvers?: string[];
   labels: PRLabel[];
   assignees: PRAssignee[];
   reviews: ReviewSummary[];
@@ -185,4 +190,6 @@ export interface TeamPR {
   trunkInQueue?: boolean;
   /** Pass / total CI rollup counts. */
   ciCounts?: { passed: number; total: number };
+  /** GitHub logins whose LATEST review on this PR is APPROVED. */
+  approvers?: string[];
 }

@@ -162,7 +162,7 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictS
                   is dead, and Approved is high-signal "ready to merge". Other
                   states (merged, changes-requested) render to the right of CI. */}
               {(p.ghStatus === 'draft' || p.ghStatus === 'closed' || p.ghStatus === 'approved') && (
-                <GhStatusBadge status={p.ghStatus} />
+                <GhStatusBadge status={p.ghStatus} approvers={p.approvers} />
               )}
               {/* StatusBadge returns null for 'untouched' (the default state),
                   so this just renders Reviewed / Approved chips when set. Sits
@@ -181,7 +181,7 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictS
                 onClick={onOpenCiChecks ? () => onOpenCiChecks({ owner: p.owner, repo: p.repo, number: p.number }) : undefined}
               />
               {p.ghStatus !== 'draft' && p.ghStatus !== 'closed' && p.ghStatus !== 'approved' && (
-                <GhStatusBadge status={p.ghStatus} />
+                <GhStatusBadge status={p.ghStatus} approvers={p.approvers} />
               )}
               {/* My PRs tab: per-row "Copy PR link" button. Renders to the
                   left of the auto-merge toggle so both action icons sit in

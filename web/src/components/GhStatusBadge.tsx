@@ -2,21 +2,25 @@ import type { GhStatus } from '../types.js';
 import { GH_STATUS_LABEL } from '../lib/ghStatus.js';
 import { CheckCircleFillIcon, GitPullRequestDraftIcon, GitPullRequestClosedIcon } from '@primer/octicons-react';
 
-export function GhStatusBadge({ status }: { status: GhStatus | null }) {
+export function GhStatusBadge({ status, approvers }: { status: GhStatus | null; approvers?: string[] }) {
   if (status == null) return <span className="gh-status gh-status-unknown">…</span>;
   // 'open' is the default for a normal PR — rendering a chip for it is just
   // noise. Draft / approved / changes-requested / merged / closed still
   // render because each carries actual information.
   if (status === 'open') return null;
   // Approved: green check icon (Octicons CheckCircleFill) instead of a text
-  // badge — easier to scan in a busy row. Other states stay textual since
-  // they don't have a universally-understood single glyph.
+  // badge — easier to scan in a busy row. Tooltip surfaces the approvers'
+  // logins ("Approved by alice, bob") when we have that info.
   if (status === 'approved') {
+    const list = (approvers ?? []).filter(Boolean);
+    const tooltip = list.length > 0
+      ? `Approved by ${list.join(', ')}`
+      : GH_STATUS_LABEL.approved;
     return (
       <span
         className="gh-status gh-status-approved gh-status-approved-icon has-tooltip"
-        data-tooltip={GH_STATUS_LABEL.approved}
-        aria-label={GH_STATUS_LABEL.approved}
+        data-tooltip={tooltip}
+        aria-label={tooltip}
       >
         <CheckCircleFillIcon size={16} />
       </span>

@@ -44,6 +44,9 @@ interface PullRequestMeta {
   /** Pass / total counters across the rollup contexts. Powers the row's
    * GitHub-style "✓ N/M" badge. Passed = SUCCESS / NEUTRAL / SKIPPED. */
   ciCounts: { passed: number; total: number };
+  /** GitHub logins whose LATEST review on this PR is APPROVED. Used to
+   * surface "Approved by alice, bob" in the green-check tooltip. */
+  approvers: string[];
   baseRefName: string;
   headRefName: string;
   headSha: string;
@@ -216,6 +219,9 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
     ciUrl: extractBuildkiteCheckUrl(pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
     ciContexts: flattenCiContexts(pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
     ciCounts: countCiContexts(pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+    approvers: (pr.latestReviews?.nodes ?? [])
+      .filter((r: { state?: string; author?: { login?: string } }) => r?.state === 'APPROVED' && r.author?.login)
+      .map((r: { author?: { login?: string } }) => r.author!.login!),
     baseRefName: pr.baseRefName,
     headRefName: pr.headRefName,
     headSha: pr.headRefOid,

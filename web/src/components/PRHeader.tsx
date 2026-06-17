@@ -68,7 +68,7 @@ export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl, co
           state={conflictState}
           onClick={onResolveConflicts}
         />
-        <GhStatusBadge status={status} />
+        <GhStatusBadge status={status} approvers={meta.approvers} />
         <CiBadge status={ci} url={ciUrl} counts={meta.ciCounts} onClick={onOpenCiChecks} />
         {diffStats && (diffStats.additions > 0 || diffStats.deletions > 0) && (
           <span

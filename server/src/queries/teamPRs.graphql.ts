@@ -26,6 +26,7 @@ export const TEAM_PR_SEARCH_QUERY = /* GraphQL */ `
           createdAt
           updatedAt
           labels(first: 10) { nodes { name color } }
+          latestReviews(first: 10) { nodes { state author { login } } }
           autoMergeRequest { mergeMethod }
           mergeQueueEntry { state position }
           commits(last: 1) {

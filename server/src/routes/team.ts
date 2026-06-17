@@ -102,6 +102,8 @@ interface TeamPR {
   trunkInQueue: boolean;
   /** Pass/total CI rollup counts for the GitHub-style "✓ N/M" badge. */
   ciCounts: { passed: number; total: number };
+  /** GitHub logins whose LATEST review on the PR is APPROVED. */
+  approvers: string[];
 }
 
 interface TalentFile {
@@ -158,6 +160,7 @@ interface SearchNode {
   createdAt?: string;
   updatedAt: string;
   labels?: { nodes?: Array<{ name?: string; color?: string }> };
+  latestReviews?: { nodes?: Array<{ state?: string; author?: { login?: string } }> };
   autoMergeRequest?: { mergeMethod?: string } | null;
   mergeQueueEntry?: { state?: string; position?: number | null } | null;
   commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string; contexts?: { nodes?: Array<{ __typename?: string; context?: string; name?: string; targetUrl?: string | null; detailsUrl?: string | null; state?: string; status?: string; conclusion?: string | null }> } } } }> };
@@ -237,6 +240,7 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
       mergeQueueQueued: n.mergeQueueEntry != null,
       trunkInQueue: detectTrunkInQueue(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
       ciCounts: countCiContexts(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+      approvers: (n.latestReviews?.nodes ?? []).filter((r) => r?.state === 'APPROVED' && r.author?.login).map((r) => r.author!.login!),
     }))
     .filter((p) => p.owner && p.repo);
 }
@@ -335,6 +339,7 @@ export async function registerTeamRoutes(app: FastifyInstance) {
           mergeQueueQueued: n.mergeQueueEntry != null,
           trunkInQueue: detectTrunkInQueue(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
           ciCounts: countCiContexts(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+          approvers: (n.latestReviews?.nodes ?? []).filter((r) => r?.state === 'APPROVED' && r.author?.login).map((r) => r.author!.login!),
         }))
         .filter((p) => p.owner && p.repo);
       const result = { author, prs };
@@ -394,6 +399,7 @@ export async function registerTeamRoutes(app: FastifyInstance) {
           mergeQueueQueued: n.mergeQueueEntry != null,
           trunkInQueue: detectTrunkInQueue(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
           ciCounts: countCiContexts(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+          approvers: (n.latestReviews?.nodes ?? []).filter((r) => r?.state === 'APPROVED' && r.author?.login).map((r) => r.author!.login!),
         }))
         .filter((p) => p.owner && p.repo);
       const result = { label, prs };

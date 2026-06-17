@@ -21,6 +21,11 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
         createdAt
         bodyHTML
         viewerLatestReview { id state }
+        # Per-reviewer latest review — used to surface approver names in the
+        # approved checkmark tooltip. first=20 covers any realistic PR.
+        latestReviews(first: 20) {
+          nodes { state author { login } }
+        }
         # Auto-merge ("merge when ready") state for the toggle button. The
         # request is null when auto-merge isn't enabled.
         autoMergeRequest {

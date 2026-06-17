@@ -207,7 +207,7 @@ export function App() {
       for (const r of results) {
         if (r.status === 'fulfilled') {
           const { p, meta } = r.value;
-          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING', trunkInQueue: !!meta.trunkInQueue, ciCounts: meta.ciCounts, metaFetchedAt: Date.now() });
+          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING', trunkInQueue: !!meta.trunkInQueue, ciCounts: meta.ciCounts, approvers: meta.approvers, metaFetchedAt: Date.now() });
         }
       }
     });
@@ -375,7 +375,7 @@ export function App() {
     for (const r of results) {
       if (r.status === 'fulfilled') {
         const { p, meta } = r.value;
-        target.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING', trunkInQueue: !!meta.trunkInQueue, ciCounts: meta.ciCounts, metaFetchedAt: Date.now() });
+        target.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING', trunkInQueue: !!meta.trunkInQueue, ciCounts: meta.ciCounts, approvers: meta.approvers, metaFetchedAt: Date.now() });
       } else {
         const err = r.reason as ApiCallError;
         console.error('Failed to fetch PR meta', err);
@@ -435,6 +435,7 @@ export function App() {
       hasConflicts: meta.mergeable === 'CONFLICTING',
       trunkInQueue: !!meta.trunkInQueue,
       ciCounts: meta.ciCounts,
+      approvers: meta.approvers,
       metaFetchedAt: fetchedAt,
     };
     /** Newest-wins guard: a row whose `metaFetchedAt` is greater than the
@@ -602,7 +603,7 @@ export function App() {
       for (const r of results) {
         if (r.status === 'fulfilled') {
           const { p, meta } = r.value;
-          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING', trunkInQueue: !!meta.trunkInQueue, ciCounts: meta.ciCounts, metaFetchedAt: Date.now() });
+          myPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING', trunkInQueue: !!meta.trunkInQueue, ciCounts: meta.ciCounts, approvers: meta.approvers, metaFetchedAt: Date.now() });
         } else {
           const err = r.reason as ApiCallError;
           console.error('Refresh failed for PR', err);
@@ -626,7 +627,7 @@ export function App() {
         for (const r of results) {
           if (r.status === 'fulfilled') {
             const { p, meta } = r.value;
-            mineAddedPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING', trunkInQueue: !!meta.trunkInQueue, ciCounts: meta.ciCounts, metaFetchedAt: Date.now() });
+            mineAddedPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING', trunkInQueue: !!meta.trunkInQueue, ciCounts: meta.ciCounts, approvers: meta.approvers, metaFetchedAt: Date.now() });
           }
         }
       });
