@@ -68,6 +68,38 @@ export function flattenCiContexts(
   }).filter((x) => x.name);
 }
 
+/** Counts of passing vs total CI contexts on the rollup. Matches GitHub's
+ * "9 of 10 successful" surface — passed includes SUCCESS / NEUTRAL / SKIPPED
+ * (a "successful" terminal state from the user's POV); total counts every
+ * context regardless of state so still-running pipelines also raise the
+ * denominator. */
+export function countCiContexts(
+  contexts: RollupContextNode[] | undefined | null,
+): { passed: number; total: number } {
+  if (!Array.isArray(contexts)) return { passed: 0, total: 0 };
+  let passed = 0;
+  let total = 0;
+  for (const c of contexts) {
+    if (!c) continue;
+    if (c.__typename === 'CheckRun') {
+      total++;
+      // Treat pending/in-progress as "not yet passed". Once COMPLETED we look
+      // at conclusion — SUCCESS / NEUTRAL / SKIPPED count as passing.
+      if (c.status === 'COMPLETED' && (
+        c.conclusion === 'SUCCESS' ||
+        c.conclusion === 'NEUTRAL' ||
+        c.conclusion === 'SKIPPED'
+      )) {
+        passed++;
+      }
+    } else if (c.__typename === 'StatusContext') {
+      total++;
+      if (c.state === 'SUCCESS') passed++;
+    }
+  }
+  return { passed, total };
+}
+
 /**
  * Detect whether this PR has an active Trunk merge-queue check run. Trunk's
  * GitHub app posts a check whose name starts with "Trunk" (typically

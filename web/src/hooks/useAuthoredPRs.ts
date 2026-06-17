@@ -84,6 +84,7 @@ export function useAuthoredPRs(author: string, opts: Options = {}) {
         mergeQueueQueued: !!p.mergeQueueQueued,
         hasConflicts: !!p.hasConflicts,
         trunkInQueue: !!p.trunkInQueue,
+        ciCounts: p.ciCounts,
         metaFetchedAt: Date.now(),
       }));
       tracked.sort((a, b) => b.addedAt - a.addedAt);

@@ -16,21 +16,27 @@ interface Props {
    * an in-flight "Fix CI" run is targeting this PR. Color stays tied to the
    * underlying `status` so the user still sees what's currently red. */
   fixing?: boolean;
+  /** Pass / total counts from the PR's rollup contexts. When provided,
+   * renders "✓ N/M" / "✗ N/M" in GitHub-status-page style; otherwise the
+   * badge falls back to the plain "CI" label. */
+  counts?: { passed: number; total: number };
 }
 
-export function CiBadge({ status, url, fixing }: Props) {
+export function CiBadge({ status, url, fixing, counts }: Props) {
   if (status == null) return null;
   const c = CONFIG[status];
   const showLink = url && status !== 'SUCCESS';
+  const haveCounts = counts != null && counts.total > 0;
+  const label = haveCounts ? `${counts!.passed}/${counts!.total}` : c.label;
   const title = fixing
-    ? `CI: ${status.toLowerCase()} — Claude is fixing this`
-    : `CI: ${status.toLowerCase()}`;
+    ? `CI: ${status.toLowerCase()}${haveCounts ? ` (${counts!.passed} of ${counts!.total} passing)` : ''} — Claude is fixing this`
+    : `CI: ${status.toLowerCase()}${haveCounts ? ` (${counts!.passed} of ${counts!.total} passing)` : ''}`;
   const content = (
     <>
       {fixing
         ? <span className="loading-spinner ci-badge-spinner" aria-hidden="true" />
         : <span className="ci-icon" aria-hidden="true">{c.icon}</span>}
-      {c.label}
+      {label}
     </>
   );
   const cls = `ci-badge ${c.cls}${fixing ? ' ci-badge-fixing' : ''}`;

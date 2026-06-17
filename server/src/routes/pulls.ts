@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { ghExec, GhCliError } from '../lib/ghExec.js';
 import { LRUCache } from '../lib/lruCache.js';
 import { BadParamsError, parsePullParams } from '../lib/parseRouteParams.js';
-import { extractBuildkiteCheckUrl, detectTrunkInQueue, flattenCiContexts } from '../lib/ciUrl.js';
+import { extractBuildkiteCheckUrl, detectTrunkInQueue, flattenCiContexts, countCiContexts } from '../lib/ciUrl.js';
 import { PULL_REQUEST_QUERY } from '../queries/pullRequest.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_MUTATION } from '../queries/addPullRequestReview.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION } from '../queries/addPullRequestReviewThread.graphql.js';
@@ -41,6 +41,9 @@ interface PullRequestMeta {
    * the failing check names + their detail URLs to know what to reproduce
    * locally. `isFailure` is true for any non-success terminal state. */
   ciContexts: Array<{ name: string; state: string | null; url: string | null; isFailure: boolean }>;
+  /** Pass / total counters across the rollup contexts. Powers the row's
+   * GitHub-style "✓ N/M" badge. Passed = SUCCESS / NEUTRAL / SKIPPED. */
+  ciCounts: { passed: number; total: number };
   baseRefName: string;
   headRefName: string;
   headSha: string;
@@ -212,6 +215,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
     ciStatus: (pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null) as CiStatus,
     ciUrl: extractBuildkiteCheckUrl(pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
     ciContexts: flattenCiContexts(pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+    ciCounts: countCiContexts(pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
     baseRefName: pr.baseRefName,
     headRefName: pr.headRefName,
     headSha: pr.headRefOid,

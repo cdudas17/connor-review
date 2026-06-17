@@ -67,7 +67,7 @@ export function PRHeader({ meta, latestGhStatus, latestCiStatus, latestCiUrl, co
           onClick={onResolveConflicts}
         />
         <GhStatusBadge status={status} />
-        <CiBadge status={ci} url={ciUrl} />
+        <CiBadge status={ci} url={ciUrl} counts={meta.ciCounts} />
         {diffStats && (diffStats.additions > 0 || diffStats.deletions > 0) && (
           <span
             className="pr-header-diffstats has-tooltip"

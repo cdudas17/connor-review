@@ -50,6 +50,8 @@ export interface TrackedPR {
   /** True when the PR has an active Trunk merge-queue check. Authoritative
    * "in queue" signal for Trunk-managed repos (Gusto/web, etc.). */
   trunkInQueue?: boolean;
+  /** Pass / total CI rollup counts for the GitHub-style "✓ N/M" badge. */
+  ciCounts?: { passed: number; total: number };
   /** Epoch ms when the server-derived fields on this row were last refreshed
    * (either by a list auto-refresh or a drawer meta fetch). Used to ensure
    * the *most recent* data wins — a stale drawer fetch resolving after a
@@ -82,6 +84,8 @@ export interface PullRequestMeta {
    * terminal state. Used by the "Fix failing CI" flow to count + label
    * failing checks. */
   ciContexts?: Array<{ name: string; state: string | null; url: string | null; isFailure: boolean }>;
+  /** Pass / total counts across the rollup contexts (e.g. "9 of 10 passing"). */
+  ciCounts?: { passed: number; total: number };
   labels: PRLabel[];
   assignees: PRAssignee[];
   reviews: ReviewSummary[];
@@ -179,4 +183,6 @@ export interface TeamPR {
   hasConflicts?: boolean;
   /** True when this PR has an active Trunk merge-queue check. */
   trunkInQueue?: boolean;
+  /** Pass / total CI rollup counts. */
+  ciCounts?: { passed: number; total: number };
 }

@@ -90,6 +90,7 @@ export function useTeamPRs(opts: Options = {}) {
         addedAt: Date.parse(p.updatedAt) || Date.now(),
         hasConflicts: !!p.hasConflicts,
         trunkInQueue: !!p.trunkInQueue,
+        ciCounts: p.ciCounts,
         metaFetchedAt: Date.now(),
       }));
       // Newest PRs first.

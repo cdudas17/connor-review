@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import yaml from 'js-yaml';
 import { ghExec, GhCliError } from '../lib/ghExec.js';
 import { TEAM_PR_SEARCH_QUERY } from '../queries/teamPRs.graphql.js';
-import { extractBuildkiteCheckUrl, detectTrunkInQueue } from '../lib/ciUrl.js';
+import { extractBuildkiteCheckUrl, detectTrunkInQueue, countCiContexts } from '../lib/ciUrl.js';
 
 /**
  * Tiny TTL cache. Used to de-dupe overlapping calls to the same external API
@@ -100,6 +100,8 @@ interface TeamPR {
    * or IN_PROGRESS, name starts with "trunk"). Authoritative for Trunk
    * repos, where GitHub's mergeQueueEntry is always null. */
   trunkInQueue: boolean;
+  /** Pass/total CI rollup counts for the GitHub-style "✓ N/M" badge. */
+  ciCounts: { passed: number; total: number };
 }
 
 interface TalentFile {
@@ -234,6 +236,7 @@ async function searchTeamPRs(members: string[]): Promise<TeamPR[]> {
       autoMergeEnabled: n.autoMergeRequest != null,
       mergeQueueQueued: n.mergeQueueEntry != null,
       trunkInQueue: detectTrunkInQueue(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+      ciCounts: countCiContexts(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
     }))
     .filter((p) => p.owner && p.repo);
 }
@@ -331,6 +334,7 @@ export async function registerTeamRoutes(app: FastifyInstance) {
           autoMergeEnabled: n.autoMergeRequest != null,
           mergeQueueQueued: n.mergeQueueEntry != null,
           trunkInQueue: detectTrunkInQueue(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+          ciCounts: countCiContexts(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
         }))
         .filter((p) => p.owner && p.repo);
       const result = { author, prs };
@@ -389,6 +393,7 @@ export async function registerTeamRoutes(app: FastifyInstance) {
           autoMergeEnabled: n.autoMergeRequest != null,
           mergeQueueQueued: n.mergeQueueEntry != null,
           trunkInQueue: detectTrunkInQueue(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
+          ciCounts: countCiContexts(n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes),
         }))
         .filter((p) => p.owner && p.repo);
       const result = { label, prs };

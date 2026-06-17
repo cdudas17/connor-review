@@ -390,6 +390,7 @@ export function App() {
       mergeQueueQueued: meta.mergeQueueEntry != null,
       hasConflicts: meta.mergeable === 'CONFLICTING',
       trunkInQueue: !!meta.trunkInQueue,
+      ciCounts: meta.ciCounts,
       metaFetchedAt: fetchedAt,
     };
     /** Newest-wins guard: a row whose `metaFetchedAt` is greater than the
@@ -581,7 +582,7 @@ export function App() {
         for (const r of results) {
           if (r.status === 'fulfilled') {
             const { p, meta } = r.value;
-            mineAddedPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING', trunkInQueue: !!meta.trunkInQueue, metaFetchedAt: Date.now() });
+            mineAddedPRs.update(p, { title: meta.title, authorLogin: meta.authorLogin, ghStatus: computeGhStatus(meta), ciStatus: meta.ciStatus, ciUrl: meta.ciUrl, labels: meta.labels ?? [], createdAt: meta.createdAt, autoMergeEnabled: meta.autoMergeRequest != null, mergeQueueQueued: meta.mergeQueueEntry != null, hasConflicts: meta.mergeable === 'CONFLICTING', trunkInQueue: !!meta.trunkInQueue, ciCounts: meta.ciCounts, metaFetchedAt: Date.now() });
           }
         }
       });

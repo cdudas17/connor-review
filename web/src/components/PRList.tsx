@@ -173,6 +173,7 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictS
               <CiBadge
                 status={p.ciStatus}
                 url={p.ciUrl}
+                counts={p.ciCounts}
                 fixing={ciFixStateFor?.({ owner: p.owner, repo: p.repo, number: p.number })?.kind === 'running'}
               />
               {p.ghStatus !== 'draft' && p.ghStatus !== 'closed' && p.ghStatus !== 'approved' && (
