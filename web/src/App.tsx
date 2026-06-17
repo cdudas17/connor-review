@@ -6,12 +6,14 @@ import { FilterToggle, type FilterMode } from './components/FilterToggle.js';
 import { ReviewDrawer } from './components/ReviewDrawer.js';
 import { AuthRequiredBanner } from './components/AuthRequiredBanner.js';
 import { ErrorToast } from './components/ErrorToast.js';
+import { LabelChips } from './components/LabelChips.js';
 import { Tabs, type TabId } from './components/Tabs.js';
 import { BulkActionsBar } from './components/BulkActionsBar.js';
 import { MemberFilter } from './components/MemberFilter.js';
 import { OncallStateFilter, type OncallState } from './components/OncallStateFilter.js';
 import { NotesFab } from './components/NotesFab.js';
-import { IssuesFab } from './components/IssuesFab.js';
+import { IssueDrawer } from './components/IssueDrawer.js';
+import { useMyIssues } from './hooks/useMyIssues.js';
 import { ToastStack } from './components/ToastStack.js';
 import { useToasts } from './hooks/useToasts.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
@@ -83,8 +85,21 @@ export function App() {
   const localPRs = useTrackedPRs({ storageKey: 'connor-review.localBranches.v1' });
   const localRepoNames = useMemo(() => Object.keys(APP_CONFIG.localRepos ?? {}), []);
   const [tab, setTab] = useState<TabId>('my');
+  // Open-issues feed for the Issues tab. Lazy: fetches the first time the
+  // user lands on the tab, then stays mounted across switches. Owner is the
+  // user's myIssuesOwner (e.g. 'Gusto') to keep the list scoped.
+  const [issuesTabEverSeen, setIssuesTabEverSeen] = useState(false);
+  const myIssues = useMyIssues({
+    enabled: issuesTabEverSeen,
+    scope: 'either',
+    owner: APP_CONFIG.myIssuesOwner || undefined,
+  });
+  useEffect(() => { if (tab === 'issues') setIssuesTabEverSeen(true); }, [tab]);
   const [mode, setMode] = useState<FilterMode>('all');
   const [current, setCurrent] = useState<Identity | null>(null);
+  // Identity of the open issue (Issues tab). Held parallel to `current` so
+  // the PR + issue drawer states are independent.
+  const [currentIssue, setCurrentIssue] = useState<{ owner: string; repo: string; number: number } | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [pendingReviews, setPendingReviews] = useState<Record<string, string>>({});
@@ -623,6 +638,7 @@ export function App() {
           ...(localRepoNames.length > 0
             ? [{ id: 'local' as const, label: 'Local', badge: untouchedCount(localPRs.prs) || null }]
             : []),
+          { id: 'issues' as const, label: 'Issues', badge: myIssues.hasLoaded ? (myIssues.issues.length || null) : null },
         ]}
         active={tab}
         onChange={setTab}
@@ -863,7 +879,50 @@ export function App() {
         );
       })()}
 
-      <PRList
+      {tab === 'issues' && (
+        <section className="issues-tab">
+          {myIssues.loading && !myIssues.hasLoaded && (
+            <p className="empty"><span className="loading-spinner" aria-hidden="true" /> Loading your open issues…</p>
+          )}
+          {myIssues.error && (
+            <ErrorToast
+              message={describeApiError(myIssues.error, 'Failed to load issues')}
+              onDismiss={() => { /* hook doesn't expose dismiss — refresh button will retry */ }}
+            />
+          )}
+          {myIssues.hasLoaded && myIssues.issues.length === 0 && !myIssues.error && (
+            <p className="empty">No open issues.</p>
+          )}
+          {myIssues.issues.length > 0 && (
+            <ul className="issue-list">
+              {myIssues.issues.map((i) => {
+                const [owner, repo] = i.repository.split('/');
+                return (
+                  <li
+                    key={`${i.repository}#${i.number}`}
+                    className="issue-row"
+                    onClick={() => owner && repo ? setCurrentIssue({ owner, repo, number: i.number }) : null}
+                  >
+                    <span className="pr-text">
+                      <span className="pr-title-row">
+                        <span className="pr-title">{i.title}</span>
+                        {i.labels.length > 0 && (
+                          <LabelChips labels={i.labels.map((name) => ({ name, color: '888888' }))} max={4} />
+                        )}
+                      </span>
+                      <span className="pr-meta">
+                        {i.repository}#{i.number} · {i.authorLogin ?? 'unknown'}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {tab !== 'issues' && <PRList
         prs={activePRs}
         mode={mode}
         onOpen={setCurrent}
@@ -947,7 +1006,9 @@ export function App() {
               },
             }
           : {})}
-      />
+      />}
+
+      <IssueDrawer current={currentIssue} onClose={() => setCurrentIssue(null)} />
 
       {current && (() => {
         const tracked = activePRs.find((p) => same(p, current));
@@ -1002,7 +1063,6 @@ export function App() {
         );
       })()}
       <NotesFab />
-      <IssuesFab />
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </main>
     </MentionsProvider>

@@ -229,6 +229,24 @@ export const api = {
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
     return call(`/api/issues/mine${suffix}`);
   },
+  /** Full detail for a single issue — title + rendered body HTML + metadata.
+   * Powers the issue drawer when the user clicks an entry on the Issues tab. */
+  getIssue(owner: string, repo: string, number: number): Promise<{
+    id: string;
+    number: number;
+    title: string;
+    bodyHtml: string;
+    state: 'open' | 'closed';
+    authorLogin: string | null;
+    authorAvatarUrl: string | null;
+    assignees: Array<{ login: string; avatarUrl: string | null; url: string | null }>;
+    labels: Array<{ name: string; color: string }>;
+    createdAt: string;
+    updatedAt: string;
+    url: string;
+  }> {
+    return call(`/api/issues/${owner}/${repo}/${number}`);
+  },
   /** Attach (or replace) labels on a PR.
    *  - mode='add' (default): append; existing labels stay.
    *  - mode='replace': set the label list to exactly `labels`; drops everything else. */
