@@ -16,6 +16,7 @@ import { IssueDrawer } from './components/IssueDrawer.js';
 import { useMyIssues } from './hooks/useMyIssues.js';
 import { CiChecksDrawer } from './components/CiChecksDrawer.js';
 import { usePinnedIssues, pinnedIssueKey } from './hooks/usePinnedIssues.js';
+import { prefetchIssue } from './hooks/useIssueDetails.js';
 import { PinIcon } from '@primer/octicons-react';
 import { ToastStack } from './components/ToastStack.js';
 import { useToasts } from './hooks/useToasts.js';
@@ -113,6 +114,28 @@ export function App() {
   // so a CI-checks click on a row doesn't dismiss the open PR drawer.
   const [ciChecksTarget, setCiChecksTarget] = useState<{ owner: string; repo: string; number: number } | null>(null);
   const pinnedIssues = usePinnedIssues();
+  // Warm the IssueDrawer cache for every pinned issue whenever the user is
+  // on the Issues tab. Click → drawer opens instantly with the body already
+  // rendered (no spinner) since the hook seeds its initial state from the
+  // prefetch cache. Refires when the pinned set changes (user pins or
+  // unpins an issue) so newly-pinned entries warm up immediately.
+  useEffect(() => {
+    if (tab !== 'issues') return;
+    for (const key of pinnedIssues.pinned) {
+      // Key format: `${owner}/${repo}#${number}` — parse defensively.
+      const hashIdx = key.lastIndexOf('#');
+      if (hashIdx <= 0) continue;
+      const ownerRepo = key.slice(0, hashIdx);
+      const numStr = key.slice(hashIdx + 1);
+      const slashIdx = ownerRepo.indexOf('/');
+      if (slashIdx <= 0) continue;
+      const owner = ownerRepo.slice(0, slashIdx);
+      const repo = ownerRepo.slice(slashIdx + 1);
+      const number = parseInt(numStr, 10);
+      if (!owner || !repo || !Number.isFinite(number)) continue;
+      void prefetchIssue({ owner, repo, number });
+    }
+  }, [tab, pinnedIssues.pinned]);
   const [addError, setAddError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [pendingReviews, setPendingReviews] = useState<Record<string, string>>({});
