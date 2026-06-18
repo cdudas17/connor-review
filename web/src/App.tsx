@@ -658,7 +658,7 @@ export function App() {
     <MentionsProvider value={teamPRs.members}>
     <main className="app">
       <header className="app-header">
-        <h1>Connor Review</h1>
+        <h1 className="app-title"><span className="app-title-starfield">Connor Command Center</span></h1>
         <div className="app-header-actions">
           <button
             type="button"
