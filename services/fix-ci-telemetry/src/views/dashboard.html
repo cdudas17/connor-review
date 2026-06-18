@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Fix CI Telemetry</title>
+  <style>
+    body { font: 14px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 24px; color: #1f2328; background: #f6f8fa; }
+    h1 { margin: 0 0 12px; font-size: 20px; }
+    h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: #57606a; margin: 24px 0 8px; }
+    table { border-collapse: collapse; width: 100%; background: white; border: 1px solid #d0d7de; border-radius: 6px; overflow: hidden; }
+    th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #eaeef2; font-size: 13px; vertical-align: top; }
+    th { background: #f6f8fa; font-weight: 600; color: #57606a; }
+    tr:last-child td { border-bottom: none; }
+    .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 500; }
+    .pill.ok { background: #dafbe1; color: #1a7f37; }
+    .pill.warn { background: #fff8c5; color: #9a6700; }
+    .pill.err { background: #ffebe9; color: #cf222e; }
+    .pill.muted { background: #eaeef2; color: #57606a; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    .row-link { color: #0969da; text-decoration: none; }
+    .row-link:hover { text-decoration: underline; }
+    code { background: #eaeef2; padding: 1px 4px; border-radius: 3px; }
+    .empty { color: #57606a; font-style: italic; padding: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Fix CI Telemetry</h1>
+
+  <h2>By prompt version</h2>
+  <div id="by-version-mount"><div class="empty">Loading…</div></div>
+
+  <h2>Recent runs</h2>
+  <div id="runs-mount"><div class="empty">Loading…</div></div>
+
+  <h2>Prompt suggestions</h2>
+  <div id="suggestions-mount"><div class="empty">Loading…</div></div>
+
+  <script>
+    function pillForStatus(s) {
+      if (s === 'success_pushed') return '<span class="pill ok">' + s + '</span>';
+      if (s === 'no_changes' || s === 'no_failures') return '<span class="pill muted">' + s + '</span>';
+      if (s === 'started') return '<span class="pill warn">' + s + '</span>';
+      return '<span class="pill err">' + (s || 'unknown') + '</span>';
+    }
+    function fmtMs(ms) {
+      if (ms == null) return '';
+      if (ms < 1000) return ms + ' ms';
+      return (ms / 1000).toFixed(1) + ' s';
+    }
+    function fmtAgo(ts) {
+      if (!ts) return '';
+      const diff = Date.now() - ts;
+      const m = Math.floor(diff / 60000);
+      if (m < 1) return 'just now';
+      if (m < 60) return m + 'm ago';
+      const h = Math.floor(m / 60);
+      if (h < 24) return h + 'h ago';
+      return Math.floor(h / 24) + 'd ago';
+    }
+    function pct(n, d) { return d ? (100 * n / d).toFixed(0) + '%' : '–'; }
+
+    Promise.all([
+      fetch('/stats/by-version').then(r => r.json()),
+      fetch('/runs?limit=50').then(r => r.json()),
+      fetch('/suggestions').then(r => r.json()),
+    ]).then(([versions, runs, suggestions]) => {
+      const v = document.getElementById('by-version-mount');
+      if (!versions.length) v.innerHTML = '<div class="empty">No runs yet.</div>';
+      else v.innerHTML = '<table><thead><tr><th>Version</th><th>Total</th><th>Success</th><th>Safety abort</th><th>Claude failed</th><th>No changes</th><th>Avg time</th></tr></thead><tbody>' +
+        versions.map(row => '<tr>' +
+          '<td class="mono">' + (row.prompt_version || 'unknown') + '</td>' +
+          '<td>' + row.total + '</td>' +
+          '<td>' + row.successes + ' (' + pct(row.successes, row.total) + ')</td>' +
+          '<td>' + row.safety_aborts + '</td>' +
+          '<td>' + row.claude_failed + '</td>' +
+          '<td>' + row.no_changes + '</td>' +
+          '<td>' + fmtMs(row.avg_total_ms) + '</td>' +
+        '</tr>').join('') + '</tbody></table>';
+
+      const r = document.getElementById('runs-mount');
+      if (!runs.length) r.innerHTML = '<div class="empty">No runs yet.</div>';
+      else r.innerHTML = '<table><thead><tr><th>When</th><th>PR</th><th>Status</th><th>Abort</th><th>Install</th><th>Claude</th><th>Total</th><th>CI</th><th>Version</th></tr></thead><tbody>' +
+        runs.map(row => '<tr>' +
+          '<td>' + fmtAgo(row.triggered_at) + '</td>' +
+          '<td class="mono"><a class="row-link" href="https://github.com/' + row.owner + '/' + row.repo + '/pull/' + row.number + '" target="_blank">' + row.owner + '/' + row.repo + '#' + row.number + '</a></td>' +
+          '<td>' + pillForStatus(row.status) + '</td>' +
+          '<td class="mono">' + (row.abort_code || '') + '</td>' +
+          '<td>' + fmtMs(row.install_ms) + '</td>' +
+          '<td>' + fmtMs(row.claude_ms) + '</td>' +
+          '<td>' + fmtMs(row.total_ms) + '</td>' +
+          '<td>' + (row.ci_state ? '<span class="pill ' + (row.ci_state === 'success' ? 'ok' : row.ci_state === 'failure' ? 'err' : 'warn') + '">' + row.ci_state + '</span>' : '') +
+            (row.merged_at ? ' <span class="pill ok">merged</span>' : '') +
+            (row.reverted ? ' <span class="pill err">reverted</span>' : '') + '</td>' +
+          '<td class="mono">' + (row.prompt_version || '') + '</td>' +
+        '</tr>').join('') + '</tbody></table>';
+
+      const s = document.getElementById('suggestions-mount');
+      if (!suggestions.length) s.innerHTML = '<div class="empty">No suggestions yet — the propose-prompt worker will fill this overnight.</div>';
+      else s.innerHTML = '<table><thead><tr><th>Created</th><th>Cluster</th><th>Shipped</th><th></th></tr></thead><tbody>' +
+        suggestions.map(row => '<tr>' +
+          '<td>' + fmtAgo(row.created_at) + '</td>' +
+          '<td>' + row.cluster_summary + '</td>' +
+          '<td>' + (row.shipped ? '<span class="pill ok">shipped</span>' : '<span class="pill warn">pending</span>') + '</td>' +
+          '<td><button onclick="markShipped(' + row.id + ')">Mark shipped</button></td>' +
+        '</tr>').join('') + '</tbody></table>';
+    }).catch(err => {
+      document.body.insertAdjacentHTML('beforeend', '<pre style="color:#cf222e">' + err + '</pre>');
+    });
+
+    function markShipped(id) {
+      fetch('/suggestions/' + id + '/shipped', { method: 'POST' })
+        .then(() => location.reload());
+    }
+  </script>
+</body>
+</html>

@@ -12,6 +12,9 @@ import { MARK_READY_FOR_REVIEW_MUTATION } from '../queries/markReadyForReview.gr
 import { CLOSE_PULL_REQUEST_MUTATION } from '../queries/closePullRequest.graphql.js';
 import { claudeExec, ClaudeCliError } from '../lib/claudeExec.js';
 import { gitExec, GitCliError } from '../lib/gitExec.js';
+import { getFixCiPrompt } from '../prompts/index.js';
+import { FIX_CI_PROMPT_VERSION, emitFixCiEvent } from '../lib/fixCiTelemetry.js';
+import { randomUUID } from 'node:crypto';
 import { ENABLE_AUTO_MERGE_MUTATION, DISABLE_AUTO_MERGE_MUTATION } from '../queries/autoMerge.graphql.js';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
@@ -1229,10 +1232,29 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     metaCache.delete(metaKey(params));
     const meta = await fetchMeta(params.owner, params.repo, params.number);
     const failing = (meta.ciContexts ?? []).filter((c) => c.isFailure);
+    // One UUID identifies this run across every telemetry milestone. Emits
+    // are fire-and-forget — see `lib/fixCiTelemetry.ts` for the contract.
+    const runId = randomUUID();
+    const startedAt = Date.now();
     if (failing.length === 0) {
+      void emitFixCiEvent({
+        runId, kind: 'finished',
+        owner: params.owner, repo: params.repo, number: params.number,
+        head_sha: meta.headSha,
+        prompt_version: FIX_CI_PROMPT_VERSION,
+        status: 'no_failures',
+        total_ms: Date.now() - startedAt,
+      });
       reply.send({ ok: true, noFailures: true });
       return;
     }
+    void emitFixCiEvent({
+      runId, kind: 'started',
+      owner: params.owner, repo: params.repo, number: params.number,
+      head_sha: meta.headSha,
+      failing_checks: failing.map((c) => ({ name: c.name, state: c.state, url: c.url })),
+      prompt_version: FIX_CI_PROMPT_VERSION,
+    });
     const baseRef = meta.baseRefName;
     const headRef = meta.headRefName;
     const remoteHead = `origin/${headRef}`;
@@ -1326,6 +1348,7 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         });
       };
       const installErrors: string[] = [];
+      const installStartedAt = Date.now();
       if (hasGemfile) {
         try { await runShell('bundle install --quiet', 'bundle install', 15 * 60_000); }
         catch (e) { installErrors.push((e as Error).message); }
@@ -1341,7 +1364,20 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         try { await runShell(installCmd, 'yarn/npm install', 15 * 60_000); }
         catch (e) { installErrors.push((e as Error).message); }
       }
+      const installMs = Date.now() - installStartedAt;
+      void emitFixCiEvent({
+        runId, kind: 'install_done',
+        install_ms: installMs,
+        install_failed: installErrors.length > 0,
+        install_error: installErrors.length > 0 ? installErrors.join('\n\n') : undefined,
+      });
       if (installErrors.length > 0) {
+        void emitFixCiEvent({
+          runId, kind: 'finished',
+          status: 'install_failed',
+          error: installErrors.join('\n\n').slice(0, 2000),
+          total_ms: Date.now() - startedAt,
+        });
         reply.code(502).send({
           code: 'INSTALL_FAILED',
           message: `Dependency install failed in the worktree — Claude can't run tests without it.`,
@@ -1352,65 +1388,25 @@ export async function registerPullsRoutes(app: FastifyInstance) {
 
       // 3) Build the prompt. The failing-check list is the key signal —
       // Claude uses the names to figure out which tests / linters to run.
-      const failingLines = failing.map((c) => `  - ${c.name}${c.state ? ` (${c.state})` : ''}${c.url ? `\n      ${c.url}` : ''}`);
-      const prompt = [
-        `You are fixing failing CI builds for PR #${params.number} ("${meta.title}") in ${params.owner}/${params.repo}.`,
-        '',
-        `The PR branch ${headRef} is checked out at:`,
-        `  ${worktreePath}`,
-        '',
-        'This is your CWD. Dependencies are ALREADY INSTALLED (bundle install + yarn install have already',
-        'run). Do NOT re-run them — they take a long time and there is no need.',
-        '',
-        `The following CI checks are currently failing on the PR's head commit (${meta.headSha}):`,
-        '',
-        ...failingLines,
-        '',
-        'Your task:',
-        '',
-        '1. Investigate which tests / linters / type checks are failing. Use the check names above to',
-        '   identify the relevant local test commands (e.g. `bin/rspec spec/path/to/failing_spec.rb`,',
-        '   `yarn jest path/to/test.test.ts`, `bundle exec rubocop file.rb`, `bundle exec srb tc`).',
-        '',
-        '2. Reproduce the failures locally by running the SPECIFIC failing test(s), not the full suite.',
-        '   Use NON-INTERACTIVE, NON-WATCH flags to avoid hangs:',
-        '     - jest: `--ci --no-watch --no-color`',
-        '     - rspec: `--no-color --format documentation` (no `--watch`)',
-        '     - rubocop / sorbet: their default non-interactive mode is fine',
-        '   Wrap any test invocation in a 120-second outer timeout (e.g. `timeout 120 bin/rspec ...`)',
-        '   so a misconfigured run cannot hang indefinitely.',
-        '',
-        '3. Once you have reproduced a failure, edit the relevant source files to make the test pass.',
-        '   Re-run only the same test to verify the fix.',
-        '',
-        '4. Repeat until every failing CI check above passes locally.',
-        '',
-        '5. When you are done, briefly summarise:',
-        '   - which checks were failing',
-        '   - which files you changed',
-        '   - which tests now pass',
-        '',
-        'You MAY use: Read, Edit, Write, Bash, Grep, Glob, LS.',
-        '',
-        'You MUST:',
-        '  - NOT run any git commands (no commit, no push, no rebase). A wrapper will commit and push',
-        '    your changes when you are done.',
-        '  - NOT install dependencies (already done — re-running `bundle install` / `yarn install`',
-        '    wastes minutes and risks lockfile churn).',
-        '  - NOT modify Gemfile.lock, yarn.lock, package-lock.json, pnpm-lock.yaml, or any other',
-        '    lockfile. Lockfile changes belong in their own PR; the wrapper will discard any',
-        '    lockfile edits before committing.',
-        '  - NOT enable interactive / watch modes for any test runner.',
-        '  - NOT make changes unrelated to the failing CI checks. If a real fix requires broader',
-        '    refactoring than the failing tests warrant, stop and explain instead of writing code.',
-        '',
-        'After you finish, the wrapper will commit your working-tree changes with --no-verify and push',
-        'them to origin. If you made no changes, the wrapper will report that the PR needs no fixes from',
-        'you.',
-      ].join('\n');
+      // The prompt body lives in `server/src/prompts/fixCi.v1.ts` (and
+      // sibling files for later versions) so we can iterate on it and tag
+      // every telemetry event with the version that ran.
+      const prompt = getFixCiPrompt(FIX_CI_PROMPT_VERSION)({
+        owner: params.owner,
+        repo: params.repo,
+        number: params.number,
+        title: meta.title,
+        authorLogin: meta.authorLogin,
+        headRef,
+        baseRef,
+        headSha: meta.headSha,
+        worktreePath,
+        failing: failing.map((c) => ({ name: c.name, state: c.state, url: c.url })),
+      });
 
       // 4) Run Claude. Long timeout (30 min) because test iteration on a
       // big repo can take a while.
+      const claudeStartedAt = Date.now();
       try {
         await claudeExec(prompt, {
           cwd: worktreePath,
@@ -1418,8 +1414,29 @@ export async function registerPullsRoutes(app: FastifyInstance) {
           permissionMode: 'acceptEdits',
           timeoutMs: 30 * 60_000,
         });
+        void emitFixCiEvent({
+          runId, kind: 'claude_done',
+          claude_ms: Date.now() - claudeStartedAt,
+          claude_failed: false,
+        });
       } catch (e) {
+        const claudeMs = Date.now() - claudeStartedAt;
         if (e instanceof ClaudeCliError) {
+          void emitFixCiEvent({
+            runId, kind: 'claude_done',
+            claude_ms: claudeMs,
+            claude_failed: true,
+            claude_error: e.code,
+            stderr_tail: (e.stderr ?? '').slice(-2000),
+          });
+          void emitFixCiEvent({
+            runId, kind: 'finished',
+            status: 'claude_failed',
+            abort_code: e.code,
+            error: e.message,
+            stderr_tail: (e.stderr ?? '').slice(-2000),
+            total_ms: Date.now() - startedAt,
+          });
           const status = e.code === 'CLAUDE_NOT_INSTALLED' ? 502 : e.code === 'TIMEOUT' ? 504 : 500;
           reply.code(status).send({ code: e.code, message: e.message, stderr: e.stderr });
           return;
@@ -1454,6 +1471,11 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       const statusOut = await gitExec(['status', '--porcelain', '-z'], { cwd: worktreePath });
       const hasChanges = statusOut.split('\0').filter(Boolean).length > 0;
       if (!hasChanges) {
+        void emitFixCiEvent({
+          runId, kind: 'finished',
+          status: 'no_changes',
+          total_ms: Date.now() - startedAt,
+        });
         reply.send({ ok: true, noChanges: true });
         return;
       }
@@ -1479,14 +1501,37 @@ export async function registerPullsRoutes(app: FastifyInstance) {
         await gitExec(['push', '--no-verify', 'origin', `HEAD:${headRef}`], { cwd: worktreePath });
       } catch (e) {
         const stderr = e instanceof GitCliError ? e.stderr : (e as Error).message;
+        void emitFixCiEvent({
+          runId, kind: 'finished',
+          status: 'push_failed',
+          error: 'PUSH_FAILED',
+          stderr_tail: (stderr ?? '').slice(-2000),
+          total_ms: Date.now() - startedAt,
+        });
         reply.code(502).send({ code: 'PUSH_FAILED', message: `git push failed: ${stderr.trim()}`, stderr });
         return;
       }
 
       metaCache.delete(metaKey(params));
+      void emitFixCiEvent({
+        runId, kind: 'finished',
+        status: 'success_pushed',
+        pushed_sha: commitSha,
+        files_changed: filesChanged,
+        failing_checks_fixed: failing.map((c) => c.name),
+        total_ms: Date.now() - startedAt,
+      });
       reply.send({ ok: true, commitSha, filesChanged, failingChecksFixed: failing.map((c) => c.name) });
     } catch (e) {
       if (e instanceof GitCliError) {
+        void emitFixCiEvent({
+          runId, kind: 'finished',
+          status: 'safety_aborted',
+          abort_code: 'GIT_CLI_ERROR',
+          error: e.message,
+          stderr_tail: (e.stderr ?? '').slice(-2000),
+          total_ms: Date.now() - startedAt,
+        });
         reply.code(502).send({ code: 'FIX_FAILED', message: e.message, stderr: e.stderr });
         return;
       }
