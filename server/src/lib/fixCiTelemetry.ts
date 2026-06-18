@@ -17,7 +17,7 @@
 
 /** Bump this when shipping a new prompt version. Should track the filename
  * of the active prompt file (see `server/src/prompts/index.ts`). */
-export const FIX_CI_PROMPT_VERSION = 'v1-2026-06-18';
+export const FIX_CI_PROMPT_VERSION = 'v2-2026-06-18';
 
 /** Resolved at module load — empty / unset disables emission entirely. */
 const TELEMETRY_URL = (process.env.FIX_CI_TELEMETRY_URL ?? '').trim() || null;

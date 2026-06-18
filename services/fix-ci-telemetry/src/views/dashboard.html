@@ -37,7 +37,7 @@
 
   <script>
     function pillForStatus(s) {
-      if (s === 'success_pushed') return '<span class="pill ok">' + s + '</span>';
+      if (s === 'success_pushed' || s === 'success_rebased') return '<span class="pill ok">' + s + '</span>';
       if (s === 'no_changes' || s === 'no_failures') return '<span class="pill muted">' + s + '</span>';
       if (s === 'started') return '<span class="pill warn">' + s + '</span>';
       return '<span class="pill err">' + (s || 'unknown') + '</span>';
@@ -66,13 +66,15 @@
     ]).then(([versions, runs, suggestions]) => {
       const v = document.getElementById('by-version-mount');
       if (!versions.length) v.innerHTML = '<div class="empty">No runs yet.</div>';
-      else v.innerHTML = '<table><thead><tr><th>Version</th><th>Total</th><th>Success</th><th>Safety abort</th><th>Claude failed</th><th>No changes</th><th>Avg time</th></tr></thead><tbody>' +
+      else v.innerHTML = '<table><thead><tr><th>Version</th><th>Total</th><th>Success</th><th>Rebased</th><th>Safety abort</th><th>Claude failed</th><th>Rebase conflicts</th><th>No changes</th><th>Avg time</th></tr></thead><tbody>' +
         versions.map(row => '<tr>' +
           '<td class="mono">' + (row.prompt_version || 'unknown') + '</td>' +
           '<td>' + row.total + '</td>' +
           '<td>' + row.successes + ' (' + pct(row.successes, row.total) + ')</td>' +
+          '<td>' + (row.rebases || 0) + '</td>' +
           '<td>' + row.safety_aborts + '</td>' +
           '<td>' + row.claude_failed + '</td>' +
+          '<td>' + (row.rebase_conflicts || 0) + '</td>' +
           '<td>' + row.no_changes + '</td>' +
           '<td>' + fmtMs(row.avg_total_ms) + '</td>' +
         '</tr>').join('') + '</tbody></table>';

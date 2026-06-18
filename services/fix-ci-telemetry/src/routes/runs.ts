@@ -42,9 +42,11 @@ export function registerRunsRoutes(app: FastifyInstance, db: Database.Database):
       SELECT
         COALESCE(prompt_version, 'unknown') AS prompt_version,
         COUNT(*) AS total,
-        SUM(CASE WHEN status = 'success_pushed' THEN 1 ELSE 0 END) AS successes,
+        SUM(CASE WHEN status IN ('success_pushed', 'success_rebased') THEN 1 ELSE 0 END) AS successes,
+        SUM(CASE WHEN status = 'success_rebased' THEN 1 ELSE 0 END) AS rebases,
         SUM(CASE WHEN status = 'safety_aborted' THEN 1 ELSE 0 END) AS safety_aborts,
         SUM(CASE WHEN status = 'claude_failed' THEN 1 ELSE 0 END) AS claude_failed,
+        SUM(CASE WHEN status = 'rebase_conflicts' THEN 1 ELSE 0 END) AS rebase_conflicts,
         SUM(CASE WHEN status = 'no_changes' THEN 1 ELSE 0 END) AS no_changes,
         AVG(total_ms) AS avg_total_ms
       FROM runs

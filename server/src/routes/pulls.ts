@@ -1407,8 +1407,9 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       // 4) Run Claude. Long timeout (30 min) because test iteration on a
       // big repo can take a while.
       const claudeStartedAt = Date.now();
+      let claudeOutput = '';
       try {
-        await claudeExec(prompt, {
+        claudeOutput = await claudeExec(prompt, {
           cwd: worktreePath,
           allowedTools: ['Read', 'Edit', 'Write', 'Bash', 'Grep', 'Glob', 'LS'],
           permissionMode: 'acceptEdits',
@@ -1442,6 +1443,94 @@ export async function registerPullsRoutes(app: FastifyInstance) {
           return;
         }
         throw e;
+      }
+
+      // 4.25) Triage branch: if Claude decided the failures aren't this PR's
+      // fault, it outputs the sentinel `<<UNRELATED_REBASE>>`. The wrapper
+      // then rebases the PR branch onto its base and force-with-lease-pushes,
+      // so CI re-runs against an up-to-date base. No commit, no merge-conflict
+      // resolution — if the rebase isn't clean we abort and surface the
+      // conflict to the user.
+      const UNRELATED_REBASE_SENTINEL = '<<UNRELATED_REBASE>>';
+      if (claudeOutput.includes(UNRELATED_REBASE_SENTINEL)) {
+        // Discard any tracked-file edits Claude may have made despite the
+        // prompt telling it not to. The worktree is ephemeral so this is safe.
+        try { await gitExec(['checkout', '--', '.'], { cwd: worktreePath }); } catch { /* nothing to revert */ }
+
+        // Re-fetch the freshest base before rebasing — the install step takes
+        // a while and the base may have moved since the initial fetch at the
+        // top of the route.
+        try {
+          await gitExec(['fetch', 'origin', baseRef], { cwd: worktreePath });
+        } catch (e) {
+          const stderr = e instanceof GitCliError ? e.stderr : (e as Error).message;
+          void emitFixCiEvent({
+            runId, kind: 'finished',
+            status: 'rebase_conflicts',
+            abort_code: 'FETCH_BASE_FAILED',
+            error: 'FETCH_BASE_FAILED',
+            stderr_tail: (stderr ?? '').slice(-2000),
+            total_ms: Date.now() - startedAt,
+          });
+          reply.code(502).send({ code: 'FETCH_BASE_FAILED', message: `git fetch origin ${baseRef} failed: ${stderr.trim()}`, stderr });
+          return;
+        }
+
+        try {
+          await gitExec(['rebase', `origin/${baseRef}`], { cwd: worktreePath });
+        } catch (e) {
+          const stderr = e instanceof GitCliError ? e.stderr : (e as Error).message;
+          // Always abort so the worktree is in a clean state for cleanup().
+          try { await gitExec(['rebase', '--abort'], { cwd: worktreePath }); } catch { /* nothing in progress */ }
+          void emitFixCiEvent({
+            runId, kind: 'finished',
+            status: 'rebase_conflicts',
+            abort_code: 'REBASE_CONFLICTS',
+            error: 'REBASE_CONFLICTS',
+            stderr_tail: (stderr ?? '').slice(-2000),
+            total_ms: Date.now() - startedAt,
+          });
+          reply.code(409).send({
+            code: 'REBASE_CONFLICTS',
+            message: `Claude flagged the failures as unrelated, but rebasing onto ${baseRef} produced conflicts — resolve manually.`,
+            stderr,
+          });
+          return;
+        }
+
+        const rebasedSha = (await gitExec(['rev-parse', 'HEAD'], { cwd: worktreePath })).trim();
+
+        // --force-with-lease guards against a teammate having pushed to the PR
+        // branch since we started — we pin to the head SHA we observed at the
+        // top of the route. If the remote moved, the push fails safely.
+        try {
+          await gitExec(
+            ['push', `--force-with-lease=${headRef}:${meta.headSha}`, '--no-verify', 'origin', `HEAD:${headRef}`],
+            { cwd: worktreePath },
+          );
+        } catch (e) {
+          const stderr = e instanceof GitCliError ? e.stderr : (e as Error).message;
+          void emitFixCiEvent({
+            runId, kind: 'finished',
+            status: 'push_failed',
+            abort_code: 'PUSH_FAILED_REBASE',
+            error: 'PUSH_FAILED_REBASE',
+            stderr_tail: (stderr ?? '').slice(-2000),
+            total_ms: Date.now() - startedAt,
+          });
+          reply.code(502).send({ code: 'PUSH_FAILED', message: `git push (rebase) failed: ${stderr.trim()}`, stderr });
+          return;
+        }
+
+        metaCache.delete(metaKey(params));
+        void emitFixCiEvent({
+          runId, kind: 'finished',
+          status: 'success_rebased',
+          pushed_sha: rebasedSha,
+          total_ms: Date.now() - startedAt,
+        });
+        reply.send({ ok: true, rebased: true, unrelated: true, commitSha: rebasedSha });
+        return;
       }
 
       // 4.5) Revert any lockfile changes the install step may have produced.

@@ -9,6 +9,8 @@ export type RunStatus =
   | 'push_failed'
   | 'safety_aborted'
   | 'success_pushed'
+  | 'success_rebased'
+  | 'rebase_conflicts'
   | 'no_failures'
   | 'no_changes';
 

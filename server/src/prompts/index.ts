@@ -13,15 +13,15 @@
  */
 
 import { buildFixCiPrompt as v1, type FixCiPromptInput } from './fixCi.v1.js';
+import { buildFixCiPrompt as v2 } from './fixCi.v2.js';
 
 export type { FixCiPromptInput };
 
-/** Resolve the prompt builder for a given version string. Falls back to v1
- * for anything we don't recognise — that way the server never throws on a
- * stale FIX_CI_PROMPT_VERSION constant during development. */
+/** Resolve the prompt builder for a given version string. Falls back to the
+ * latest known builder for anything we don't recognise — that way the server
+ * never throws on a stale FIX_CI_PROMPT_VERSION constant during development. */
 export function getFixCiPrompt(version: string): (input: FixCiPromptInput) => string {
   if (version.startsWith('v1-')) return v1;
-  // Future versions register here:
-  //   if (version.startsWith('v2-')) return v2;
-  return v1;
+  if (version.startsWith('v2-')) return v2;
+  return v2;
 }

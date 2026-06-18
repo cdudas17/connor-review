@@ -42,6 +42,8 @@ type FinishedPayload = {
   kind: 'finished';
   status:
     | 'success_pushed'
+    | 'success_rebased'
+    | 'rebase_conflicts'
     | 'no_changes'
     | 'no_failures'
     | 'safety_aborted'
