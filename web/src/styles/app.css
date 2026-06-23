@@ -271,7 +271,13 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .add-pr-bar-remove-approved:disabled { opacity: 0.4; cursor: not-allowed; }
 .add-pr-bar-hint { color: var(--muted); font-size: 0.85rem; margin: 0; }
 .add-pr-bar-hint kbd { padding: 1px 4px; border: 1px solid var(--border); border-radius: 3px; font-size: 0.8em; }
-.add-pr-bar button, .filter-toggle, .drawer button { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; cursor: pointer; font: inherit; }
+/* :not(.ci-badge):not(.gh-status) — the pill badges (CiBadge, ConflictBadge,
+ * GhStatusBadge) carry their own padding/border/color/radius and must NOT
+ * pick up this catch-all when they happen to render as a <button> inside
+ * the drawer (i.e. when an onClick is wired). Without the :not, the diff
+ * view's clickable CiBadge gets grey-bordered, square-cornered, and
+ * white-colored — visibly mismatched against the table view's badge. */
+.add-pr-bar button, .filter-toggle, .drawer button:not(.ci-badge):not(.gh-status) { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; cursor: pointer; font: inherit; }
 .add-pr-bar .error { color: var(--danger); }
 .pr-list { list-style: none; padding: 0; }
 .pr-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; align-items: center; }
