@@ -81,10 +81,13 @@ export async function runProposePromptOnce(
   log: (msg: string) => void,
 ): Promise<number> {
   const since = Date.now() - WINDOW_MS;
+  // `claude_failed` is excluded: it means the CLI itself crashed (overloaded,
+  // rate-limited, killed mid-stream) — the prompt had no chance to influence
+  // the outcome. Clustering on it produced suggestions that were noise.
   const rows = db.prepare(`
     SELECT * FROM runs
     WHERE triggered_at >= ?
-      AND status IN ('claude_failed', 'safety_aborted', 'push_failed', 'install_failed')
+      AND status IN ('safety_aborted', 'push_failed', 'install_failed')
   `).all(since) as RunRow[];
   const clusters = clusterFailures(rows);
   if (!clusters.length) {
