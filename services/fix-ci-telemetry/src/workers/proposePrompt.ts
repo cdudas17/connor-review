@@ -51,15 +51,18 @@ function isSlowSuccess(r: RunRow): boolean {
 function clusterRuns(rows: RunRow[]): Cluster[] {
   const by = new Map<string, Cluster>();
   for (const r of rows) {
-    // Slow successes share `status` with fast successes (which the query
-    // already excludes), so tag them with a synthetic 'SLOW' abort_code.
-    // That keeps the dashboard's cluster summary unambiguous and lets
-    // buildMetaPrompt branch on it.
-    const abortCode = isSlowSuccess(r) ? 'SLOW' : r.abort_code;
-    const key = `${r.status}::${abortCode ?? ''}`;
+    // Slow successes get a synthetic status+abort_code so success_pushed
+    // and success_rebased collapse into one latency cluster — both want
+    // the same prompt-optimization (cut wall-clock), the push/rebase
+    // distinction is irrelevant to that goal. buildMetaPrompt branches
+    // on abort_code === 'SLOW'.
+    const slow = isSlowSuccess(r);
+    const status = slow ? 'slow_success' : r.status;
+    const abortCode = slow ? 'SLOW' : r.abort_code;
+    const key = `${status}::${abortCode ?? ''}`;
     let c = by.get(key);
     if (!c) {
-      c = { status: r.status, abort_code: abortCode, runs: [] };
+      c = { status, abort_code: abortCode, runs: [] };
       by.set(key, c);
     }
     c.runs.push(r);
