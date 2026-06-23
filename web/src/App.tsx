@@ -10,6 +10,8 @@ import { LabelChips } from './components/LabelChips.js';
 import { Tabs, type TabId } from './components/Tabs.js';
 import { BulkActionsBar } from './components/BulkActionsBar.js';
 import { MemberFilter } from './components/MemberFilter.js';
+import { TagFilter } from './components/TagFilter.js';
+import { ANY_TAG, effectiveTags } from './lib/extractTags.js';
 import { OncallStateFilter, type OncallState } from './components/OncallStateFilter.js';
 import { NotesFab } from './components/NotesFab.js';
 import { IssueDrawer } from './components/IssueDrawer.js';
@@ -274,12 +276,72 @@ export function App() {
   const selectAllOncallStates = useCallback(() => setOncallStates(new Set<OncallState>(['draft', 'ready'])), []);
   const clearAllOncallStates = useCallback(() => setOncallStates(new Set<OncallState>()), []);
 
-  const activePRs: TrackedPR[] =
+  const tabPRs: TrackedPR[] =
     tab === 'my' ? myPRs.prs
     : tab === 'mine' ? combinedMinePRs
     : tab === 'team' ? filteredTeamPRs
     : tab === 'local' ? localPRs.prs
     : filteredOncallPRs;
+
+  // Tag filter — derives the [BRACKET] tags from the current tab's PR titles
+  // and applies an OR filter. PRs with no bracket tags fall under [ANY].
+  // Selection is per-tab (resets when the tab switches) so each tab's tag
+  // chip set stays meaningful — global persistence would surface chips for
+  // tags that don't exist on the active tab.
+  const [tagFilters, setTagFilters] = useState<Record<TabId, Set<string> | null>>({} as Record<TabId, Set<string> | null>);
+  const tagFilter = tagFilters[tab] ?? null;
+  const setTagFilter = useCallback((next: Set<string> | null | ((cur: Set<string> | null) => Set<string> | null)) => {
+    setTagFilters((cur) => {
+      const prev = cur[tab] ?? null;
+      const resolved = typeof next === 'function' ? next(prev) : next;
+      return { ...cur, [tab]: resolved };
+    });
+  }, [tab]);
+
+  const { tagList, tagCounts } = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of tabPRs) {
+      const tags = effectiveTags(p.title);
+      for (const t of tags) counts[t] = (counts[t] ?? 0) + 1;
+    }
+    // ANY pins to the end; real tags sort alphabetically so the chip order is stable.
+    const list = Object.keys(counts).sort((a, b) => {
+      if (a === ANY_TAG) return 1;
+      if (b === ANY_TAG) return -1;
+      return a.localeCompare(b);
+    });
+    return { tagList: list, tagCounts: counts };
+  }, [tabPRs]);
+
+  // First-time default: when a tab first surfaces tags, mark all on. Once the
+  // user toggles anything, future tags appearing on the tab don't auto-enable.
+  useEffect(() => {
+    if (tagList.length === 0) return;
+    setTagFilter((cur) => cur ?? new Set(tagList));
+  }, [tagList, setTagFilter]);
+
+  const toggleTag = useCallback((t: string) => {
+    setTagFilter((cur) => {
+      const base = cur ?? new Set(tagList);
+      const next = new Set(base);
+      if (next.has(t)) next.delete(t); else next.add(t);
+      return next;
+    });
+  }, [tagList, setTagFilter]);
+  const selectAllTags = useCallback(() => setTagFilter(new Set(tagList)), [tagList, setTagFilter]);
+  const clearAllTags = useCallback(() => setTagFilter(new Set()), [setTagFilter]);
+
+  const activePRs: TrackedPR[] = useMemo(() => {
+    // Skip filtering entirely when the chip filter would be a no-op — either
+    // there's <2 tags (chip filter doesn't render) or the user hasn't touched
+    // it yet (tagFilter === null → treat as all-on).
+    if (tagList.length < 2 || tagFilter === null) return tabPRs;
+    if (tagFilter.size === 0) return [];
+    return tabPRs.filter((p) => {
+      const tags = effectiveTags(p.title);
+      return tags.some((t) => tagFilter.has(t));
+    });
+  }, [tabPRs, tagFilter, tagList.length]);
   // For setStatus on the My PRs tab, route to whichever underlying list owns
   // the PR: authored ones go to the authored hook, pasted ones to the tracked
   // hook. If a PR id ends up in both, prefer authored (matches the dedupe rule).
@@ -1062,6 +1124,17 @@ export function App() {
             );
           })()}
         </section>
+      )}
+
+      {tab !== 'issues' && (
+        <TagFilter
+          tags={tagList}
+          selected={tagFilter ?? new Set(tagList)}
+          countsByTag={tagCounts}
+          onToggle={toggleTag}
+          onSelectAll={selectAllTags}
+          onClearAll={clearAllTags}
+        />
       )}
 
       {tab !== 'issues' && <PRList
