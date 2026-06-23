@@ -25,6 +25,18 @@
     .propose-run-btn:hover:not(:disabled) { background: #f6f8fa; }
     .propose-run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .propose-run-status { font-size: 12px; color: #57606a; text-transform: none; letter-spacing: 0; font-weight: 400; }
+    .suggestion-panel-row td { background: #f6f8fa; padding: 0; }
+    .suggestion-panel { padding: 12px 14px; }
+    .suggestion-panel-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .suggestion-panel-col-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #57606a; font-weight: 600; margin-bottom: 4px; }
+    .suggestion-panel-pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: white; border: 1px solid #d0d7de; border-radius: 4px; padding: 8px 10px; margin: 0; max-height: 360px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+    .suggestion-panel-pre.proposed { border-color: #3fb950; background: #f0fdf4; }
+    .suggestion-panel-runs { margin-top: 10px; font-size: 12px; color: #57606a; }
+    .suggestion-panel-runs a { margin-right: 8px; }
+    .suggestion-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+    .suggestion-actions button { font: inherit; font-size: 12px; padding: 3px 10px; border: 1px solid #d0d7de; border-radius: 6px; background: white; color: #1f2328; cursor: pointer; }
+    .suggestion-actions button:hover { background: #f6f8fa; }
+    .suggestion-actions .copy-btn.copied { color: #1a7f37; border-color: #3fb950; }
   </style>
 </head>
 <body>
@@ -104,15 +116,7 @@
           '<td class="mono">' + (row.prompt_version || '') + '</td>' +
         '</tr>').join('') + '</tbody></table>';
 
-      const s = document.getElementById('suggestions-mount');
-      if (!suggestions.length) s.innerHTML = '<div class="empty">No suggestions yet — the propose-prompt worker will fill this overnight.</div>';
-      else s.innerHTML = '<table><thead><tr><th>Created</th><th>Cluster</th><th>Shipped</th><th></th></tr></thead><tbody>' +
-        suggestions.map(row => '<tr>' +
-          '<td>' + fmtAgo(row.created_at) + '</td>' +
-          '<td>' + row.cluster_summary + '</td>' +
-          '<td>' + (row.shipped ? '<span class="pill ok">shipped</span>' : '<span class="pill warn">pending</span>') + '</td>' +
-          '<td><button onclick="markShipped(' + row.id + ')">Mark shipped</button></td>' +
-        '</tr>').join('') + '</tbody></table>';
+      refreshSuggestions(suggestions);
     }).catch(err => {
       document.body.insertAdjacentHTML('beforeend', '<pre style="color:#cf222e">' + err + '</pre>');
     });
@@ -155,16 +159,84 @@
       }).catch(() => { /* swallow */ });
     }
 
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
     function refreshSuggestions(suggestions) {
       const s = document.getElementById('suggestions-mount');
-      if (!suggestions.length) s.innerHTML = '<div class="empty">No suggestions yet — the propose-prompt worker will fill this overnight, or click "Run now" above.</div>';
-      else s.innerHTML = '<table><thead><tr><th>Created</th><th>Cluster</th><th>Shipped</th><th></th></tr></thead><tbody>' +
-        suggestions.map(row => '<tr>' +
-          '<td>' + fmtAgo(row.created_at) + '</td>' +
-          '<td>' + row.cluster_summary + '</td>' +
-          '<td>' + (row.shipped ? '<span class="pill ok">shipped</span>' : '<span class="pill warn">pending</span>') + '</td>' +
-          '<td><button onclick="markShipped(' + row.id + ')">Mark shipped</button></td>' +
-        '</tr>').join('') + '</tbody></table>';
+      if (!suggestions.length) {
+        s.innerHTML = '<div class="empty">No suggestions yet — the propose-prompt worker will fill this overnight, or click "Run now" above.</div>';
+        return;
+      }
+      const rowsHtml = suggestions.map(row => {
+        let runs = [];
+        try { runs = JSON.parse(row.failing_runs || '[]'); } catch { runs = []; }
+        const runLinks = runs.map(rid => '<a class="row-link" href="/runs/' + encodeURIComponent(rid) + '" target="_blank">' + escapeHtml(String(rid).slice(0, 8)) + '…</a>').join(' · ') || '<span style="color:#57606a">(no runs recorded)</span>';
+        const shippedPill = row.shipped
+          ? '<span class="pill ok">shipped</span>'
+          : '<span class="pill warn">pending</span>';
+        return ''
+          + '<tr>'
+          +   '<td>' + fmtAgo(row.created_at) + '</td>'
+          +   '<td>' + escapeHtml(row.cluster_summary) + '</td>'
+          +   '<td>' + shippedPill + '</td>'
+          +   '<td><div class="suggestion-actions">'
+          +     '<button type="button" onclick="togglePanel(' + row.id + ', this)">View diff</button>'
+          +     '<button type="button" onclick="markShipped(' + row.id + ')">Mark shipped</button>'
+          +   '</div></td>'
+          + '</tr>'
+          + '<tr class="suggestion-panel-row" id="suggestion-panel-row-' + row.id + '" hidden>'
+          +   '<td colspan="4">'
+          +     '<div class="suggestion-panel">'
+          +       '<div class="suggestion-panel-cols">'
+          +         '<div>'
+          +           '<div class="suggestion-panel-col-title">Current prompt</div>'
+          +           '<pre class="suggestion-panel-pre">' + escapeHtml(row.current_prompt) + '</pre>'
+          +         '</div>'
+          +         '<div>'
+          +           '<div class="suggestion-panel-col-title">'
+          +             'Proposed prompt'
+          +             ' <button type="button" class="copy-btn" onclick="copyProposed(this, ' + row.id + ')">Copy</button>'
+          +           '</div>'
+          +           '<pre class="suggestion-panel-pre proposed" id="proposed-' + row.id + '">' + escapeHtml(row.proposed_prompt) + '</pre>'
+          +         '</div>'
+          +       '</div>'
+          +       '<div class="suggestion-panel-runs"><strong>Runs in cluster:</strong> ' + runLinks + '</div>'
+          +     '</div>'
+          +   '</td>'
+          + '</tr>';
+      }).join('');
+      s.innerHTML = '<table><thead><tr><th>Created</th><th>Cluster</th><th>Shipped</th><th></th></tr></thead><tbody>' + rowsHtml + '</tbody></table>';
+    }
+
+    function togglePanel(id, btn) {
+      const row = document.getElementById('suggestion-panel-row-' + id);
+      if (!row) return;
+      const isHidden = row.hasAttribute('hidden');
+      if (isHidden) {
+        row.removeAttribute('hidden');
+        if (btn) btn.textContent = 'Hide diff';
+      } else {
+        row.setAttribute('hidden', '');
+        if (btn) btn.textContent = 'View diff';
+      }
+    }
+
+    function copyProposed(btn, id) {
+      const pre = document.getElementById('proposed-' + id);
+      if (!pre) return;
+      navigator.clipboard.writeText(pre.textContent || '').then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1200);
+      }).catch(() => {
+        btn.textContent = 'Copy failed';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 1200);
+      });
     }
 
     runBtn.addEventListener('click', () => {
