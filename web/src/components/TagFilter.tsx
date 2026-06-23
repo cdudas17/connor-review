@@ -3,13 +3,13 @@
  * MemberFilter layout/UX — toggling each chip changes the OR-filter, and a
  * "Select all / Clear all" bulk button sits at the end. PRs that match ANY
  * selected tag are shown; PRs whose tag set is disjoint from the selection
- * are hidden. PRs with no bracket tags fall under the synthetic [ANY] chip.
+ * are hidden. PRs with no bracket tags fall under the synthetic [NONE] chip.
  *
  * The dashboard only renders the filter when there are ≥2 tags — a single tag
  * would collapse the list to all or nothing, which is useless noise.
  */
 
-import { ANY_TAG } from '../lib/extractTags.js';
+import { NONE_TAG } from '../lib/extractTags.js';
 
 interface Props {
   tags: string[];
@@ -29,9 +29,9 @@ export function TagFilter({ tags, selected, countsByTag, onToggle, onSelectAll, 
         {tags.map((t) => {
           const isOn = selected.has(t);
           const count = countsByTag[t] ?? 0;
-          const isAny = t === ANY_TAG;
+          const isNone = t === NONE_TAG;
           const label = `[${t}]`;
-          const title = isAny
+          const title = isNone
             ? isOn ? 'Hide PRs without any leading bracket tags' : 'Show PRs without any leading bracket tags'
             : isOn ? `Hide PRs tagged [${t}]` : `Show PRs tagged [${t}]`;
           return (

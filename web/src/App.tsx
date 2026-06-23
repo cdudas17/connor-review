@@ -11,7 +11,7 @@ import { Tabs, type TabId } from './components/Tabs.js';
 import { BulkActionsBar } from './components/BulkActionsBar.js';
 import { MemberFilter } from './components/MemberFilter.js';
 import { TagFilter } from './components/TagFilter.js';
-import { ANY_TAG, effectiveTags } from './lib/extractTags.js';
+import { NONE_TAG, effectiveTags } from './lib/extractTags.js';
 import { OncallStateFilter, type OncallState } from './components/OncallStateFilter.js';
 import { NotesFab } from './components/NotesFab.js';
 import { IssueDrawer } from './components/IssueDrawer.js';
@@ -284,7 +284,7 @@ export function App() {
     : filteredOncallPRs;
 
   // Tag filter — derives the [BRACKET] tags from the current tab's PR titles
-  // and applies an OR filter. PRs with no bracket tags fall under [ANY].
+  // and applies an OR filter. PRs with no bracket tags fall under [NONE].
   // Selection is per-tab (resets when the tab switches) so each tab's tag
   // chip set stays meaningful — global persistence would surface chips for
   // tags that don't exist on the active tab.
@@ -304,10 +304,10 @@ export function App() {
       const tags = effectiveTags(p.title);
       for (const t of tags) counts[t] = (counts[t] ?? 0) + 1;
     }
-    // ANY pins to the end; real tags sort alphabetically so the chip order is stable.
+    // NONE pins to the end; real tags sort alphabetically so the chip order is stable.
     const list = Object.keys(counts).sort((a, b) => {
-      if (a === ANY_TAG) return 1;
-      if (b === ANY_TAG) return -1;
+      if (a === NONE_TAG) return 1;
+      if (b === NONE_TAG) return -1;
       return a.localeCompare(b);
     });
     return { tagList: list, tagCounts: counts };
@@ -332,6 +332,8 @@ export function App() {
   const clearAllTags = useCallback(() => setTagFilter(new Set()), [setTagFilter]);
 
   const activePRs: TrackedPR[] = useMemo(() => {
+    // Tag filter is My-PRs-only — other tabs aren't subject to it.
+    if (tab !== 'my') return tabPRs;
     // Skip filtering entirely when the chip filter would be a no-op — either
     // there's <2 tags (chip filter doesn't render) or the user hasn't touched
     // it yet (tagFilter === null → treat as all-on).
@@ -341,7 +343,7 @@ export function App() {
       const tags = effectiveTags(p.title);
       return tags.some((t) => tagFilter.has(t));
     });
-  }, [tabPRs, tagFilter, tagList.length]);
+  }, [tab, tabPRs, tagFilter, tagList.length]);
   // For setStatus on the My PRs tab, route to whichever underlying list owns
   // the PR: authored ones go to the authored hook, pasted ones to the tracked
   // hook. If a PR id ends up in both, prefer authored (matches the dedupe rule).
@@ -1126,7 +1128,7 @@ export function App() {
         </section>
       )}
 
-      {tab !== 'issues' && (
+      {tab === 'my' && (
         <TagFilter
           tags={tagList}
           selected={tagFilter ?? new Set(tagList)}

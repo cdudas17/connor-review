@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANY_TAG, effectiveTags, extractTags } from '../../src/lib/extractTags.js';
+import { NONE_TAG, effectiveTags, extractTags } from '../../src/lib/extractTags.js';
 
 describe('extractTags', () => {
   it('extracts a single leading bracket tag', () => {
@@ -40,9 +40,9 @@ describe('effectiveTags', () => {
     expect(effectiveTags('[FOO][BAR] body')).toEqual(['FOO', 'BAR']);
   });
 
-  it('returns the ANY sentinel when no tags', () => {
-    expect(effectiveTags('Plain title')).toEqual([ANY_TAG]);
-    expect(effectiveTags('')).toEqual([ANY_TAG]);
-    expect(effectiveTags(null)).toEqual([ANY_TAG]);
+  it('returns the NONE sentinel when no tags', () => {
+    expect(effectiveTags('Plain title')).toEqual([NONE_TAG]);
+    expect(effectiveTags('')).toEqual([NONE_TAG]);
+    expect(effectiveTags(null)).toEqual([NONE_TAG]);
   });
 });

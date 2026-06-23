@@ -27,11 +27,11 @@ export function extractTags(title: string | null | undefined): string[] {
 }
 
 /** Sentinel tag used for PRs whose title has no leading bracket-tags. Renders
- * as "[ANY]" on the dashboard. Keeps the OR-filter logic uniform — every PR
+ * as "[NONE]" on the dashboard. Keeps the OR-filter logic uniform — every PR
  * has at least one effective tag. */
-export const ANY_TAG = 'ANY';
+export const NONE_TAG = 'NONE';
 
 export function effectiveTags(title: string | null | undefined): string[] {
   const tags = extractTags(title);
-  return tags.length > 0 ? tags : [ANY_TAG];
+  return tags.length > 0 ? tags : [NONE_TAG];
 }
