@@ -333,7 +333,7 @@ export function App() {
 
   const activePRs: TrackedPR[] = useMemo(() => {
     // Tag filter is My-PRs-only — other tabs aren't subject to it.
-    if (tab !== 'my') return tabPRs;
+    if (tab !== 'mine') return tabPRs;
     // Skip filtering entirely when the chip filter would be a no-op — either
     // there's <2 tags (chip filter doesn't render) or the user hasn't touched
     // it yet (tagFilter === null → treat as all-on).
@@ -1128,7 +1128,7 @@ export function App() {
         </section>
       )}
 
-      {tab === 'my' && (
+      {tab === 'mine' && (
         <TagFilter
           tags={tagList}
           selected={tagFilter ?? new Set(tagList)}
