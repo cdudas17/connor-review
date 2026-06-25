@@ -608,8 +608,13 @@ button.ci-badge { cursor: pointer; }
  * so its own z-index has to be higher; otherwise it stacks underneath the
  * diff drawer and the user can't see it. Backdrop bumped too so it covers
  * the ReviewDrawer + click-to-close works as expected. */
-.ci-checks-drawer { width: 56vw; min-width: 560px; z-index: 13; }
-.ci-checks-backdrop { z-index: 12; }
+.ci-checks-drawer { width: 56vw; min-width: 560px; }
+/* The `.drawer.` prefix on each selector bumps specificity above the plain
+ * `.drawer { z-index: 11 }` rule (which appears later in this file and would
+ * otherwise win on source-order, sinking the CI drawer back behind the diff
+ * drawer). `.drawer-backdrop.` does the same for the backdrop. */
+.drawer.ci-checks-drawer { z-index: 13; }
+.drawer-backdrop.ci-checks-backdrop { z-index: 12; }
 .ci-checks-header { margin: 0 0 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .ci-checks-header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .ci-checks-header-row h2 { margin: 0; font-size: 18px; line-height: 1.2; }
