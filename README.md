@@ -52,6 +52,23 @@ on-call workflows where the friction of `cmd+click` on every PR link adds up.
 - **Authenticated via `gh`**: no GitHub tokens to manage; reuses your
   existing `gh auth login` session via `gh api graphql` subprocesses.
 
+## Feature catalog ([FEATURES.md](FEATURES.md))
+
+[`FEATURES.md`](FEATURES.md) is a pick-and-choose catalog of every
+self-contained feature in this repo, grouped by area (foundation,
+drawer UX, list/tabs/filters, Claude-driven actions, CI integrations,
+telemetry, persistence). Each entry lists:
+
+- **What it does** — one-paragraph pitch.
+- **Files** — exact paths so you can read the implementation directly.
+- **Requires** — runtime/env dependencies and sibling features.
+- **Adapt for your app** — what's connor-review-specific and likely
+  needs swapping.
+
+Drop the file into a Claude chat with the prompt at the bottom of
+`FEATURES.md` to lift a feature into your own app — most are 1–3
+small files plus a CSS block.
+
 ## Stack
 
 - **Frontend** (`web/`, port 5173): Vite + React 18 + TypeScript,
