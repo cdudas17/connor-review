@@ -40,11 +40,19 @@ if (process.argv[1] && process.argv[1].endsWith('index.ts')) {
   const log = (msg: string) => app.log.info(msg);
   const poller = startOutcomePoller(db, log);
   const proposer = startProposePromptDaily(db, log);
-  const shutdown = async () => {
+  // Belt-and-suspenders: try to close cleanly, but force-exit after 2s if
+  // anything hangs. Without the fallback, an in-flight Claude meta-prompt
+  // run can hold the process open long after Ctrl-C.
+  let shuttingDown = false;
+  const shutdown = async (signal: NodeJS.Signals) => {
+    if (shuttingDown) { process.exit(0); return; }
+    shuttingDown = true;
+    app.log.warn(`[fix-ci-telemetry] received ${signal}, shutting down`);
     poller.stop();
     proposer.stop();
-    await app.close();
-    db.close();
+    setTimeout(() => process.exit(0), 2000).unref();
+    try { await app.close(); } catch { /* ignore */ }
+    try { db.close(); } catch { /* ignore */ }
     process.exit(0);
   };
   process.on('SIGINT', shutdown);
