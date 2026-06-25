@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiCallError } from '../lib/api.js';
 
 function CloseIcon({ size = 16 }: { size?: number }) {
@@ -31,6 +31,16 @@ function labelFor(b: Bucket): string {
   return b === 'failure' ? 'Failing' : b === 'success' ? 'Successful' : b === 'skipped' ? 'Skipped' : 'Pending';
 }
 
+/** Does this check come from Buildkite? Buildkite contexts always link to a
+ * buildkite.com URL. The "Failures" view applies the Buildkite-style red-X
+ * row treatment only to these — non-Buildkite failures (CircleCI, GitHub
+ * Actions, etc.) keep the standard row layout. */
+function isBuildkite(c: CiContext): boolean {
+  if (!c.url) return false;
+  try { return new URL(c.url).hostname.endsWith('buildkite.com'); }
+  catch { return false; }
+}
+
 interface Props {
   /** PR identity for the checks panel — null hides the drawer. */
   target: { owner: string; repo: string; number: number } | null;
@@ -58,6 +68,10 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
   const [contexts, setContexts] = useState<CiContext[] | null>(seedContexts ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Buildkite-style "All / Failures" tab toggle. Defaults to Failures whenever
+  // the drawer opens with failures present — that's almost always what the
+  // user wants to look at.
+  const [viewMode, setViewMode] = useState<'all' | 'failures'>('all');
 
   useEffect(() => {
     if (!target) { setContexts(seedContexts ?? null); setError(null); return; }
@@ -91,6 +105,23 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
     for (const k of Object.keys(out) as Bucket[]) out[k].sort((a, b) => a.name.localeCompare(b.name));
     return out;
   }, [contexts]);
+
+  // Default to the Failures view on the first contexts-load per drawer open
+  // if there are failures — the user opens the drawer 95% of the time because
+  // something is red. Refetches don't touch viewMode (so a manual 'All' click
+  // sticks), and the flag resets when the drawer closes.
+  const viewModeInitialized = useRef(false);
+  useEffect(() => {
+    if (target == null) {
+      viewModeInitialized.current = false;
+      setViewMode('all');
+    }
+  }, [target]);
+  useEffect(() => {
+    if (!target || viewModeInitialized.current || !grouped) return;
+    if (grouped.failure.length > 0) setViewMode('failures');
+    viewModeInitialized.current = true;
+  }, [target, grouped]);
 
   if (!target) return null;
   return (
@@ -140,22 +171,55 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
                   : null}
           </p>
           <p className="ci-checks-target">{target.owner}/{target.repo}#{target.number}</p>
+          {/* Buildkite-style "All / Failures" tab toggle. Sits below the
+            * summary so it doesn't fight with the title / Fix CI row. */}
+          {grouped && (grouped.failure.length > 0 || viewMode === 'failures') && (
+            <div className="ci-checks-view-toggle" role="tablist" aria-label="Filter checks">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'all'}
+                className={`ci-checks-view-tab${viewMode === 'all' ? ' ci-checks-view-tab-on' : ''}`}
+                onClick={() => setViewMode('all')}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'failures'}
+                className={`ci-checks-view-tab${viewMode === 'failures' ? ' ci-checks-view-tab-on' : ''}`}
+                onClick={() => setViewMode('failures')}
+              >
+                Failures{grouped.failure.length > 0 ? ` (${grouped.failure.length})` : ''}
+              </button>
+            </div>
+          )}
         </header>
         {grouped && (
           <ul className="ci-checks-list">
-            {(['failure', 'pending', 'skipped', 'success'] as const).flatMap((bucket) =>
-              grouped[bucket].map((c) => (
-                <li key={`${bucket}:${c.name}`} className={`ci-checks-item ci-checks-${bucket}`}>
-                  <span className="ci-checks-state-icon" aria-hidden="true">{iconFor(bucket)}</span>
-                  <span className="ci-checks-item-body">
-                    <span className="ci-checks-item-name">{c.name}</span>
-                    <span className="ci-checks-item-status">{labelFor(bucket)}{c.state ? ` · ${c.state.toLowerCase()}` : ''}</span>
-                  </span>
-                  {c.url && (
-                    <a className="ci-checks-item-details" href={c.url} target="_blank" rel="noopener noreferrer">Details</a>
-                  )}
-                </li>
-              )),
+            {(viewMode === 'failures'
+              ? (['failure'] as const)
+              : (['failure', 'pending', 'skipped', 'success'] as const)
+            ).flatMap((bucket) =>
+              grouped[bucket].map((c) => {
+                const bkStyled = bucket === 'failure' && isBuildkite(c);
+                return (
+                  <li key={`${bucket}:${c.name}`} className={`ci-checks-item ci-checks-${bucket}${bkStyled ? ' ci-checks-buildkite-failure' : ''}`}>
+                    <span className="ci-checks-state-icon" aria-hidden="true">{iconFor(bucket)}</span>
+                    <span className="ci-checks-item-body">
+                      <span className="ci-checks-item-name">{c.name}</span>
+                      <span className="ci-checks-item-status">{labelFor(bucket)}{c.state ? ` · ${c.state.toLowerCase()}` : ''}</span>
+                    </span>
+                    {c.url && (
+                      <a className="ci-checks-item-details" href={c.url} target="_blank" rel="noopener noreferrer">Details</a>
+                    )}
+                  </li>
+                );
+              }),
+            )}
+            {viewMode === 'failures' && grouped.failure.length === 0 && (
+              <li className="ci-checks-empty">No failing checks — all green!</li>
             )}
           </ul>
         )}
