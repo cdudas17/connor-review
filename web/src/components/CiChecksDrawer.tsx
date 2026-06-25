@@ -95,7 +95,7 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
   if (!target) return null;
   return (
     <>
-      <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
+      <div className="drawer-backdrop ci-checks-backdrop" onClick={onClose} aria-hidden="true" />
       <aside className="drawer ci-checks-drawer" aria-label={`CI checks for ${target.owner}/${target.repo}#${target.number}`}>
         <button type="button" className="drawer-close has-tooltip" data-tooltip="Close (Esc)" aria-label="Close" onClick={onClose}>
           <CloseIcon size={18} />
