@@ -15,6 +15,80 @@ see `git log --reverse`. For overall app architecture see [README.md](README.md)
 
 ---
 
+## How to use this catalog
+
+Two intended modes. Pick the one that matches what you're doing.
+
+### Mode A — Lift one feature into an existing app
+
+You have your own app and want feature X from this repo. Drop this into
+Claude:
+
+```
+Read https://github.com/cdudas17/connor-review/blob/main/FEATURES.md.
+I want feature <X>. Read the files listed in that section plus their
+immediate dependencies, then lift the code into <your repo> at <your
+path>. Skip anything connor-review-specific (the gh auth assumption,
+the team-roster YAML, the Gusto-only URLs). Call out anywhere I'll need
+to substitute my own backend / config.
+```
+
+Most features are 1–3 small files plus a CSS block in
+`web/src/styles/app.css`.
+
+### Mode B — Recreate the whole app, picking features as you go
+
+You want a connor-review-shaped app for yourself, but you don't need
+every feature. Have Claude walk you through the catalog one section at
+a time and ask which ones to include. Drop this into Claude:
+
+```
+Read https://github.com/cdudas17/connor-review/blob/main/FEATURES.md and
+https://github.com/cdudas17/connor-review/blob/main/README.md. I want to
+recreate this app — but only the features I actually need.
+
+Walk me through the catalog ONE SECTION AT A TIME (Foundation first,
+then PR review drawer, list/tabs/filters, etc.). For each section:
+
+  1. Briefly summarise each feature in that section in one sentence —
+     what it does and what it costs (deps, env vars, complexity).
+  2. Group obviously-required ones (server scaffold, drawer chrome,
+     etc.) and call them out as recommended baseline.
+  3. For each optional feature, ask me "include this? (y/n/skip-section)"
+     and wait for my answer before moving on.
+
+Track my choices. After we finish all sections, produce:
+  - A summary of what I picked and why each pick implies which files.
+  - A dependency check — flag if I picked feature Y without its required
+    sibling X, and ask whether to add X.
+  - A short build order — which features to scaffold first so dependent
+    ones have something to plug into.
+
+Then ask me whether to start implementing in <my repo path>. Don't write
+any code until I confirm.
+```
+
+The catalog is roughly 10 sections × 3–8 features each, so this takes
+about 30 well-targeted "y/n" answers — far less than the full ~50-feature
+list shipped one by one. The walk leaves you with a personal manifest,
+a dependency-checked build plan, and the choice of whether to hand
+Claude the keys for the implementation.
+
+#### Hot tips for Mode B
+
+- **Skip the foundation section quickly.** Sections 1.1–1.7 are
+  effectively "any app needs this" — accept them as a block unless you
+  specifically don't want feature Y (e.g. you're embedding in an existing
+  Express app and don't need a Fastify scaffold).
+- **The order matters for dependencies.** Foundation → server scaffold →
+  drawer chrome → list & tabs → header badges → drawer features → Claude
+  flows → telemetry. The catalog is roughly ordered this way already.
+- **The telemetry service (section 9) is opt-in and independent.** Even
+  if you skip it now, you can add it later without re-touching the main
+  app — the contact surface is one env var.
+
+---
+
 ## 1. Foundation
 
 ### 1.1 `gh` CLI shell-out with typed errors + retry
@@ -682,24 +756,20 @@ schema-on-startup so a fresh DB just works.
 
 ---
 
-## How to adapt a feature into another app
+## Features that lift cleanly (no GitHub coupling)
 
-A simple prompt for Claude (or you):
+If you want the easiest wins — features that drop straight into any app
+because they don't assume `gh` auth or a PR-shaped domain:
 
-```
-Read /path/to/connor-review/FEATURES.md. I want feature X — read the files
-listed there, plus their immediate dependencies, then lift the code into
-<your repo> at <your path>. Skip anything connor-review-specific (the GH
-auth assumption, the team-YAML config, etc.); call out anywhere I'll need
-to substitute my own backend / config.
-```
-
-Most features are 1-3 small files plus a CSS block in
-`web/src/styles/app.css`. The pre-shipped ones with no GitHub-specific
-coupling are: the `.env` loader (1.6), the multi-process dev script (1.7),
-the slide-in drawer chrome (2.1), the drag-to-select composer (2.4), the
-@-mention + emoji autocomplete (2.8 + 6.3), the bracket-tag filter (3.4),
-the toast stack (6.6), the file-per-version prompt registry (5.5), the
-chevron-with-cached-loading row pattern (7.2), and the entire telemetry
-service if you want a separate "observe a CLI-driven action across
-versions" app.
+- The `.env` loader (1.6)
+- The multi-process dev script with reliable Ctrl-C (1.7)
+- The slide-in drawer chrome (2.1) and stacked-drawer pattern (2.2)
+- The drag-to-select inline composer (2.4)
+- The @-mention + emoji-shortcode autocomplete (2.8 + 6.3)
+- The bracket-tag filter chips (3.4)
+- The toast stack (6.6)
+- The draggable Notes/FAB widget pattern (6.1, 6.2)
+- The file-per-version Claude prompt registry (5.5)
+- The chevron-with-cached-loading row pattern (7.2)
+- The entire telemetry service (9.*) as a generic "observe a CLI-driven
+  action across prompt versions" app

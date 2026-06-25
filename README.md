@@ -57,17 +57,22 @@ on-call workflows where the friction of `cmd+click` on every PR link adds up.
 [`FEATURES.md`](FEATURES.md) is a pick-and-choose catalog of every
 self-contained feature in this repo, grouped by area (foundation,
 drawer UX, list/tabs/filters, Claude-driven actions, CI integrations,
-telemetry, persistence). Each entry lists:
+telemetry, persistence). Each entry lists what it does, the files to
+read, dependencies, and what's connor-review-specific.
 
-- **What it does** — one-paragraph pitch.
-- **Files** — exact paths so you can read the implementation directly.
-- **Requires** — runtime/env dependencies and sibling features.
-- **Adapt for your app** — what's connor-review-specific and likely
-  needs swapping.
+Two usage modes — pick the one that fits:
 
-Drop the file into a Claude chat with the prompt at the bottom of
-`FEATURES.md` to lift a feature into your own app — most are 1–3
-small files plus a CSS block.
+- **Lift one feature into an existing app.** You have your own app and
+  want feature X. Drop FEATURES.md into a Claude chat with the **Mode A**
+  prompt from the top of the file and Claude pulls just that feature.
+- **Recreate the whole app, picking features as you go.** Drop
+  FEATURES.md into Claude with the **Mode B** prompt and Claude walks
+  you through the catalog one section at a time, asking "include this?"
+  for each feature. You end with a personal manifest + dependency-checked
+  build plan before any code is written.
+
+Both prompt templates live at the top of
+[`FEATURES.md`](FEATURES.md#how-to-use-this-catalog).
 
 ## Stack
 
