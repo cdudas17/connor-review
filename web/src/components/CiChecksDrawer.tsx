@@ -64,6 +64,19 @@ interface Props {
  * passing. Each row shows the check's state icon, name, and a Details
  * link when one's available. Mirrors GitHub's "Some checks were not
  * successful" panel. */
+interface BkDetail {
+  buildWebUrl: string;
+  focusedJob: { id: string; name?: string; web_url?: string; state?: string; exit_status?: number | null } | null;
+  failedJobs: Array<{ id: string; name?: string; web_url?: string; state?: string; exit_status?: number | null }>;
+  annotations: Array<{ id: string; context: string; style: 'success' | 'info' | 'warning' | 'error'; body_html: string }>;
+}
+
+type BkState =
+  | { kind: 'closed' }
+  | { kind: 'loading' }
+  | { kind: 'ok'; detail: BkDetail }
+  | { kind: 'error'; code: string; message: string };
+
 export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixCi, ciFixRunning }: Props) {
   const [contexts, setContexts] = useState<CiContext[] | null>(seedContexts ?? null);
   const [loading, setLoading] = useState(false);
@@ -72,6 +85,9 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
   // the drawer opens with failures present — that's almost always what the
   // user wants to look at.
   const [viewMode, setViewMode] = useState<'all' | 'failures'>('all');
+  // Per-row Buildkite expand state, keyed by check URL. We don't load anything
+  // until the user clicks a row, then we cache the result here.
+  const [bkExpanded, setBkExpanded] = useState<Record<string, BkState>>({});
 
   useEffect(() => {
     if (!target) { setContexts(seedContexts ?? null); setError(null); return; }
@@ -122,6 +138,29 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
     if (grouped.failure.length > 0) setViewMode('failures');
     viewModeInitialized.current = true;
   }, [target, grouped]);
+
+  // Reset per-row Buildkite expansions whenever the drawer target changes —
+  // the next drawer open shouldn't show drill-ins from the previous PR.
+  useEffect(() => { setBkExpanded({}); }, [target?.owner, target?.repo, target?.number]);
+
+  const toggleBuildkiteRow = (url: string) => {
+    setBkExpanded((cur) => {
+      const existing = cur[url];
+      // Clicking again on an expanded row collapses; clicking on closed or
+      // errored row triggers a fresh fetch.
+      if (existing && (existing.kind === 'ok' || existing.kind === 'loading')) {
+        const next = { ...cur };
+        delete next[url];
+        return next;
+      }
+      const next = { ...cur, [url]: { kind: 'loading' as const } };
+      // Fire the fetch outside of setState (no await — let it land async).
+      api.getBuildkiteFailures(url)
+        .then((detail) => setBkExpanded((c) => ({ ...c, [url]: { kind: 'ok', detail } })))
+        .catch((e) => setBkExpanded((c) => ({ ...c, [url]: { kind: 'error', code: (e as ApiCallError).code ?? 'UNKNOWN', message: (e as Error).message } })));
+      return next;
+    });
+  };
 
   if (!target) return null;
   return (
@@ -204,12 +243,64 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
             ).flatMap((bucket) =>
               grouped[bucket].map((c) => {
                 const bkStyled = bucket === 'failure' && isBuildkite(c);
+                const bk = bkStyled && c.url ? bkExpanded[c.url] : undefined;
+                const isOpen = bk && (bk.kind === 'loading' || bk.kind === 'ok' || bk.kind === 'error');
                 return (
-                  <li key={`${bucket}:${c.name}`} className={`ci-checks-item ci-checks-${bucket}${bkStyled ? ' ci-checks-buildkite-failure' : ''}`}>
+                  <li key={`${bucket}:${c.name}`} className={`ci-checks-item ci-checks-${bucket}${bkStyled ? ' ci-checks-buildkite-failure' : ''}${isOpen ? ' ci-checks-buildkite-open' : ''}`}>
                     <span className="ci-checks-state-icon" aria-hidden="true">{iconFor(bucket)}</span>
                     <span className="ci-checks-item-body">
-                      <span className="ci-checks-item-name">{c.name}</span>
+                      <span className="ci-checks-item-name">
+                        {bkStyled && c.url && (
+                          <button
+                            type="button"
+                            className={`ci-checks-buildkite-chevron${isOpen ? ' ci-checks-buildkite-chevron-open' : ''}`}
+                            onClick={(e) => { e.preventDefault(); toggleBuildkiteRow(c.url!); }}
+                            aria-expanded={isOpen ? 'true' : 'false'}
+                            aria-label={isOpen ? 'Hide test failure details' : 'Show test failure details'}
+                          >▸</button>
+                        )}
+                        {c.name}
+                      </span>
                       <span className="ci-checks-item-status">{labelFor(bucket)}{c.state ? ` · ${c.state.toLowerCase()}` : ''}</span>
+                      {isOpen && (
+                        <div className="ci-checks-buildkite-detail">
+                          {bk!.kind === 'loading' && (
+                            <p className="ci-checks-buildkite-loading"><span className="loading-spinner" aria-hidden="true" /> Loading failure details from Buildkite…</p>
+                          )}
+                          {bk!.kind === 'error' && (
+                            <div className="ci-checks-buildkite-error">
+                              <strong>Couldn't load Buildkite failures.</strong>
+                              <p>{bk!.message}</p>
+                              {bk!.code === 'NO_TOKEN' && (
+                                <p className="ci-checks-buildkite-hint">Export <code>BUILDKITE_API_TOKEN</code> in your shell and restart the server.</p>
+                              )}
+                            </div>
+                          )}
+                          {bk!.kind === 'ok' && (() => {
+                            const detail = bk!.detail;
+                            if (detail.annotations.length === 0) {
+                              return (
+                                <p className="ci-checks-buildkite-empty">
+                                  No annotations found on this build. The job probably didn't post a
+                                  failure summary — open it on Buildkite for the raw log.
+                                </p>
+                              );
+                            }
+                            return (
+                              <div className="ci-checks-buildkite-annotations">
+                                {detail.annotations.map((a) => (
+                                  <div key={a.id} className={`ci-checks-buildkite-annotation ci-checks-buildkite-annotation-${a.style}`}>
+                                    {a.context && a.context !== 'default' && (
+                                      <div className="ci-checks-buildkite-annotation-context">{a.context}</div>
+                                    )}
+                                    <div className="ci-checks-buildkite-annotation-body" dangerouslySetInnerHTML={{ __html: a.body_html }} />
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </span>
                     {c.url && (
                       <a className="ci-checks-item-details" href={c.url} target="_blank" rel="noopener noreferrer">Details</a>

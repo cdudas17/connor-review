@@ -268,4 +268,18 @@ export const api = {
       body: JSON.stringify({ body }),
     });
   },
+  /** Drill into a failing Buildkite CI check: fetches the build's annotations
+   * (where rspec / jest / similar agents post failure summaries) so the CI
+   * drawer can render per-test failure details inline. */
+  getBuildkiteFailures(url: string): Promise<{
+    org: string;
+    pipeline: string;
+    build: string;
+    buildWebUrl: string;
+    focusedJob: { id: string; name?: string; web_url?: string; state?: string; exit_status?: number | null } | null;
+    failedJobs: Array<{ id: string; name?: string; web_url?: string; state?: string; exit_status?: number | null }>;
+    annotations: Array<{ id: string; context: string; style: 'success' | 'info' | 'warning' | 'error'; body_html: string }>;
+  }> {
+    return call(`/api/buildkite/failures?url=${encodeURIComponent(url)}`);
+  },
 };

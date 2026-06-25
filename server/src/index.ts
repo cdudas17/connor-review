@@ -5,6 +5,7 @@ import { registerTeamRoutes } from './routes/team.js';
 import { registerNotesRoutes } from './routes/notes.js';
 import { registerLocalRoutes } from './routes/local.js';
 import { registerIssuesRoutes } from './routes/issues.js';
+import { registerBuildkiteRoutes } from './routes/buildkite.js';
 
 export async function buildServer() {
   const app = Fastify({ logger: { level: 'warn' } });
@@ -15,6 +16,7 @@ export async function buildServer() {
   await registerNotesRoutes(app);
   await registerLocalRoutes(app);
   await registerIssuesRoutes(app);
+  await registerBuildkiteRoutes(app);
   return app;
 }
 
