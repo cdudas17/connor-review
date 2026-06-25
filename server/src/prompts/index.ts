@@ -14,6 +14,7 @@
 
 import { buildFixCiPrompt as v1, type FixCiPromptInput } from './fixCi.v1.js';
 import { buildFixCiPrompt as v2 } from './fixCi.v2.js';
+import { buildFixCiPrompt as v3 } from './fixCi.v3.js';
 
 export type { FixCiPromptInput };
 
@@ -23,5 +24,6 @@ export type { FixCiPromptInput };
 export function getFixCiPrompt(version: string): (input: FixCiPromptInput) => string {
   if (version.startsWith('v1-')) return v1;
   if (version.startsWith('v2-')) return v2;
-  return v2;
+  if (version.startsWith('v3-')) return v3;
+  return v3;
 }
