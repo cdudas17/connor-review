@@ -1,3 +1,8 @@
+import { loadEnvFile } from './lib/loadEnvFile.js';
+// Load .env BEFORE any other import so route modules that read env at top
+// level (e.g. fixCiTelemetry's FIX_CI_TELEMETRY_URL) see the right values.
+const envLoad = loadEnvFile();
+
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { registerPullsRoutes } from './routes/pulls.js';
@@ -24,6 +29,14 @@ const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
   const app = await buildServer();
   await app.listen({ port: 5174, host: '127.0.0.1' });
+
+  // Startup announcement — surfaces which secrets are wired up so you can
+  // tell at a glance whether `.zshrc` / `.env` is propagating, instead of
+  // clicking through the UI to find out a token is missing.
+  if (envLoad) {
+    app.log.warn(`[server] loaded ${envLoad.loaded.length} var(s) from ${envLoad.source}: ${envLoad.loaded.join(', ') || '(none new)'}`);
+  }
+  app.log.warn(`[server] BUILDKITE_API_TOKEN: ${process.env.BUILDKITE_API_TOKEN ? 'set ✓' : 'NOT set — Buildkite drill-in disabled'}`);
 
   // Without explicit signal handlers, Fastify's default graceful-shutdown can
   // hang on in-flight worktree / Claude work, and tsx-watch's child never
