@@ -97,23 +97,31 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
     <>
       <div className="drawer-backdrop ci-checks-backdrop" onClick={onClose} aria-hidden="true" />
       <aside className="drawer ci-checks-drawer" aria-label={`CI checks for ${target.owner}/${target.repo}#${target.number}`}>
-        <button type="button" className="drawer-close has-tooltip" data-tooltip="Close (Esc)" aria-label="Close" onClick={onClose}>
-          <CloseIcon size={18} />
-        </button>
         <header className="ci-checks-header">
           <div className="ci-checks-header-row">
             <h2>CI checks</h2>
-            {onFixCi && grouped && grouped.failure.length > 0 && (
+            <div className="ci-checks-header-actions">
+              {onFixCi && grouped && grouped.failure.length > 0 && (
+                <button
+                  type="button"
+                  className="btn-fix-ci ci-checks-fix-ci"
+                  disabled={!!ciFixRunning}
+                  onClick={onFixCi}
+                  title={`Spin up a worktree, install deps, and ask Claude to fix the ${grouped.failure.length} failing check${grouped.failure.length === 1 ? '' : 's'}`}
+                >
+                  {ciFixRunning ? 'Fixing CI…' : `Fix CI (${grouped.failure.length})`}
+                </button>
+              )}
               <button
                 type="button"
-                className="btn-fix-ci ci-checks-fix-ci"
-                disabled={!!ciFixRunning}
-                onClick={onFixCi}
-                title={`Spin up a worktree, install deps, and ask Claude to fix the ${grouped.failure.length} failing check${grouped.failure.length === 1 ? '' : 's'}`}
+                className="drawer-close ci-checks-header-close has-tooltip"
+                data-tooltip="Close (Esc)"
+                aria-label="Close"
+                onClick={onClose}
               >
-                {ciFixRunning ? 'Fixing CI…' : `Fix CI (${grouped.failure.length})`}
+                <CloseIcon size={18} />
               </button>
-            )}
+            </div>
           </div>
           <p className="ci-checks-summary">
             {grouped

@@ -617,6 +617,12 @@ button.ci-badge { cursor: pointer; }
 .drawer-backdrop.ci-checks-backdrop { z-index: 12; }
 .ci-checks-header { margin: 0 0 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .ci-checks-header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+/* CI drawer keeps its close button inline next to the "Fix CI" button so the
+ * two don't fight for the upper-right corner like they do in the standard
+ * `.drawer-close { position: absolute }` layout. Both buttons sit in a small
+ * flex cluster on the right side of the header row. */
+.ci-checks-header-actions { display: inline-flex; align-items: center; gap: 8px; }
+.drawer.ci-checks-drawer .drawer-close.ci-checks-header-close { position: static; top: auto; right: auto; }
 .ci-checks-header-row h2 { margin: 0; font-size: 18px; line-height: 1.2; }
 .ci-checks-fix-ci { font-size: 12px !important; padding: 4px 12px !important; }
 .ci-checks-summary { margin: 0; font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
