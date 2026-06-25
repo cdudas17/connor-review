@@ -201,7 +201,7 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
                   <li key={`${bucket}:${c.name}`} className={`ci-checks-item ci-checks-${bucket}${bkStyled ? ' ci-checks-buildkite-failure' : ''}${isOpen ? ' ci-checks-buildkite-open' : ''}`}>
                     <span className="ci-checks-state-icon" aria-hidden="true">{iconFor(bucket)}</span>
                     <span className="ci-checks-item-body">
-                      <span className="ci-checks-item-name">
+                      <span className="ci-checks-item-name-row">
                         {bkStyled && c.url && (
                           <button
                             type="button"
@@ -211,7 +211,10 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
                             aria-label={isOpen ? 'Hide test failure details' : 'Show test failure details'}
                           >▸</button>
                         )}
-                        {c.name}
+                        <span className="ci-checks-item-name">{c.name}</span>
+                        {bkStyled && c.url && (
+                          <a className="ci-checks-item-details ci-checks-item-details-inline" href={c.url} target="_blank" rel="noopener noreferrer">Details</a>
+                        )}
                       </span>
                       <span className="ci-checks-item-status">{labelFor(bucket)}{c.state ? ` · ${c.state.toLowerCase()}` : ''}</span>
                       {isOpen && (
@@ -254,7 +257,7 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
                         </div>
                       )}
                     </span>
-                    {c.url && (
+                    {c.url && !bkStyled && (
                       <a className="ci-checks-item-details" href={c.url} target="_blank" rel="noopener noreferrer">Details</a>
                     )}
                   </li>

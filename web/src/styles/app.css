@@ -633,7 +633,14 @@ button.ci-badge { cursor: pointer; }
  * icon, full-width red outline. Matches the screenshot on buildkite.com when
  * the Failures tab is selected. Only applied to failing rows whose URL is a
  * buildkite.com link. */
-.ci-checks-item.ci-checks-buildkite-failure { padding: 0; border: 1px solid rgba(248, 81, 73, 0.45); border-radius: 6px; margin-bottom: 8px; overflow: hidden; grid-template-columns: 36px 1fr auto; gap: 0; }
+.ci-checks-item.ci-checks-buildkite-failure { padding: 0; border: 1px solid rgba(248, 81, 73, 0.45); border-radius: 6px; margin-bottom: 8px; overflow: hidden; grid-template-columns: 36px 1fr; gap: 0; align-items: stretch; }
+/* Name-row holds chevron + check name + inline "Details" link. Flex layout
+ * keeps the Details link snapped to the right of the name (next to the
+ * `buildkite/zenpayroll` heading) instead of floating in its own grid
+ * column beside the expanded annotation body. */
+.ci-checks-item-name-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ci-checks-item-name-row .ci-checks-item-name { flex: 1; min-width: 0; }
+.ci-checks-item-details-inline { margin-left: 8px; }
 .ci-checks-item.ci-checks-buildkite-failure:last-child { margin-bottom: 0; }
 .ci-checks-item.ci-checks-buildkite-failure .ci-checks-state-icon { background: rgba(248, 81, 73, 0.85); color: #1f2328; width: 36px; height: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
 .ci-checks-item.ci-checks-buildkite-failure .ci-checks-item-body { padding: 10px 0 10px 12px; }
@@ -659,7 +666,15 @@ button.ci-badge { cursor: pointer; }
 .ci-checks-buildkite-annotation-error { border-color: rgba(248, 81, 73, 0.45); }
 .ci-checks-buildkite-annotation-warning { border-color: rgba(210, 153, 34, 0.45); }
 .ci-checks-buildkite-annotation-context { font-size: 11px; padding: 4px 10px; background: var(--bg-subtle); color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; border-bottom: 1px solid var(--border); }
-.ci-checks-buildkite-annotation-body { font-size: 12px; line-height: 1.5; padding: 10px 12px; max-height: 480px; overflow: auto; }
+.ci-checks-buildkite-annotation-body { font-size: 12px; line-height: 1.55; padding: 10px 12px; max-height: 480px; overflow: auto; }
+/* Buildkite's rspec annotation packs each failed test into one collapsible
+ * (or one list item); without explicit spacing the long test names run into
+ * each other visually. A small per-entry gap separates them cleanly. */
+.ci-checks-buildkite-annotation-body details,
+.ci-checks-buildkite-annotation-body li,
+.ci-checks-buildkite-annotation-body p { margin: 0 0 8px; }
+.ci-checks-buildkite-annotation-body ul, .ci-checks-buildkite-annotation-body ol { padding-left: 18px; margin: 4px 0; }
+.ci-checks-buildkite-annotation-body details > summary { cursor: pointer; padding: 2px 0; }
 .ci-checks-buildkite-annotation-body pre,
 .ci-checks-buildkite-annotation-body code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; }
 .ci-checks-buildkite-annotation-body pre { background: var(--bg-subtle); padding: 8px 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
