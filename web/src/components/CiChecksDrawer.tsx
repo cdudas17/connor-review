@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, ApiCallError } from '../lib/api.js';
 
 function CloseIcon({ size = 16 }: { size?: number }) {
@@ -81,10 +81,6 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
   const [contexts, setContexts] = useState<CiContext[] | null>(seedContexts ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Buildkite-style "All / Failures" tab toggle. Defaults to Failures whenever
-  // the drawer opens with failures present — that's almost always what the
-  // user wants to look at.
-  const [viewMode, setViewMode] = useState<'all' | 'failures'>('all');
   // Per-row Buildkite expand state, keyed by check URL. We don't load anything
   // until the user clicks a row, then we cache the result here.
   const [bkExpanded, setBkExpanded] = useState<Record<string, BkState>>({});
@@ -121,23 +117,6 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
     for (const k of Object.keys(out) as Bucket[]) out[k].sort((a, b) => a.name.localeCompare(b.name));
     return out;
   }, [contexts]);
-
-  // Default to the Failures view on the first contexts-load per drawer open
-  // if there are failures — the user opens the drawer 95% of the time because
-  // something is red. Refetches don't touch viewMode (so a manual 'All' click
-  // sticks), and the flag resets when the drawer closes.
-  const viewModeInitialized = useRef(false);
-  useEffect(() => {
-    if (target == null) {
-      viewModeInitialized.current = false;
-      setViewMode('all');
-    }
-  }, [target]);
-  useEffect(() => {
-    if (!target || viewModeInitialized.current || !grouped) return;
-    if (grouped.failure.length > 0) setViewMode('failures');
-    viewModeInitialized.current = true;
-  }, [target, grouped]);
 
   // Reset per-row Buildkite expansions whenever the drawer target changes —
   // the next drawer open shouldn't show drill-ins from the previous PR.
@@ -210,37 +189,10 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
                   : null}
           </p>
           <p className="ci-checks-target">{target.owner}/{target.repo}#{target.number}</p>
-          {/* Buildkite-style "All / Failures" tab toggle. Sits below the
-            * summary so it doesn't fight with the title / Fix CI row. */}
-          {grouped && (grouped.failure.length > 0 || viewMode === 'failures') && (
-            <div className="ci-checks-view-toggle" role="tablist" aria-label="Filter checks">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'all'}
-                className={`ci-checks-view-tab${viewMode === 'all' ? ' ci-checks-view-tab-on' : ''}`}
-                onClick={() => setViewMode('all')}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'failures'}
-                className={`ci-checks-view-tab${viewMode === 'failures' ? ' ci-checks-view-tab-on' : ''}`}
-                onClick={() => setViewMode('failures')}
-              >
-                Failures{grouped.failure.length > 0 ? ` (${grouped.failure.length})` : ''}
-              </button>
-            </div>
-          )}
         </header>
         {grouped && (
           <ul className="ci-checks-list">
-            {(viewMode === 'failures'
-              ? (['failure'] as const)
-              : (['failure', 'pending', 'skipped', 'success'] as const)
-            ).flatMap((bucket) =>
+            {(['failure', 'pending', 'skipped', 'success'] as const).flatMap((bucket) =>
               grouped[bucket].map((c) => {
                 const bkStyled = bucket === 'failure' && isBuildkite(c);
                 const bk = bkStyled && c.url ? bkExpanded[c.url] : undefined;
@@ -308,9 +260,6 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
                   </li>
                 );
               }),
-            )}
-            {viewMode === 'failures' && grouped.failure.length === 0 && (
-              <li className="ci-checks-empty">No failing checks — all green!</li>
             )}
           </ul>
         )}

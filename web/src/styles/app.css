@@ -629,13 +629,6 @@ button.ci-badge { cursor: pointer; }
 .ci-checks-summary-failure { color: #f85149; font-weight: 600; }
 .ci-checks-summary-success { color: #3fb950; font-weight: 600; }
 .ci-checks-target { margin: 4px 0 0; font-size: 11px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-/* Buildkite-style "All / Failures" toggle. Two pill-ish tabs that sit
- * between the header summary and the check list. */
-.ci-checks-view-toggle { display: inline-flex; gap: 4px; margin: 10px 0 4px; }
-.ci-checks-view-tab { font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer; }
-.ci-checks-view-tab:hover { color: var(--fg); background: var(--bg-subtle); }
-.ci-checks-view-tab-on { color: #b794f6; background: rgba(139, 92, 246, 0.18); border-color: rgba(139, 92, 246, 0.35); }
-.ci-checks-view-tab-on:hover { color: #b794f6; background: rgba(139, 92, 246, 0.24); }
 /* Buildkite-style failed row — orange-red square on the left containing the X
  * icon, full-width red outline. Matches the screenshot on buildkite.com when
  * the Failures tab is selected. Only applied to failing rows whose URL is a
@@ -645,7 +638,6 @@ button.ci-badge { cursor: pointer; }
 .ci-checks-item.ci-checks-buildkite-failure .ci-checks-state-icon { background: rgba(248, 81, 73, 0.85); color: #1f2328; width: 36px; height: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
 .ci-checks-item.ci-checks-buildkite-failure .ci-checks-item-body { padding: 10px 0 10px 12px; }
 .ci-checks-item.ci-checks-buildkite-failure .ci-checks-item-details { padding-right: 14px; }
-.ci-checks-empty { padding: 14px; text-align: center; color: var(--muted); font-style: italic; font-size: 13px; }
 /* Expand chevron + annotation panel for Buildkite failures. Chevron sits to
  * the LEFT of the test name; rotates 90° when open. Annotation panel renders
  * below the name with rspec-style monospace formatting matching what
