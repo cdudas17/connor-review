@@ -15,6 +15,7 @@ import { NONE_TAG, effectiveTags } from './lib/extractTags.js';
 import { ShaderLoader } from './components/ShaderLoader.js';
 import { CalendarAgenda } from './components/CalendarAgenda.js';
 import { EventDrawer } from './components/EventDrawer.js';
+import { NextMeetingFab } from './components/NextMeetingFab.js';
 import { useCalendarEvents } from './hooks/useCalendarEvents.js';
 import type { CalendarEvent } from './types.js';
 import { OncallStateFilter, type OncallState } from './components/OncallStateFilter.js';
@@ -1374,6 +1375,11 @@ export function App() {
         );
       })()}
       <NotesFab />
+      <NextMeetingFab
+        events={calendar.events}
+        hasCalendar={calendar.auth.kind === 'ready'}
+        onOpen={() => setTab('calendar')}
+      />
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </main>
     </MentionsProvider>

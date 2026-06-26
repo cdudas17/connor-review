@@ -533,6 +533,20 @@ button.ci-badge { cursor: pointer; }
 .notes-fab { position: fixed; z-index: 70; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--border); background: var(--bg); color: var(--accent); cursor: grab; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); display: inline-flex; align-items: center; justify-content: center; transition: background 80ms, box-shadow 80ms; user-select: none; touch-action: none; }
 .notes-fab:hover { background: var(--bg-subtle); }
 .notes-fab-dragging { cursor: grabbing; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); transition: none; }
+/* "Next meeting" FAB — pill-shaped so the countdown ("in 12m") fits next to
+ * the clock icon. Defaults to bottom-right. Colour shifts by state:
+ * red while you're in a meeting, amber when one's within 5 min, muted
+ * accent otherwise, dim green when there's nothing left today. */
+.next-meeting-fab { position: fixed; z-index: 70; height: 44px; padding: 0 14px 0 12px; border-radius: 22px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); cursor: grab; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; user-select: none; touch-action: none; transition: background 80ms, color 80ms, border-color 80ms, box-shadow 80ms; }
+.next-meeting-fab:hover { background: var(--bg-subtle); }
+.next-meeting-fab-dragging { cursor: grabbing; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); transition: none; }
+.next-meeting-fab-label { line-height: 1; }
+.next-meeting-fab-live { color: #fff; background: #cf222e; border-color: #cf222e; }
+.next-meeting-fab-live:hover { background: #b21f2a; }
+.next-meeting-fab-soon { color: #1f2328; background: #ffd33d; border-color: #ffd33d; }
+.next-meeting-fab-soon:hover { background: #f0c500; }
+.next-meeting-fab-idle { color: var(--accent); }
+.next-meeting-fab-free { color: #3fb950; opacity: 0.85; }
 .notes-fab svg { display: block; pointer-events: none; }
 
 .notes-panel { position: fixed; z-index: 71; width: 440px; max-width: calc(100vw - 40px); height: 620px; max-height: calc(100vh - 120px); display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); padding: 12px; }
