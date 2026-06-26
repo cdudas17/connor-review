@@ -77,7 +77,8 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
  * deep-space backdrop. Pure CSS radial-gradients so there's no JS / asset
  * cost. Hand-picked dot positions inside the padded wrapper give an evenly
  * scattered constellation without obvious grids. */
-.app-title { margin: 0; }
+.app-title { margin: 0; display: inline-flex; align-items: center; gap: 14px; }
+.app-title .shader-loader { vertical-align: middle; flex-shrink: 0; }
 .app-title-starfield {
   display: inline-block;
   padding: 14px 36px;

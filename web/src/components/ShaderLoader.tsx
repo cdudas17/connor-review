@@ -38,11 +38,14 @@ const FRAGMENT_SHADER = `
 interface Props {
   /** Rendered pixel size of the square canvas. */
   size?: number;
-  /** Accessible label — surfaces to screen readers via aria-label. */
+  /** Accessible label — surfaces to screen readers via aria-label.
+   * Pass an empty string for decorative uses (the orb is rendered as
+   * `aria-hidden` so screen readers skip it). */
   label?: string;
 }
 
 export function ShaderLoader({ size = 96, label = 'Loading' }: Props) {
+  const decorative = label === '';
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -128,8 +131,9 @@ export function ShaderLoader({ size = 96, label = 'Loading' }: Props) {
       ref={canvasRef}
       className="shader-loader"
       style={{ width: size, height: size }}
-      role="img"
-      aria-label={label}
+      {...(decorative
+        ? { 'aria-hidden': true }
+        : { role: 'img', 'aria-label': label })}
     />
   );
 }

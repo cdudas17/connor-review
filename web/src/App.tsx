@@ -12,6 +12,7 @@ import { BulkActionsBar } from './components/BulkActionsBar.js';
 import { MemberFilter } from './components/MemberFilter.js';
 import { TagFilter } from './components/TagFilter.js';
 import { NONE_TAG, effectiveTags } from './lib/extractTags.js';
+import { ShaderLoader } from './components/ShaderLoader.js';
 import { OncallStateFilter, type OncallState } from './components/OncallStateFilter.js';
 import { NotesFab } from './components/NotesFab.js';
 import { IssueDrawer } from './components/IssueDrawer.js';
@@ -722,7 +723,11 @@ export function App() {
     <MentionsProvider value={teamPRs.members}>
     <main className="app">
       <header className="app-header">
-        <h1 className="app-title"><span className="app-title-starfield">Connor Command Center</span></h1>
+        <h1 className="app-title">
+          <ShaderLoader size={36} label="" />
+          <span className="app-title-starfield">Connor Command Center</span>
+          <ShaderLoader size={36} label="" />
+        </h1>
         <div className="app-header-actions">
           <button
             type="button"
