@@ -12,7 +12,6 @@ interface Props {
   onOpen?: () => void;
 }
 
-const FAB_SIZE = 44;
 const DRAG_THRESHOLD_PX = 4;
 
 function ClockIcon({ size = 18 }: { size?: number }) {
@@ -82,8 +81,11 @@ function computeStatus(events: CalendarEvent[], now: Date): NextOrNow {
  * to the Calendar tab. */
 export function NextMeetingFab({ events, hasCalendar, onOpen }: Props) {
   const { pos, setPos } = useFabPosition({
-    storageKey: 'connor-review.nextMeetingFabPosition.v1',
-    defaultPosition: ({ w, h }) => ({ x: w - FAB_SIZE - 20, y: h - FAB_SIZE - 20 }),
+    // v2 — default moved bottom-right → top-left; bumping the storage key
+    // discards the old persisted position so this lands at the new default
+    // immediately instead of where the user happened to leave the v1 button.
+    storageKey: 'connor-review.nextMeetingFabPosition.v2',
+    defaultPosition: () => ({ x: 20, y: 20 }),
   });
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{
