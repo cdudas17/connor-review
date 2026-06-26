@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Next-meeting FAB preview</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-subtle: #161b22;
+      --border: #30363d;
+      --fg: #e6edf3;
+      --muted: #8b949e;
+      --accent: #6366f1;
+      --ok: #3fb950;
+      --warn: #d29922;
+      --err: #cf222e;
+    }
+    body { font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 32px; background: var(--bg); color: var(--fg); min-height: 100vh; }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    h2 { margin: 32px 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+    p { color: var(--muted); }
+    .grid { display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: center; }
+    .swatch { display: inline-block; min-height: 44px; }
+    .state-row { padding: 18px 24px; border-bottom: 1px solid var(--border); }
+    .state-row:last-child { border-bottom: none; }
+    .desc { color: var(--muted); font-size: 12px; }
+    .desc strong { color: var(--fg); font-weight: 600; }
+    .card { background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .controls { background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 8px; padding: 18px 24px; margin-top: 24px; }
+    .controls label { display: flex; align-items: center; gap: 12px; margin: 8px 0; font-size: 13px; }
+    .controls input[type="number"] { width: 64px; padding: 4px 8px; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 4px; font: inherit; font-variant-numeric: tabular-nums; }
+    .controls input[type="color"] { width: 36px; height: 24px; padding: 0; background: transparent; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+    .controls input[type="checkbox"] { width: 16px; height: 16px; }
+    .note { font-size: 12px; color: var(--muted); margin-top: 12px; }
+    code { background: var(--bg); padding: 1px 6px; border-radius: 3px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+
+    /* === Current NextMeetingFab styles, copied from web/src/styles/app.css. */
+    .next-meeting-fab {
+      height: 44px;
+      padding: 0 14px 0 12px;
+      border-radius: 22px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--fg);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      user-select: none;
+    }
+    .next-meeting-fab svg { width: 18px; height: 18px; }
+    .next-meeting-fab-live   { color: #fff; background: #cf222e; border-color: #cf222e; }
+    .next-meeting-fab-soon   { color: #1f2328; background: #ffd33d; border-color: #ffd33d; }
+    .next-meeting-fab-idle   { color: var(--accent); }
+    .next-meeting-fab-free   { color: #3fb950; opacity: 0.85; }
+
+    /* === Optional extras — toggle on to see them in action. === */
+    .next-meeting-fab-pulse-live.next-meeting-fab-live { animation: pulse-red 1.4s ease-in-out infinite; }
+    .next-meeting-fab-pulse-soon.next-meeting-fab-soon { animation: pulse-amber 1.4s ease-in-out infinite; }
+    @keyframes pulse-red   { 0%, 100% { box-shadow: 0 0 0 0 rgba(207, 34, 46, 0.55); } 50% { box-shadow: 0 0 0 8px rgba(207, 34, 46, 0); } }
+    @keyframes pulse-amber { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 211, 61, 0.55); } 50% { box-shadow: 0 0 0 8px rgba(255, 211, 61, 0); } }
+
+    .browser-notif-mock {
+      width: 360px; border-radius: 10px; background: #1f2328; border: 1px solid #30363d; padding: 12px 14px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+      font-size: 13px; display: flex; gap: 12px; align-items: center;
+    }
+    .browser-notif-mock .dot { width: 28px; height: 28px; border-radius: 50%; background: var(--err); flex: 0 0 28px; display: inline-flex; align-items: center; justify-content: center; }
+    .browser-notif-mock .title { font-weight: 600; color: var(--fg); }
+    .browser-notif-mock .body  { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <h1>Next-meeting FAB — design sandbox</h1>
+  <p>Live preview of every state the floating widget can be in. Edit this file
+    (or the controls below) and reload to iterate. When something looks right,
+    tell Claude and we'll port the change into <code>web/src/components/NextMeetingFab.tsx</code>
+    + <code>web/src/styles/app.css</code>.</p>
+
+  <h2>States</h2>
+
+  <div class="card">
+    <div class="state-row">
+      <div class="grid">
+        <button class="next-meeting-fab next-meeting-fab-live" id="state-live">
+          <svg viewBox="0 0 16 16"><path fill="currentColor" d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0Zm0 1.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Zm.75 2.75a.75.75 0 0 0-1.5 0V8c0 .2.08.39.22.53l2.5 2.5a.75.75 0 1 0 1.06-1.06L8.75 7.69V4.25Z"/></svg>
+          <span>12m left</span>
+        </button>
+        <div class="desc"><strong>live</strong> — you're currently in a meeting. Default colour: red. Shows time until the event ends.</div>
+      </div>
+    </div>
+
+    <div class="state-row">
+      <div class="grid">
+        <button class="next-meeting-fab next-meeting-fab-soon" id="state-soon">
+          <svg viewBox="0 0 16 16"><path fill="currentColor" d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0Zm0 1.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Zm.75 2.75a.75.75 0 0 0-1.5 0V8c0 .2.08.39.22.53l2.5 2.5a.75.75 0 1 0 1.06-1.06L8.75 7.69V4.25Z"/></svg>
+          <span>in 4m</span>
+        </button>
+        <div class="desc"><strong>soon</strong> — next meeting is within the "soon" cutoff (default 5 min). Default colour: amber.</div>
+      </div>
+    </div>
+
+    <div class="state-row">
+      <div class="grid">
+        <button class="next-meeting-fab next-meeting-fab-idle">
+          <svg viewBox="0 0 16 16"><path fill="currentColor" d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0Zm0 1.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Zm.75 2.75a.75.75 0 0 0-1.5 0V8c0 .2.08.39.22.53l2.5 2.5a.75.75 0 1 0 1.06-1.06L8.75 7.69V4.25Z"/></svg>
+          <span>in 47m</span>
+        </button>
+        <div class="desc"><strong>idle</strong> — routine countdown to the next meeting. Default colour: accent blue.</div>
+      </div>
+    </div>
+
+    <div class="state-row">
+      <div class="grid">
+        <button class="next-meeting-fab next-meeting-fab-free">
+          <svg viewBox="0 0 16 16"><path fill="currentColor" d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0Zm0 1.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Zm.75 2.75a.75.75 0 0 0-1.5 0V8c0 .2.08.39.22.53l2.5 2.5a.75.75 0 1 0 1.06-1.06L8.75 7.69V4.25Z"/></svg>
+          <span>Free</span>
+        </button>
+        <div class="desc"><strong>free</strong> — no more events today. Default colour: dim green, 85% opacity.</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Tweak parameters</h2>
+  <div class="controls">
+    <label>
+      <span style="min-width:200px">"Soon" cutoff (minutes)</span>
+      <input type="number" id="ctrl-soon-cutoff" value="5" min="0" max="60">
+      <span class="desc">FAB flips to amber when next meeting is within this many minutes.</span>
+    </label>
+    <label>
+      <span style="min-width:200px">Pulse while live</span>
+      <input type="checkbox" id="ctrl-pulse-live">
+      <span class="desc">Red FAB pulses to draw attention while you're in a meeting.</span>
+    </label>
+    <label>
+      <span style="min-width:200px">Pulse while soon</span>
+      <input type="checkbox" id="ctrl-pulse-soon">
+      <span class="desc">Amber FAB pulses when a meeting is about to start.</span>
+    </label>
+    <label>
+      <span style="min-width:200px">Refresh every (seconds)</span>
+      <input type="number" id="ctrl-refresh-secs" value="30" min="5" max="300">
+      <span class="desc">How often the countdown ticks (default 30s).</span>
+    </label>
+    <label>
+      <span style="min-width:200px">Browser notification at start</span>
+      <input type="checkbox" id="ctrl-browser-notif">
+      <span class="desc">Fire a system notification when a meeting begins.</span>
+    </label>
+    <button type="button" id="grant-perm" style="margin: 8px 0; padding: 6px 12px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 4px; cursor: pointer;">Request browser-notification permission</button>
+    <button type="button" id="fire-test-notif" style="margin-left: 8px; padding: 6px 12px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 4px; cursor: pointer;">Fire a test notification</button>
+
+    <h2 style="margin-top: 22px;">Custom colours</h2>
+    <label><span style="min-width:200px">Live (in meeting) background</span> <input type="color" id="ctrl-live-bg" value="#cf222e"></label>
+    <label><span style="min-width:200px">Soon background</span> <input type="color" id="ctrl-soon-bg" value="#ffd33d"></label>
+    <label><span style="min-width:200px">Idle text</span> <input type="color" id="ctrl-idle-text" value="#6366f1"></label>
+    <label><span style="min-width:200px">Free text</span> <input type="color" id="ctrl-free-text" value="#3fb950"></label>
+
+    <p class="note">Changes here only affect this preview page. When you've
+      landed on something you like, ping Claude with what to apply
+      (e.g. "make Soon cutoff 10 minutes and pulse when live").</p>
+  </div>
+
+  <h2>System notification mock</h2>
+  <p>What a browser-fired notification could look like for "Standup starting now":</p>
+  <div class="browser-notif-mock">
+    <div class="dot">
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="#fff"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0Zm.75 4.25a.75.75 0 0 0-1.5 0V8c0 .2.08.39.22.53l2.5 2.5a.75.75 0 1 0 1.06-1.06L8.75 7.69V4.25Z"/></svg>
+    </div>
+    <div>
+      <div class="title">Meeting starting now</div>
+      <div class="body">Connor Command Center · 10:30 AM</div>
+    </div>
+  </div>
+
+  <script>
+    // Live tweaking: react to control changes by toggling CSS on the four
+    // example FAB buttons.
+    const ctrl = {
+      soonCutoff: document.getElementById('ctrl-soon-cutoff'),
+      pulseLive: document.getElementById('ctrl-pulse-live'),
+      pulseSoon: document.getElementById('ctrl-pulse-soon'),
+      refresh: document.getElementById('ctrl-refresh-secs'),
+      notif: document.getElementById('ctrl-browser-notif'),
+      liveBg: document.getElementById('ctrl-live-bg'),
+      soonBg: document.getElementById('ctrl-soon-bg'),
+      idleText: document.getElementById('ctrl-idle-text'),
+      freeText: document.getElementById('ctrl-free-text'),
+    };
+    const fabs = {
+      live: document.querySelector('.next-meeting-fab-live'),
+      soon: document.querySelector('.next-meeting-fab-soon'),
+      idle: document.querySelector('.next-meeting-fab-idle'),
+      free: document.querySelector('.next-meeting-fab-free'),
+    };
+
+    function applyTweaks() {
+      fabs.live.style.background = ctrl.liveBg.value;
+      fabs.live.style.borderColor = ctrl.liveBg.value;
+      fabs.soon.style.background = ctrl.soonBg.value;
+      fabs.soon.style.borderColor = ctrl.soonBg.value;
+      fabs.idle.style.color = ctrl.idleText.value;
+      fabs.free.style.color = ctrl.freeText.value;
+
+      fabs.live.classList.toggle('next-meeting-fab-pulse-live', ctrl.pulseLive.checked);
+      fabs.soon.classList.toggle('next-meeting-fab-pulse-soon', ctrl.pulseSoon.checked);
+    }
+    Object.values(ctrl).forEach((el) => el.addEventListener('input', applyTweaks));
+    applyTweaks();
+
+    // Browser-notification permission + test fire.
+    document.getElementById('grant-perm').addEventListener('click', async () => {
+      if (!('Notification' in window)) {
+        alert('Browser notifications not supported in this browser.');
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      alert('Permission: ' + perm);
+    });
+    document.getElementById('fire-test-notif').addEventListener('click', () => {
+      if (Notification.permission !== 'granted') {
+        alert('Permission first — click "Request browser-notification permission".');
+        return;
+      }
+      new Notification('Meeting starting now', {
+        body: 'Connor Command Center · ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+        tag: 'connor-review-meeting-test',
+      });
+    });
+  </script>
+</body>
+</html>
