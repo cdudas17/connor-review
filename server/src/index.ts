@@ -11,6 +11,7 @@ import { registerNotesRoutes } from './routes/notes.js';
 import { registerLocalRoutes } from './routes/local.js';
 import { registerIssuesRoutes } from './routes/issues.js';
 import { registerBuildkiteRoutes } from './routes/buildkite.js';
+import { registerCalendarRoutes } from './routes/calendar.js';
 
 export async function buildServer() {
   const app = Fastify({ logger: { level: 'warn' } });
@@ -22,6 +23,7 @@ export async function buildServer() {
   await registerLocalRoutes(app);
   await registerIssuesRoutes(app);
   await registerBuildkiteRoutes(app);
+  await registerCalendarRoutes(app);
   return app;
 }
 
@@ -37,6 +39,8 @@ if (isMain) {
     app.log.warn(`[server] loaded ${envLoad.loaded.length} var(s) from ${envLoad.source}: ${envLoad.loaded.join(', ') || '(none new)'}`);
   }
   app.log.warn(`[server] BUILDKITE_API_TOKEN: ${process.env.BUILDKITE_API_TOKEN ? 'set ✓' : 'NOT set — Buildkite drill-in disabled'}`);
+  const gcalConfigured = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
+  app.log.warn(`[server] GOOGLE_CLIENT_ID/SECRET: ${gcalConfigured ? 'set ✓' : 'NOT set — Calendar tab disabled until configured'}`);
 
   // Without explicit signal handlers, Fastify's default graceful-shutdown can
   // hang on in-flight worktree / Claude work, and tsx-watch's child never

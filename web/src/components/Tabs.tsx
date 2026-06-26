@@ -1,4 +1,4 @@
-export type TabId = 'my' | 'mine' | 'team' | 'oncall' | 'local' | 'issues';
+export type TabId = 'my' | 'mine' | 'team' | 'oncall' | 'local' | 'issues' | 'calendar';
 
 interface TabSpec {
   id: TabId;

@@ -13,6 +13,10 @@ import { MemberFilter } from './components/MemberFilter.js';
 import { TagFilter } from './components/TagFilter.js';
 import { NONE_TAG, effectiveTags } from './lib/extractTags.js';
 import { ShaderLoader } from './components/ShaderLoader.js';
+import { CalendarAgenda } from './components/CalendarAgenda.js';
+import { EventDrawer } from './components/EventDrawer.js';
+import { useCalendarEvents } from './hooks/useCalendarEvents.js';
+import type { CalendarEvent } from './types.js';
 import { OncallStateFilter, type OncallState } from './components/OncallStateFilter.js';
 import { NotesFab } from './components/NotesFab.js';
 import { IssueDrawer } from './components/IssueDrawer.js';
@@ -129,6 +133,8 @@ export function App() {
     autoRefreshMs: 5 * 60 * 1000,
   });
   useEffect(() => { if (tab === 'issues') setIssuesTabEverSeen(true); }, [tab]);
+  const calendar = useCalendarEvents();
+  const [currentEvent, setCurrentEvent] = useState<CalendarEvent | null>(null);
   const [mode, setMode] = useState<FilterMode>('all');
   const [current, setCurrent] = useState<Identity | null>(null);
   // Identity of the open issue (Issues tab). Held parallel to `current` so
@@ -783,6 +789,7 @@ export function App() {
             ? [{ id: 'local' as const, label: 'Local', badge: untouchedCount(localPRs.prs) || null }]
             : []),
           { id: 'issues' as const, label: 'Issues', badge: myIssues.hasLoaded ? (myIssues.issues.length || null) : null },
+          { id: 'calendar' as const, label: 'Calendar', badge: null },
         ]}
         active={tab}
         onChange={setTab}
@@ -1162,6 +1169,63 @@ export function App() {
         </section>
       )}
 
+      {tab === 'calendar' && (
+        <section className="calendar-tab">
+          {calendar.auth.kind === 'unconfigured' && (
+            <div className="calendar-connect">
+              <p>Google OAuth client isn't configured yet.</p>
+              <p className="calendar-connect-note">{calendar.auth.message}</p>
+            </div>
+          )}
+          {calendar.auth.kind === 'disconnected' && (
+            <div className="calendar-connect">
+              <p>Connect your Google Calendar to see today + the next 7 days here.</p>
+              <p className="calendar-connect-note">
+                Opens a Google consent dialog in a popup. Read-only — Connor
+                Command Center only uses <code>calendar.readonly</code> scope.
+              </p>
+              <button type="button" className="calendar-connect-btn" onClick={() => void calendar.beginConnect()}>
+                Connect Google Calendar
+              </button>
+            </div>
+          )}
+          {calendar.auth.kind === 'connected' && (
+            <>
+              <p className="calendar-actions-row">
+                <span className="tab-context-freshness">
+                  {calendar.lastFetchedAt && (
+                    <>auto-refreshes every 5 min · last updated {new Date(calendar.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</>
+                  )}
+                  {calendar.loading && <span className="loading-spinner" aria-label="Refreshing" />}
+                </span>
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => void calendar.refresh()}
+                  disabled={calendar.loading}
+                  style={{ marginLeft: 'auto' }}
+                >Refresh</button>
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => { if (confirm('Disconnect Google Calendar?')) void calendar.signOut(); }}
+                  style={{ marginLeft: 12 }}
+                >Disconnect</button>
+              </p>
+              {calendar.error && (
+                <ErrorToast message={calendar.error} onDismiss={() => { /* error clears on next successful fetch */ }} />
+              )}
+              <CalendarAgenda events={calendar.events} onOpen={setCurrentEvent} />
+            </>
+          )}
+          {calendar.auth.kind === 'unknown' && (
+            <p className="empty"><span className="loading-spinner" aria-hidden="true" /> Checking calendar connection…</p>
+          )}
+        </section>
+      )}
+
+      <EventDrawer current={currentEvent} onClose={() => setCurrentEvent(null)} />
+
       {tab === 'mine' && (
         <TagFilter
           tags={tagList}
@@ -1173,7 +1237,7 @@ export function App() {
         />
       )}
 
-      {tab !== 'issues' && <PRList
+      {tab !== 'issues' && tab !== 'calendar' && <PRList
         prs={activePRs}
         mode={mode}
         onOpen={setCurrent}

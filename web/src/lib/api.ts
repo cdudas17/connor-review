@@ -1,4 +1,4 @@
-import type { PullRequestMeta, ReviewEvent, StagedInlineComment, TeamPR } from '../types.js';
+import type { PullRequestMeta, ReviewEvent, StagedInlineComment, TeamPR, CalendarEvent } from '../types.js';
 
 export class ApiCallError extends Error {
   constructor(
@@ -268,6 +268,29 @@ export const api = {
       body: JSON.stringify({ body }),
     });
   },
+  // --- Calendar (Google) ---
+  getCalendarAuthStatus(): Promise<{ connected: boolean; configured: boolean; configurationError: string | null }> {
+    return call('/api/calendar/auth-status');
+  },
+  getCalendarAuthUrl(): Promise<{ url: string }> {
+    return call('/api/calendar/auth-url');
+  },
+  signOutOfCalendar(): Promise<{ ok: true }> {
+    return call('/api/calendar/sign-out', { method: 'POST' });
+  },
+  getCalendarEvents(opts?: { start?: string; end?: string }): Promise<{
+    events: CalendarEvent[];
+    calendarId: string;
+    start: string;
+    end: string;
+  }> {
+    const qs = new URLSearchParams();
+    if (opts?.start) qs.set('start', opts.start);
+    if (opts?.end) qs.set('end', opts.end);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return call(`/api/calendar/events${suffix}`);
+  },
+
   /** Drill into a failing Buildkite CI check: fetches the build's annotations
    * (where rspec / jest / similar agents post failure summaries) so the CI
    * drawer can render per-test failure details inline. */

@@ -596,6 +596,54 @@ button.ci-badge { cursor: pointer; }
 .issue-body { margin-top: 16px; padding: 16px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 8px; }
 .issue-body-empty { color: var(--muted); font-style: italic; margin-top: 16px; }
 
+/* Calendar tab — agenda list grouped by day. */
+.calendar-empty { color: var(--muted); font-style: italic; padding: 24px; text-align: center; }
+.calendar-connect { padding: 32px 24px; text-align: center; border: 1px dashed var(--border); border-radius: 8px; background: var(--bg-subtle); margin: 12px 0; }
+.calendar-connect p { margin: 0 0 12px; }
+.calendar-connect .calendar-connect-note { color: var(--muted); font-size: 0.9rem; }
+.calendar-connect-btn { padding: 8px 18px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; font: inherit; font-weight: 500; }
+.calendar-connect-btn:hover { filter: brightness(1.08); }
+.calendar-agenda { display: flex; flex-direction: column; gap: 18px; padding: 4px 0 24px; }
+.calendar-day { display: flex; flex-direction: column; gap: 6px; }
+.calendar-day-header { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; padding: 0 4px; }
+.calendar-day-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.calendar-event { display: grid; grid-template-columns: 120px 1fr auto; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; align-items: center; background: var(--bg); transition: background 80ms; }
+.calendar-event:hover { background: var(--bg-subtle); }
+.calendar-event-time { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--fg); font-variant-numeric: tabular-nums; }
+.calendar-event-title { font-size: 14px; color: var(--fg); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-event-conf { font-size: 12px; color: var(--accent); text-decoration: none; padding: 3px 10px; border: 1px solid var(--accent); border-radius: 999px; }
+.calendar-event-conf:hover { background: rgba(99, 102, 241, 0.12); }
+.calendar-event-declined { opacity: 0.5; }
+.calendar-event-declined .calendar-event-title { text-decoration: line-through; }
+.calendar-event-tentative .calendar-event-title { font-style: italic; }
+.calendar-actions-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.9rem; color: var(--muted); }
+
+/* Event drawer (read-only) */
+.event-drawer .pr-header { padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.event-rsvp { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; text-transform: lowercase; }
+.event-rsvp-accepted { color: #3fb950; }
+.event-rsvp-declined { color: #8b949e; }
+.event-rsvp-tentative { color: #d29922; }
+.event-conf-row { margin: 12px 0; }
+.event-conf-join { display: inline-block; padding: 8px 18px; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 6px; text-decoration: none; font-weight: 500; }
+.event-conf-join:hover { filter: brightness(1.08); }
+.event-extra-links { margin: 8px 0 16px; font-size: 0.9rem; }
+.event-extra-links a { color: var(--accent); text-decoration: none; }
+.event-extra-links a:hover { text-decoration: underline; }
+.event-attendees { margin: 16px 0; }
+.event-attendees h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.event-attendees ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.event-attendee { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
+.event-attendee:last-child { border-bottom: none; }
+.event-attendee-status { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; text-transform: lowercase; }
+.event-attendee-accepted .event-attendee-status { color: #3fb950; }
+.event-attendee-declined .event-attendee-status { color: #8b949e; }
+.event-attendee-tentative .event-attendee-status { color: #d29922; }
+.event-attendee-declined .event-attendee-name { text-decoration: line-through; opacity: 0.7; }
+.event-description { margin: 16px 0; }
+.event-description h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.event-description-body { background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 6px; padding: 12px; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 13px; line-height: 1.5; margin: 0; }
+
 /* CI checks drawer — opened by clicking the CiBadge. Reuses .drawer chrome
  * but keeps its own header + list structure since the content is much more
  * uniform than the PR drawer.

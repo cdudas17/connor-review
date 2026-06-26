@@ -193,3 +193,28 @@ export interface TeamPR {
   /** GitHub logins whose LATEST review on this PR is APPROVED. */
   approvers?: string[];
 }
+
+export interface CalendarAttendee {
+  email: string | null;
+  displayName: string | null;
+  responseStatus: string | null;
+  isSelf: boolean;
+  isOrganizer: boolean;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string | null;
+  end: string | null;
+  isAllDay: boolean;
+  status: string | null;
+  location: string | null;
+  description: string | null;
+  htmlLink: string | null;
+  attendees: CalendarAttendee[];
+  organizer: { email: string | null; displayName: string | null; isSelf: boolean } | null;
+  conferenceUri: string | null;
+  conferenceName: string | null;
+  myResponseStatus: string | null;
+}
