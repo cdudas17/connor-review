@@ -57,8 +57,7 @@ function computeStatus(events: CalendarEvent[], now: Date): NextOrNow {
   // 1. In a meeting right now?
   const ongoing = concrete.find((s) => s.startMs <= nowMs && nowMs < s.endMs);
   if (ongoing) {
-    const left = Math.round((ongoing.endMs - nowMs) / 60_000);
-    return { state: 'live', label: fmtMins(left) };
+    return { state: 'live', label: 'Live' };
   }
 
   // 2. Next upcoming meeting?
