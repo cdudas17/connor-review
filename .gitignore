@@ -9,3 +9,4 @@ coverage
 
 # Personal / org-specific config (real URLs, repo names, labels)
 web/src/config.local.ts
+server/src/config.local.ts
