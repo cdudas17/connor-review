@@ -40,34 +40,34 @@ interface NormalizedEvent {
 }
 
 /**
- * Parse `gcalcli agenda --tsv` output. The default TSV format is six
+ * Parse `gcalcli agenda --tsv` output. The default TSV format is five
  * tab-separated columns (in this exact order, every gcalcli 4.x):
  *
- *   start_date \t start_time \t end_date \t end_time \t url \t title
+ *   start_date \t start_time \t end_date \t end_time \t title
  *
  * All-day events leave start_time / end_time empty. Title can contain
  * arbitrary characters except tab + newline — we treat anything after
- * the 5th tab as the title (so the rare title with a stray tab still
+ * the 4th tab as the title (so the rare title with a stray tab still
  * works).
  *
  * We deliberately don't use `--details=...` flags here: their column
  * order varies between gcalcli versions, which earlier broke the
- * parser. If we want rich event detail later, json mode is the right
- * upgrade path.
+ * parser. JSON mode is the right upgrade path if we want rich event
+ * detail inline later.
  */
 function parseAgendaTsv(stdout: string): NormalizedEvent[] {
   const events: NormalizedEvent[] = [];
   const lines = stdout.split('\n').filter((l) => l.length > 0);
   for (const line of lines) {
     const cells = line.split('\t');
-    if (cells.length < 6) continue;
-    const [sd, st, ed, et, url, ...titleParts] = cells;
+    if (cells.length < 5) continue;
+    const [sd, st, ed, et, ...titleParts] = cells;
     const title = titleParts.join('\t').trim();
     const isAllDay = !st;
     const startIso = isAllDay ? sd : `${sd}T${st}:00`;
     const endIso = isAllDay ? ed : (et ? `${ed}T${et}:00` : null);
     events.push({
-      id: `${startIso}|${title}|${url}`,
+      id: `${startIso}|${title}`,
       title: title || '(no title)',
       start: startIso,
       end: endIso,
@@ -75,7 +75,7 @@ function parseAgendaTsv(stdout: string): NormalizedEvent[] {
       status: null,
       location: null,
       description: null,
-      htmlLink: url || null,
+      htmlLink: null,
       attendees: [],
       organizer: null,
       conferenceUri: null,
