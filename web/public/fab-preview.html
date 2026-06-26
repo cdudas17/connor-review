@@ -54,16 +54,16 @@
     }
     .next-meeting-fab svg { width: 18px; height: 18px; }
     .next-meeting-fab-live   { color: #fff; background: #cf222e; border-color: #cf222e; }
-    /* "Soon" — animated rainbow gradient sweep with a coloured glow.
-     * Attention-grabbing without being garish; the slow drift reads as
-     * "something is about to happen." */
+    /* "Soon" — animated rainbow gradient sweep (no yellow) with a coloured
+     * glow. Attention-grabbing without being garish; the slow drift reads
+     * as "something is about to happen." */
     .next-meeting-fab-soon   {
       color: #fff;
       border-color: transparent;
       background: linear-gradient(
         90deg,
-        #ff5d73 0%, #ffa657 16%, #ffe066 33%, #56d364 50%,
-        #79c0ff 66%, #d2a8ff 83%, #f778ba 100%, #ff5d73 100%
+        #ff5d73 0%, #ffa657 20%, #56d364 40%,
+        #79c0ff 60%, #d2a8ff 80%, #f778ba 100%
       );
       background-size: 220% 100%;
       animation: rainbow-shift 4s linear infinite;
@@ -179,9 +179,11 @@
 
     <h2 style="margin-top: 22px;">Custom colours</h2>
     <label><span style="min-width:200px">Live (in meeting) background</span> <input type="color" id="ctrl-live-bg" value="#cf222e"></label>
-    <label><span style="min-width:200px">Soon background</span> <input type="color" id="ctrl-soon-bg" value="#ffd33d"></label>
     <label><span style="min-width:200px">Idle text</span> <input type="color" id="ctrl-idle-text" value="#6366f1"></label>
     <label><span style="min-width:200px">Free text</span> <input type="color" id="ctrl-free-text" value="#3fb950"></label>
+    <p class="note">Soon uses an animated rainbow gradient (no flat
+      colour). Edit the CSS at the top of this file to tweak the gradient
+      stops or animation timing.</p>
 
     <p class="note">Changes here only affect this preview page. When you've
       landed on something you like, ping Claude with what to apply
@@ -210,7 +212,6 @@
       refresh: document.getElementById('ctrl-refresh-secs'),
       notif: document.getElementById('ctrl-browser-notif'),
       liveBg: document.getElementById('ctrl-live-bg'),
-      soonBg: document.getElementById('ctrl-soon-bg'),
       idleText: document.getElementById('ctrl-idle-text'),
       freeText: document.getElementById('ctrl-free-text'),
     };
@@ -224,10 +225,9 @@
     function applyTweaks() {
       fabs.live.style.background = ctrl.liveBg.value;
       fabs.live.style.borderColor = ctrl.liveBg.value;
-      fabs.soon.style.background = ctrl.soonBg.value;
-      fabs.soon.style.borderColor = ctrl.soonBg.value;
       fabs.idle.style.color = ctrl.idleText.value;
       fabs.free.style.color = ctrl.freeText.value;
+      // Soon's rainbow gradient is CSS-only; no inline override here.
 
       fabs.live.classList.toggle('next-meeting-fab-pulse-live', ctrl.pulseLive.checked);
       fabs.soon.classList.toggle('next-meeting-fab-pulse-soon', ctrl.pulseSoon.checked);
