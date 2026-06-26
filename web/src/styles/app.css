@@ -603,26 +603,28 @@ button.ci-badge { cursor: pointer; }
 .calendar-connect .calendar-connect-note { color: var(--muted); font-size: 0.9rem; }
 .calendar-connect-btn { padding: 8px 18px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; font: inherit; font-weight: 500; }
 .calendar-connect-btn:hover { filter: brightness(1.08); }
-.calendar-agenda { display: flex; flex-direction: column; gap: 18px; padding: 4px 0 24px; }
-.calendar-day { display: flex; flex-direction: column; gap: 6px; }
-.calendar-day-header { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; padding: 0 4px; }
-.calendar-day-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.calendar-event { display: grid; grid-template-columns: 120px 1fr auto; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; align-items: center; background: var(--bg); transition: background 80ms; }
-.calendar-event:hover { background: var(--bg-subtle); }
-.calendar-event-time { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--fg); font-variant-numeric: tabular-nums; }
-.calendar-event-title { font-size: 14px; color: var(--fg); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.calendar-event-conf { font-size: 12px; color: var(--accent); text-decoration: none; padding: 3px 10px; border: 1px solid var(--accent); border-radius: 999px; }
-.calendar-event-conf:hover { background: rgba(99, 102, 241, 0.12); }
-.calendar-event-declined { opacity: 0.5; }
-.calendar-event-declined .calendar-event-title { text-decoration: line-through; }
-.calendar-event-tentative .calendar-event-title { font-style: italic; }
-/* Free/busy-only rows (shared calendar with hide-details permission) —
- * no title to render, no drawer to open. Slimmer two-column layout
- * with a quiet "Busy" label so the rows still scan as schedule blocks. */
-.calendar-event.calendar-event-busy-only { grid-template-columns: 120px 1fr; cursor: default; }
-.calendar-event.calendar-event-busy-only:hover { background: var(--bg); }
-.calendar-event-busy-label { color: var(--muted); font-size: 13px; font-style: italic; }
 .calendar-actions-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.9rem; color: var(--muted); }
+
+/* Timeline view — replaces the per-event list with a horizontal busy-block
+ * bar per day. Far more useful at a glance when every event is title-less
+ * (free/busy shared calendar). Hour axis along the top, one row per day
+ * that has at least one event, "now" line on today. */
+.calendar-timeline { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 24px; }
+.calendar-timeline-axis { position: relative; height: 16px; margin-left: 110px; color: var(--muted); font-size: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+.calendar-timeline-axis-tick { position: absolute; transform: translateX(-50%); }
+.calendar-day-row { display: grid; grid-template-columns: 100px 1fr auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.calendar-day-row:last-child { border-bottom: none; }
+.calendar-day-row-today .calendar-day-label { color: var(--fg); font-weight: 600; }
+.calendar-day-label { margin: 0; font-size: 12px; color: var(--muted); }
+.calendar-day-bar { position: relative; height: 28px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.calendar-day-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border); opacity: 0.55; pointer-events: none; }
+.calendar-block { position: absolute; top: 2px; bottom: 2px; background: rgba(99, 102, 241, 0.55); border: 1px solid rgba(99, 102, 241, 0.85); border-radius: 3px; min-width: 4px; }
+.calendar-block-titled { cursor: pointer; }
+.calendar-block-titled:hover { background: rgba(99, 102, 241, 0.75); }
+.calendar-now-marker { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #f85149; box-shadow: 0 0 6px rgba(248, 81, 73, 0.55); pointer-events: none; }
+.calendar-day-extras { display: flex; gap: 4px; flex-wrap: wrap; justify-self: end; }
+.calendar-day-extra { font-size: 10px; color: var(--muted); padding: 1px 6px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+.calendar-day-extra-allday { font-family: inherit; font-variant-numeric: normal; }
 
 /* Event drawer (read-only) */
 .event-drawer .pr-header { padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
