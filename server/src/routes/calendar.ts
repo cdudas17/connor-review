@@ -40,58 +40,46 @@ interface NormalizedEvent {
 }
 
 /**
- * Parse `gcalcli agenda --tsv --details=length,description,location,calendar,url,attendees,conference,attachments`
- * output. gcalcli's TSV format is:
- *   start_date \t start_time \t end_date \t end_time \t <details columns> \t title
+ * Parse `gcalcli agenda --tsv` output. The default TSV format is six
+ * tab-separated columns (in this exact order, every gcalcli 4.x):
  *
- * Column order for --details varies by gcalcli version; we read by
- * position based on which --details flags we passed. Some columns may
- * be empty strings.
+ *   start_date \t start_time \t end_date \t end_time \t url \t title
+ *
+ * All-day events leave start_time / end_time empty. Title can contain
+ * arbitrary characters except tab + newline — we treat anything after
+ * the 5th tab as the title (so the rare title with a stray tab still
+ * works).
+ *
+ * We deliberately don't use `--details=...` flags here: their column
+ * order varies between gcalcli versions, which earlier broke the
+ * parser. If we want rich event detail later, json mode is the right
+ * upgrade path.
  */
-function parseAgendaTsv(stdout: string, baseColumns: string[]): NormalizedEvent[] {
+function parseAgendaTsv(stdout: string): NormalizedEvent[] {
   const events: NormalizedEvent[] = [];
   const lines = stdout.split('\n').filter((l) => l.length > 0);
   for (const line of lines) {
     const cells = line.split('\t');
-    // First 4 cells are always start_date, start_time, end_date, end_time.
-    if (cells.length < 5) continue;
-    const [sd, st, ed, et, ...rest] = cells;
-    // baseColumns describes the optional detail columns we asked for
-    // (in the order we passed them via --details=...). gcalcli emits
-    // them in the canonical order (regardless of --details order), so
-    // we rely on the known canonical order rather than the flag order.
-    const details: Record<string, string> = {};
-    for (let i = 0; i < baseColumns.length && i < rest.length - 1; i++) {
-      details[baseColumns[i]] = rest[i] ?? '';
-    }
-    const title = rest[rest.length - 1] ?? '';
-
+    if (cells.length < 6) continue;
+    const [sd, st, ed, et, url, ...titleParts] = cells;
+    const title = titleParts.join('\t').trim();
     const isAllDay = !st;
     const startIso = isAllDay ? sd : `${sd}T${st}:00`;
     const endIso = isAllDay ? ed : (et ? `${ed}T${et}:00` : null);
-
     events.push({
-      id: `${startIso}-${title}`,
+      id: `${startIso}|${title}|${url}`,
       title: title || '(no title)',
       start: startIso,
       end: endIso,
       isAllDay,
       status: null,
-      location: details.location || null,
-      description: details.description || null,
-      htmlLink: details.url || null,
-      attendees: details.attendees
-        ? details.attendees.split(/[,;] */).filter(Boolean).map((s) => ({
-            email: s.includes('@') ? s : null,
-            displayName: s,
-            responseStatus: null,
-            isSelf: false,
-            isOrganizer: false,
-          }))
-        : [],
+      location: null,
+      description: null,
+      htmlLink: url || null,
+      attendees: [],
       organizer: null,
-      conferenceUri: details.hangoutLink || details.conference || null,
-      conferenceName: details.conference ? 'Meet' : null,
+      conferenceUri: null,
+      conferenceName: null,
       myResponseStatus: null,
     });
   }
@@ -130,30 +118,34 @@ export async function registerCalendarRoutes(app: FastifyInstance) {
 
   app.get<{ Querystring: { start?: string; end?: string } }>('/api/calendar/events', async (req, reply) => {
     const now = new Date();
-    const start = req.query.start ? new Date(req.query.start) : new Date(now.getTime() - 2 * 60 * 60_000);
+    // Default window: start of today through +7 days. We later drop events
+    // whose end is already in the past so an event that finished an hour
+    // ago doesn't clutter the list — but an event that STARTED earlier
+    // today and is still ongoing always survives because its end is in
+    // the future.
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const start = req.query.start ? new Date(req.query.start) : startOfToday;
     const end = req.query.end ? new Date(req.query.end) : new Date(now.getTime() + 7 * 24 * 60 * 60_000);
-
-    // gcalcli's --details flags — canonical order in the TSV output, NOT
-    // the order we list them here. We just need to know which columns to
-    // expect.
-    const detailColumns = ['url', 'conference', 'hangoutLink', 'attendees', 'attachments', 'length', 'reminders', 'description', 'location', 'calendar', 'email'];
 
     try {
       const stdout = await gcalcliExec([
         '--nocolor',
         'agenda',
         '--tsv',
-        '--details=url',
-        '--details=conference',
-        '--details=attendees',
-        '--details=length',
-        '--details=description',
-        '--details=location',
-        '--details=calendar',
         ymd(start),
         ymd(end),
       ], { timeoutMs: 15_000 });
-      const events = parseAgendaTsv(stdout, detailColumns);
+      const all = parseAgendaTsv(stdout);
+      // Hide events that have already ended (so completed standups from
+      // earlier in the day drop off) but keep ongoing + future. All-day
+      // events without an explicit end stay visible for the whole day.
+      const nowMs = now.getTime();
+      const events = all.filter((e) => {
+        if (!e.end) return true;
+        const endMs = Date.parse(e.end);
+        if (Number.isNaN(endMs)) return true;
+        return endMs > nowMs;
+      });
       return { events, start: start.toISOString(), end: end.toISOString() };
     } catch (e) {
       if (e instanceof GcalcliError) {
