@@ -63,13 +63,23 @@ export function CalendarAgenda({ events, onOpen }: Props) {
   }, []);
 
   const days = useMemo(() => {
+    // Seed a row per day from today through today+6 so empty days
+    // (including today, when nothing's scheduled) still get a row.
     const byDay = new Map<string, DayBucket>();
+    const today = new Date();
+    const seedToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(seedToday.getTime() + i * 86_400_000);
+      byDay.set(dayKey(d), { date: d, inWindow: [], allDay: [], outOfWindow: [] });
+    }
     for (const e of events) {
       if (!e.start) continue;
       const startDate = new Date(e.start);
       if (Number.isNaN(startDate.getTime())) continue;
       const localMidnight = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
       const key = dayKey(localMidnight);
+      // Preserve out-of-range days (events beyond the 7-day seed) too;
+      // those land in extra rows after today+6.
       const bucket = byDay.get(key) ?? { date: localMidnight, inWindow: [], allDay: [], outOfWindow: [] };
       if (e.isAllDay) {
         bucket.allDay.push(e);
@@ -84,10 +94,6 @@ export function CalendarAgenda({ events, onOpen }: Props) {
     }
     return Array.from(byDay.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [events]);
-
-  if (events.length === 0) {
-    return <p className="calendar-empty">No events in the next 7 days.</p>;
-  }
 
   // Hour markers — render every 2 hours for legibility (8a, 10a, 12p, …).
   const hourMarkers: Array<{ label: string; pct: number }> = [];
