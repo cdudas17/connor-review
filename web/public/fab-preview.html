@@ -54,7 +54,29 @@
     }
     .next-meeting-fab svg { width: 18px; height: 18px; }
     .next-meeting-fab-live   { color: #fff; background: #cf222e; border-color: #cf222e; }
-    .next-meeting-fab-soon   { color: #1f2328; background: #ffd33d; border-color: #ffd33d; }
+    /* "Soon" — animated rainbow gradient sweep with a coloured glow.
+     * Attention-grabbing without being garish; the slow drift reads as
+     * "something is about to happen." */
+    .next-meeting-fab-soon   {
+      color: #fff;
+      border-color: transparent;
+      background: linear-gradient(
+        90deg,
+        #ff5d73 0%, #ffa657 16%, #ffe066 33%, #56d364 50%,
+        #79c0ff 66%, #d2a8ff 83%, #f778ba 100%, #ff5d73 100%
+      );
+      background-size: 220% 100%;
+      animation: rainbow-shift 4s linear infinite;
+      text-shadow: 0 0 6px rgba(0, 0, 0, 0.45);
+      box-shadow:
+        0 0 14px rgba(255, 138, 220, 0.45),
+        0 0 24px rgba(121, 192, 255, 0.30),
+        0 4px 16px rgba(0, 0, 0, 0.35);
+    }
+    @keyframes rainbow-shift {
+      0%   { background-position:   0% 50%; }
+      100% { background-position: 220% 50%; }
+    }
     .next-meeting-fab-idle   { color: var(--accent); }
     .next-meeting-fab-free   { color: #3fb950; opacity: 0.85; }
 
