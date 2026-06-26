@@ -66,10 +66,17 @@ function computeStatus(events: CalendarEvent[], now: Date): NextOrNow {
   const next = upcoming[0];
   if (next) {
     const until = Math.round((next.startMs - nowMs) / 60_000);
-    return {
-      state: until <= 5 ? 'soon' : 'idle',
-      label: `in ${fmtMins(until)}`,
-    };
+    if (until <= 5) return { state: 'soon', label: `in ${fmtMins(until)}` };
+    // Idle only when the next event is TODAY. If your next meeting isn't
+    // until tomorrow (or later), the FAB shows "Free" — a "in 2d4h"
+    // countdown isn't useful and visually it looked the same as a real
+    // imminent meeting.
+    const nextDate = new Date(next.startMs);
+    const today = new Date(nowMs);
+    const sameDay = nextDate.getFullYear() === today.getFullYear()
+      && nextDate.getMonth() === today.getMonth()
+      && nextDate.getDate() === today.getDate();
+    if (sameDay) return { state: 'idle', label: `in ${fmtMins(until)}` };
   }
 
   return { state: 'free', label: 'Free' };
