@@ -6,9 +6,8 @@ const REFRESH_MS = 5 * 60_000;
 
 type AuthState =
   | { kind: 'unknown' }
-  | { kind: 'unconfigured'; message: string }
-  | { kind: 'disconnected' }
-  | { kind: 'connected' };
+  | { kind: 'needs-setup'; message: string }
+  | { kind: 'ready' };
 
 interface State {
   auth: AuthState;
@@ -18,10 +17,12 @@ interface State {
   lastFetchedAt: number | null;
 }
 
-/** Calendar tab data: holds auth state (configured? connected?) plus the
- * next-7-day event list. Auto-refreshes every 5 minutes while the tab is
- * visible; pauses when hidden so the OAuth token doesn't churn refresh
- * cycles in a background tab. */
+/** Calendar tab data via `gcalcli`. On mount, asks the server whether
+ * gcalcli is installed and authenticated; if so, fetches the next
+ * 7 days of events and auto-refreshes every 5 min while the tab is
+ * visible. If gcalcli is missing or not authenticated, surfaces the
+ * server's setup hint so the user can fix it from a single message in
+ * the UI. */
 export function useCalendarEvents() {
   const [state, setState] = useState<State>({
     auth: { kind: 'unknown' },
@@ -35,14 +36,16 @@ export function useCalendarEvents() {
   const checkAuth = useCallback(async () => {
     try {
       const s = await api.getCalendarAuthStatus();
-      if (cancelledRef.current) return;
-      if (!s.configured) {
-        setState((p) => ({ ...p, auth: { kind: 'unconfigured', message: s.configurationError ?? 'Google OAuth client is not configured.' } }));
-        return;
+      if (cancelledRef.current) return s;
+      if (s.connected) {
+        setState((p) => ({ ...p, auth: { kind: 'ready' } }));
+      } else {
+        setState((p) => ({ ...p, auth: { kind: 'needs-setup', message: s.configurationError ?? 'Calendar is not set up.' } }));
       }
-      setState((p) => ({ ...p, auth: { kind: s.connected ? 'connected' : 'disconnected' } }));
+      return s;
     } catch (e) {
-      setState((p) => ({ ...p, auth: { kind: 'disconnected' }, error: (e as Error).message }));
+      setState((p) => ({ ...p, auth: { kind: 'needs-setup', message: (e as Error).message } }));
+      return { connected: false, configured: false, configurationError: (e as Error).message };
     }
   }, []);
 
@@ -53,7 +56,7 @@ export function useCalendarEvents() {
       if (cancelledRef.current) return;
       setState((p) => ({
         ...p,
-        auth: { kind: 'connected' },
+        auth: { kind: 'ready' },
         events: r.events,
         loading: false,
         lastFetchedAt: Date.now(),
@@ -62,38 +65,30 @@ export function useCalendarEvents() {
     } catch (e) {
       if (cancelledRef.current) return;
       const err = e as ApiCallError;
-      // 401 here means token revoked / not connected — flip auth state.
-      if (err.status === 401) {
-        setState((p) => ({ ...p, auth: { kind: 'disconnected' }, loading: false }));
+      // 503/401 here means gcalcli not installed or not authenticated —
+      // flip back to needs-setup with the server's hint.
+      if (err.status === 503 || err.status === 401) {
+        setState((p) => ({ ...p, loading: false, auth: { kind: 'needs-setup', message: err.message } }));
         return;
       }
       setState((p) => ({ ...p, loading: false, error: err.message }));
     }
   }, []);
 
-  // Initial: check auth → fetch if connected.
+  // Initial: check auth → fetch if ready.
   useEffect(() => {
     cancelledRef.current = false;
     void (async () => {
-      await checkAuth();
+      const s = await checkAuth();
+      if (cancelledRef.current) return;
+      if (s.connected) void fetchEvents();
     })();
     return () => { cancelledRef.current = true; };
-  }, [checkAuth]);
+  }, [checkAuth, fetchEvents]);
 
-  // When auth flips to connected, fetch events. When it flips to disconnected,
-  // clear events.
+  // Auto-refresh every 5 min while ready and tab visible.
   useEffect(() => {
-    if (state.auth.kind === 'connected' && state.events.length === 0 && !state.loading && !state.error) {
-      void fetchEvents();
-    }
-    if (state.auth.kind === 'disconnected' && state.events.length > 0) {
-      setState((p) => ({ ...p, events: [], lastFetchedAt: null }));
-    }
-  }, [state.auth.kind, state.events.length, state.loading, state.error, fetchEvents]);
-
-  // Auto-refresh every 5 min while connected and tab visible.
-  useEffect(() => {
-    if (state.auth.kind !== 'connected') return;
+    if (state.auth.kind !== 'ready') return;
     const tick = () => {
       if (document.visibilityState === 'visible') void fetchEvents();
     };
@@ -101,30 +96,10 @@ export function useCalendarEvents() {
     return () => clearInterval(id);
   }, [state.auth.kind, fetchEvents]);
 
-  const beginConnect = useCallback(async () => {
-    const { url } = await api.getCalendarAuthUrl();
-    // Open the consent flow in a popup. After the callback closes the tab,
-    // poll auth-status until connected (or give up after ~2 minutes).
-    window.open(url, 'gcal-oauth', 'width=520,height=640');
-    const start = Date.now();
-    const interval = setInterval(async () => {
-      try {
-        const s = await api.getCalendarAuthStatus();
-        if (s.connected) {
-          clearInterval(interval);
-          setState((p) => ({ ...p, auth: { kind: 'connected' } }));
-          void fetchEvents();
-        } else if (Date.now() - start > 2 * 60_000) {
-          clearInterval(interval);
-        }
-      } catch { /* keep polling */ }
-    }, 2000);
-  }, [fetchEvents]);
-
-  const signOut = useCallback(async () => {
-    await api.signOutOfCalendar();
-    setState((p) => ({ ...p, auth: { kind: 'disconnected' }, events: [], lastFetchedAt: null }));
-  }, []);
+  const recheck = useCallback(async () => {
+    const s = await checkAuth();
+    if (s.connected) void fetchEvents();
+  }, [checkAuth, fetchEvents]);
 
   return {
     auth: state.auth,
@@ -133,7 +108,6 @@ export function useCalendarEvents() {
     error: state.error,
     lastFetchedAt: state.lastFetchedAt,
     refresh: fetchEvents,
-    beginConnect,
-    signOut,
+    recheck,
   };
 }

@@ -39,8 +39,6 @@ if (isMain) {
     app.log.warn(`[server] loaded ${envLoad.loaded.length} var(s) from ${envLoad.source}: ${envLoad.loaded.join(', ') || '(none new)'}`);
   }
   app.log.warn(`[server] BUILDKITE_API_TOKEN: ${process.env.BUILDKITE_API_TOKEN ? 'set ✓' : 'NOT set — Buildkite drill-in disabled'}`);
-  const gcalConfigured = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
-  app.log.warn(`[server] GOOGLE_CLIENT_ID/SECRET: ${gcalConfigured ? 'set ✓' : 'NOT set — Calendar tab disabled until configured'}`);
 
   // Without explicit signal handlers, Fastify's default graceful-shutdown can
   // hang on in-flight worktree / Claude work, and tsx-watch's child never

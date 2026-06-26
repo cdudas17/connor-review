@@ -268,19 +268,12 @@ export const api = {
       body: JSON.stringify({ body }),
     });
   },
-  // --- Calendar (Google) ---
+  // --- Calendar (via local gcalcli CLI) ---
   getCalendarAuthStatus(): Promise<{ connected: boolean; configured: boolean; configurationError: string | null }> {
     return call('/api/calendar/auth-status');
   },
-  getCalendarAuthUrl(): Promise<{ url: string }> {
-    return call('/api/calendar/auth-url');
-  },
-  signOutOfCalendar(): Promise<{ ok: true }> {
-    return call('/api/calendar/sign-out', { method: 'POST' });
-  },
   getCalendarEvents(opts?: { start?: string; end?: string }): Promise<{
     events: CalendarEvent[];
-    calendarId: string;
     start: string;
     end: string;
   }> {

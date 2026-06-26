@@ -1171,25 +1171,19 @@ export function App() {
 
       {tab === 'calendar' && (
         <section className="calendar-tab">
-          {calendar.auth.kind === 'unconfigured' && (
+          {calendar.auth.kind === 'needs-setup' && (
             <div className="calendar-connect">
-              <p>Google OAuth client isn't configured yet.</p>
+              <p>Calendar isn't set up yet.</p>
               <p className="calendar-connect-note">{calendar.auth.message}</p>
-            </div>
-          )}
-          {calendar.auth.kind === 'disconnected' && (
-            <div className="calendar-connect">
-              <p>Connect your Google Calendar to see today + the next 7 days here.</p>
-              <p className="calendar-connect-note">
-                Opens a Google consent dialog in a popup. Read-only — Connor
-                Command Center only uses <code>calendar.readonly</code> scope.
+              <p className="calendar-connect-note" style={{ marginTop: 12 }}>
+                Run those commands in your shell, then click below.
               </p>
-              <button type="button" className="calendar-connect-btn" onClick={() => void calendar.beginConnect()}>
-                Connect Google Calendar
+              <button type="button" className="calendar-connect-btn" onClick={() => void calendar.recheck()}>
+                I've installed it — recheck
               </button>
             </div>
           )}
-          {calendar.auth.kind === 'connected' && (
+          {calendar.auth.kind === 'ready' && (
             <>
               <p className="calendar-actions-row">
                 <span className="tab-context-freshness">
@@ -1205,12 +1199,6 @@ export function App() {
                   disabled={calendar.loading}
                   style={{ marginLeft: 'auto' }}
                 >Refresh</button>
-                <button
-                  type="button"
-                  className="link-button"
-                  onClick={() => { if (confirm('Disconnect Google Calendar?')) void calendar.signOut(); }}
-                  style={{ marginLeft: 12 }}
-                >Disconnect</button>
               </p>
               {calendar.error && (
                 <ErrorToast message={calendar.error} onDismiss={() => { /* error clears on next successful fetch */ }} />
