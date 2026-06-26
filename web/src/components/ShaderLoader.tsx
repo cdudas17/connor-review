@@ -28,10 +28,11 @@ const FRAGMENT_SHADER = `
   void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution.xy;
     vec3 color = 0.5 + 0.5 * cos(u_time + uv.xyx + vec3(0.0, 2.0, 4.0));
+    float alpha = 1.0;
     if (distance(uv, vec2(0.5, 0.5)) > 0.15 + cos((u_time*5.0)+uv.x*10.0+uv.y*15.0) * 0.04) {
-      color = vec3(0.0);
+      alpha = 0.0;
     }
-    gl_FragColor = vec4(color, 1.0);
+    gl_FragColor = vec4(color, alpha);
   }
 `;
 

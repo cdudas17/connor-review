@@ -121,7 +121,9 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
  * Tiny inline spinners (badges, buttons, in-flight indicators) stay on
  * `.loading-spinner` above; each shader loader spins up its own WebGL
  * context so we only use it for the single drawer-loading slot. */
-.shader-loader { display: inline-block; border-radius: 50%; background: #000; }
+/* No background / no border-radius — the shader writes alpha=0 outside the
+ * wobbly circle, so the page background shows through the corners. */
+.shader-loader { display: inline-block; }
 @keyframes cr-spin { to { transform: rotate(360deg); } }
 
 /* Centered first-load spinner inside the drawer. */

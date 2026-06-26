@@ -87,8 +87,8 @@ export function App() {
   const [titleStars] = useState(() => TITLE_STAR_POSITIONS.map((pos) => ({
     top: pos.top,
     left: pos.left,
-    // 8–16px orbs at varying sizes for depth-of-field feel
-    size: 8 + Math.floor(Math.random() * 9),
+    // 16–32px orbs at varying sizes for depth-of-field feel
+    size: 16 + Math.floor(Math.random() * 17),
     // 0–20s offset desynchronises the color cycle + circle wobble
     offset: Math.random() * 20,
   })));
