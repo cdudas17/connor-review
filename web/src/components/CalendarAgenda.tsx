@@ -34,6 +34,18 @@ function isWeekday(d: Date): boolean {
   return dow !== 0 && dow !== 6;
 }
 
+/** Monday of the work week to display. Mon–Fri → current week's Monday;
+ * Sat–Sun → next week's Monday (the "this week" the user is heading into). */
+function workWeekMonday(today: Date): Date {
+  const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const dow = midnight.getDay();
+  let delta: number;
+  if (dow === 0) delta = 1;        // Sun → +1 (tomorrow)
+  else if (dow === 6) delta = 2;   // Sat → +2 (next Monday)
+  else delta = -(dow - 1);         // Mon=0, Tue=-1, …, Fri=-4
+  return new Date(midnight.getTime() + delta * 86_400_000);
+}
+
 interface DayBucket {
   date: Date;
   /** Events that fall inside DAY_START_HOUR..DAY_END_HOUR — rendered as
@@ -62,32 +74,28 @@ export function CalendarAgenda({ events, onOpen }: Props) {
   }, []);
 
   const days = useMemo(() => {
-    // Seed the next 5 weekdays starting today (or the next weekday if
-    // today is Sat/Sun). Empty weekdays still render so the user can see
-    // "no meetings today" rather than the row vanishing. Weekends are
-    // hidden entirely — both seeded and event-bearing.
+    // Exactly the 5 work days of this week (or next week, when today is
+    // Sat/Sun). Events outside the window — including next week's events
+    // we happened to fetch — are dropped so the view is always a clean
+    // Mon–Fri snapshot.
     const byDay = new Map<string, DayBucket>();
-    const today = new Date();
-    const seedToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    let cursor = seedToday;
-    let added = 0;
-    while (added < 5) {
-      if (isWeekday(cursor)) {
-        byDay.set(dayKey(cursor), { date: new Date(cursor), inWindow: [], allDay: [], outOfWindow: [] });
-        added++;
-      }
-      cursor = new Date(cursor.getTime() + 86_400_000);
+    const monday = workWeekMonday(new Date());
+    const weekStart = monday.getTime();
+    const weekEnd = monday.getTime() + 5 * 86_400_000;   // exclusive (Saturday 00:00)
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(weekStart + i * 86_400_000);
+      byDay.set(dayKey(d), { date: d, inWindow: [], allDay: [], outOfWindow: [] });
     }
     for (const e of events) {
       if (!e.start) continue;
       const startDate = new Date(e.start);
       if (Number.isNaN(startDate.getTime())) continue;
       const localMidnight = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-      // Drop Sat/Sun events entirely so they don't add weekend rows or
-      // pollute the timeline.
       if (!isWeekday(localMidnight)) continue;
-      const key = dayKey(localMidnight);
-      const bucket = byDay.get(key) ?? { date: localMidnight, inWindow: [], allDay: [], outOfWindow: [] };
+      const t = localMidnight.getTime();
+      if (t < weekStart || t >= weekEnd) continue;   // outside this work week
+      const bucket = byDay.get(dayKey(localMidnight));
+      if (!bucket) continue;
       if (e.isAllDay) {
         bucket.allDay.push(e);
       } else {
@@ -97,7 +105,6 @@ export function CalendarAgenda({ events, onOpen }: Props) {
         if (overlapsWindow) bucket.inWindow.push(e);
         else bucket.outOfWindow.push(e);
       }
-      byDay.set(key, bucket);
     }
     return Array.from(byDay.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [events]);
