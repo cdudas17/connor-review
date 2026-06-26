@@ -17,6 +17,7 @@ import { APP_CONFIG } from '../config.js';
 import type { ClaudeResponseState } from './ClaudeResponseCard.js';
 import type { ClaudeChat, LocalThreadAnchor } from '../hooks/useClaudeResponses.js';
 import { ClaudeChatPanel } from './ClaudeChatPanel.js';
+import { ShaderLoader } from './ShaderLoader.js';
 import type { CiStatus, GhStatus, PRStatus, PullRequestMeta, ReviewEvent, StagedInlineComment, TrackedPR } from '../types.js';
 
 interface Identity {
@@ -417,7 +418,7 @@ export function ReviewDrawer(props: Props) {
           <CloseIcon size={18} />
         </button>
           <div className="drawer-loading" role="status" aria-live="polite">
-            <span className="loading-spinner drawer-loading-spinner" aria-hidden="true" />
+            <ShaderLoader label="Loading diff" />
             <span className="drawer-loading-label">Loading diff…</span>
           </div>
         </aside>

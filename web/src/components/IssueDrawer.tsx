@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useIssueDetails, type IssueId } from '../hooks/useIssueDetails.js';
 import { LabelChips } from './LabelChips.js';
 import { AssigneesRow } from './AssigneesRow.js';
+import { ShaderLoader } from './ShaderLoader.js';
 
 function CloseIcon({ size = 16 }: { size?: number }) {
   return (
@@ -106,7 +107,7 @@ export function IssueDrawer({ current, onClose }: Props) {
         </button>
         {loading && !issue && (
           <div className="drawer-loading">
-            <span className="loading-spinner drawer-loading-spinner" aria-hidden="true" />
+            <ShaderLoader label={`Loading ${current.owner}/${current.repo}#${current.number}`} />
             <span className="drawer-loading-label">Loading {current.owner}/{current.repo}#{current.number}…</span>
           </div>
         )}

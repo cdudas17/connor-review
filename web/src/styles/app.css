@@ -128,6 +128,11 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .link-button:hover:not(:disabled) { text-decoration: underline; }
 .link-button:disabled { opacity: 0.5; cursor: not-allowed; }
 .loading-spinner { display: inline-block; width: 10px; height: 10px; border: 1.5px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: cr-spin 700ms linear infinite; margin-left: 6px; vertical-align: -1px; }
+/* WebGL loader — used for the large "loading PR / issue…" drawer state.
+ * Tiny inline spinners (badges, buttons, in-flight indicators) stay on
+ * `.loading-spinner` above; each shader loader spins up its own WebGL
+ * context so we only use it for the single drawer-loading slot. */
+.shader-loader { display: inline-block; border-radius: 50%; background: #000; }
 @keyframes cr-spin { to { transform: rotate(360deg); } }
 
 /* Centered first-load spinner inside the drawer. */
