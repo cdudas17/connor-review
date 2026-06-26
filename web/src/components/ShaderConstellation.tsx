@@ -22,6 +22,11 @@ export interface ConstellationOrb {
   size: number;
   /** Time offset in seconds for desynchronisation. */
   offset: number;
+  /** Static rotation in radians. Applied to each orb's local UV before the
+   * wobble + color-cycle is evaluated, so the directional wobble pattern
+   * sits at a different angle on every orb — no two look identical, none
+   * actually spin. */
+  rotation: number;
 }
 
 interface Props {
@@ -46,6 +51,7 @@ const FRAGMENT_SHADER = `
   uniform vec2 u_orb_positions[${MAX_ORBS}];   // pixel coords, origin top-left
   uniform float u_orb_radii[${MAX_ORBS}];       // pixel radius
   uniform float u_orb_offsets[${MAX_ORBS}];     // seconds
+  uniform float u_orb_rotations[${MAX_ORBS}];   // radians
 
   void main() {
     // Convert from WebGL's bottom-left origin to top-left so the JS
@@ -62,6 +68,15 @@ const FRAGMENT_SHADER = `
       if (abs(local.x) > 1.0 || abs(local.y) > 1.0) continue;
 
       vec2 uv = local * 0.5 + 0.5;                 // 0..1
+
+      // Rotate uv around (0.5, 0.5) so the wobble + colour gradient sit at
+      // a per-orb angle. Static (no time component) — orbs do NOT spin.
+      float a = u_orb_rotations[i];
+      float ca = cos(a);
+      float sa = sin(a);
+      vec2 c = uv - vec2(0.5);
+      uv = vec2(0.5) + vec2(ca * c.x - sa * c.y, sa * c.x + ca * c.y);
+
       float t = u_time + u_orb_offsets[i];
 
       vec3 color = 0.5 + 0.5 * cos(t + uv.xyx + vec3(0.0, 2.0, 4.0));
@@ -126,6 +141,7 @@ export function ShaderConstellation({ orbs }: Props) {
     const uOrbPositions = gl.getUniformLocation(program, 'u_orb_positions');
     const uOrbRadii = gl.getUniformLocation(program, 'u_orb_radii');
     const uOrbOffsets = gl.getUniformLocation(program, 'u_orb_offsets');
+    const uOrbRotations = gl.getUniformLocation(program, 'u_orb_rotations');
 
     gl.useProgram(program);
 
@@ -135,9 +151,11 @@ export function ShaderConstellation({ orbs }: Props) {
     const orbCount = Math.min(orbs.length, MAX_ORBS);
     const radiiPx = new Float32Array(MAX_ORBS);
     const offsets = new Float32Array(MAX_ORBS);
+    const rotations = new Float32Array(MAX_ORBS);
     for (let i = 0; i < orbCount; i++) {
       radiiPx[i] = orbs[i].size / 2;
       offsets[i] = orbs[i].offset;
+      rotations[i] = orbs[i].rotation;
     }
 
     const start = performance.now();
@@ -175,6 +193,7 @@ export function ShaderConstellation({ orbs }: Props) {
       gl.uniform2fv(uOrbPositions, positionsPx);
       gl.uniform1fv(uOrbRadii, radiiScaled);
       gl.uniform1fv(uOrbOffsets, offsets);
+      gl.uniform1fv(uOrbRotations, rotations);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
       raf = requestAnimationFrame(render);

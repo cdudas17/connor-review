@@ -96,6 +96,9 @@ export function App() {
     size: 16 + Math.floor(Math.random() * 17),
     // 0–20s offset desynchronises the color cycle + circle wobble
     offset: Math.random() * 20,
+    // Random static rotation in radians — each orb's directional wobble
+    // pattern sits at a different angle. No spin, just orientation.
+    rotation: Math.random() * Math.PI * 2,
   })));
   const myPRs = useTrackedPRs();
   // Auto-fetch team PRs on app launch and every 5 minutes while the tab is visible.
