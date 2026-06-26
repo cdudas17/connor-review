@@ -119,11 +119,11 @@ export async function registerCalendarRoutes(app: FastifyInstance) {
 
   app.get<{ Querystring: { start?: string; end?: string } }>('/api/calendar/events', async (req, reply) => {
     const now = new Date();
-    // Default window: start of today through +7 days. We later drop events
-    // whose end is already in the past so an event that finished an hour
-    // ago doesn't clutter the list — but an event that STARTED earlier
-    // today and is still ongoing always survives because its end is in
-    // the future.
+    // Default window: start of today through +7 days. The client almost
+    // always passes an explicit `start`/`end` so it can request whatever
+    // window it's displaying (e.g. Mon–Fri of the current work week,
+    // which includes earlier-this-week events). We don't filter by end
+    // time on the server — the client decides what's in-window.
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const start = req.query.start ? new Date(req.query.start) : startOfToday;
     const end = req.query.end ? new Date(req.query.end) : new Date(now.getTime() + 7 * 24 * 60 * 60_000);
@@ -143,17 +143,7 @@ export async function registerCalendarRoutes(app: FastifyInstance) {
         ymd(start),
         ymd(end),
       ], { timeoutMs: 15_000 });
-      const all = parseAgendaTsv(stdout);
-      // Hide events that have already ended (so completed standups from
-      // earlier in the day drop off) but keep ongoing + future. All-day
-      // events without an explicit end stay visible for the whole day.
-      const nowMs = now.getTime();
-      const events = all.filter((e) => {
-        if (!e.end) return true;
-        const endMs = Date.parse(e.end);
-        if (Number.isNaN(endMs)) return true;
-        return endMs > nowMs;
-      });
+      const events = parseAgendaTsv(stdout);
       return { events, start: start.toISOString(), end: end.toISOString() };
     } catch (e) {
       if (e instanceof GcalcliError) {

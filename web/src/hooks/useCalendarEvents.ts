@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiCallError } from '../lib/api.js';
 import type { CalendarEvent } from '../types.js';
+import { workWeekRange } from '../lib/workWeek.js';
 
 const REFRESH_MS = 5 * 60_000;
 
@@ -52,7 +53,10 @@ export function useCalendarEvents() {
   const fetchEvents = useCallback(async () => {
     setState((p) => ({ ...p, loading: true, error: null }));
     try {
-      const r = await api.getCalendarEvents();
+      // Pull events for the exact Mon–Fri window the agenda will render,
+      // so past events from earlier in the week still come back.
+      const { start, end } = workWeekRange(new Date());
+      const r = await api.getCalendarEvents({ start: start.toISOString(), end: end.toISOString() });
       if (cancelledRef.current) return;
       setState((p) => ({
         ...p,

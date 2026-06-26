@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CalendarEvent } from '../types.js';
+import { isWeekday, workWeekMonday } from '../lib/workWeek.js';
 
 interface Props {
   events: CalendarEvent[];
@@ -29,22 +30,6 @@ function dayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function isWeekday(d: Date): boolean {
-  const dow = d.getDay();
-  return dow !== 0 && dow !== 6;
-}
-
-/** Monday of the work week to display. Mon–Fri → current week's Monday;
- * Sat–Sun → next week's Monday (the "this week" the user is heading into). */
-function workWeekMonday(today: Date): Date {
-  const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const dow = midnight.getDay();
-  let delta: number;
-  if (dow === 0) delta = 1;        // Sun → +1 (tomorrow)
-  else if (dow === 6) delta = 2;   // Sat → +2 (next Monday)
-  else delta = -(dow - 1);         // Mon=0, Tue=-1, …, Fri=-4
-  return new Date(midnight.getTime() + delta * 86_400_000);
-}
 
 interface DayBucket {
   date: Date;
