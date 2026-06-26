@@ -69,7 +69,29 @@ function describeApiError(err: ApiCallError, what: string): string {
   return `${what}: ${err.message}`;
 }
 
+/** Constellation of shader orbs scattered around the title text. Positions
+ * are fixed (so the layout is stable); sizes and time offsets are random
+ * per page load so the orbs don't pulse in unison. 12 orbs stays well
+ * under the typical 16-WebGL-context-per-origin browser cap and leaves
+ * room for the drawer-loading shader to spin up too. */
+const TITLE_STAR_POSITIONS = [
+  { top: '12%', left: '4%' },  { top: '78%', left: '6%' },
+  { top: '90%', left: '14%' }, { top: '20%', left: '20%' },
+  { top: '88%', left: '34%' }, { top: '14%', left: '50%' },
+  { top: '58%', left: '62%' }, { top: '86%', left: '74%' },
+  { top: '30%', left: '82%' }, { top: '72%', left: '90%' },
+  { top: '16%', left: '94%' }, { top: '92%', left: '98%' },
+] as const;
+
 export function App() {
+  const [titleStars] = useState(() => TITLE_STAR_POSITIONS.map((pos) => ({
+    top: pos.top,
+    left: pos.left,
+    // 8–16px orbs at varying sizes for depth-of-field feel
+    size: 8 + Math.floor(Math.random() * 9),
+    // 0–20s offset desynchronises the color cycle + circle wobble
+    offset: Math.random() * 20,
+  })));
   const myPRs = useTrackedPRs();
   // Auto-fetch team PRs on app launch and every 5 minutes while the tab is visible.
   // The paginated search can hit GraphQL multiple times per refresh once the team
@@ -724,9 +746,16 @@ export function App() {
     <main className="app">
       <header className="app-header">
         <h1 className="app-title">
-          <ShaderLoader size={36} label="" />
-          <span className="app-title-starfield">Connor Command Center</span>
-          <ShaderLoader size={36} label="" />
+          <span className="app-title-starfield">
+            <span className="app-title-stars" aria-hidden="true">
+              {titleStars.map((s, i) => (
+                <span key={i} className="app-title-star" style={{ top: s.top, left: s.left }}>
+                  <ShaderLoader size={s.size} timeOffset={s.offset} label="" />
+                </span>
+              ))}
+            </span>
+            Connor Command Center
+          </span>
         </h1>
         <div className="app-header-actions">
           <button

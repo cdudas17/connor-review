@@ -42,9 +42,13 @@ interface Props {
    * Pass an empty string for decorative uses (the orb is rendered as
    * `aria-hidden` so screen readers skip it). */
   label?: string;
+  /** Seconds added to `u_time` so multiple instances animate out of
+   * phase. Defaults to 0. Pick a random value per instance to
+   * desynchronise a field of orbs. */
+  timeOffset?: number;
 }
 
-export function ShaderLoader({ size = 96, label = 'Loading' }: Props) {
+export function ShaderLoader({ size = 96, label = 'Loading', timeOffset = 0 }: Props) {
   const decorative = label === '';
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -110,7 +114,7 @@ export function ShaderLoader({ size = 96, label = 'Loading' }: Props) {
         gl.viewport(0, 0, w, h);
       }
       gl.uniform2f(uRes, w, h);
-      gl.uniform1f(uTime, (performance.now() - start) / 1000);
+      gl.uniform1f(uTime, (performance.now() - start) / 1000 + timeOffset);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       raf = requestAnimationFrame(render);
     };

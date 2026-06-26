@@ -77,29 +77,17 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
  * deep-space backdrop. Pure CSS radial-gradients so there's no JS / asset
  * cost. Hand-picked dot positions inside the padded wrapper give an evenly
  * scattered constellation without obvious grids. */
-.app-title { margin: 0; display: inline-flex; align-items: center; gap: 14px; }
-.app-title .shader-loader { vertical-align: middle; flex-shrink: 0; }
+.app-title { margin: 0; }
 .app-title-starfield {
   display: inline-block;
+  position: relative;
   padding: 14px 36px;
-  background:
-    radial-gradient(circle at 6% 28%,  #ff7b72 0 1.6px, transparent 2.2px),
-    radial-gradient(circle at 4% 72%,  #79c0ff 0 1.4px, transparent 2px),
-    radial-gradient(circle at 12% 88%, #d2a8ff 0 1px,   transparent 1.5px),
-    radial-gradient(circle at 18% 14%, #ffa657 0 1.6px, transparent 2.2px),
-    radial-gradient(circle at 24% 50%, #ffe066 0 1px,   transparent 1.5px),
-    radial-gradient(circle at 32% 90%, #56d364 0 1.4px, transparent 2px),
-    radial-gradient(circle at 38% 22%, #f778ba 0 1px,   transparent 1.5px),
-    radial-gradient(circle at 46% 78%, #79c0ff 0 1.4px, transparent 2px),
-    radial-gradient(circle at 52% 14%, #ff7b72 0 1px,   transparent 1.5px),
-    radial-gradient(circle at 60% 56%, #d2a8ff 0 1.6px, transparent 2.2px),
-    radial-gradient(circle at 68% 8%,  #ffe066 0 1px,   transparent 1.5px),
-    radial-gradient(circle at 74% 86%, #56d364 0 1.4px, transparent 2px),
-    radial-gradient(circle at 82% 38%, #ffa657 0 1.6px, transparent 2.2px),
-    radial-gradient(circle at 88% 70%, #f778ba 0 1px,   transparent 1.5px),
-    radial-gradient(circle at 94% 18%, #79c0ff 0 1.4px, transparent 2px),
-    radial-gradient(circle at 96% 92%, #d2a8ff 0 1px,   transparent 1.5px);
 }
+/* Absolutely-positioned overlay holding the shader orbs. `pointer-events: none`
+ * so the orbs never intercept hover/clicks on the title. Each `.app-title-star`
+ * is centered on its top/left via translate(-50%, -50%). */
+.app-title-stars { position: absolute; inset: 0; pointer-events: none; }
+.app-title-star { position: absolute; transform: translate(-50%, -50%); display: inline-block; }
 .app-header-actions { display: flex; gap: 8px; align-items: center; }
 .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin: 8px 0 12px; }
 .tab { padding: 8px 14px; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); cursor: pointer; font: inherit; display: inline-flex; align-items: center; gap: 8px; }
