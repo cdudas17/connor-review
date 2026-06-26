@@ -616,6 +616,12 @@ button.ci-badge { cursor: pointer; }
 .calendar-event-declined { opacity: 0.5; }
 .calendar-event-declined .calendar-event-title { text-decoration: line-through; }
 .calendar-event-tentative .calendar-event-title { font-style: italic; }
+/* Free/busy-only rows (shared calendar with hide-details permission) —
+ * no title to render, no drawer to open. Slimmer two-column layout
+ * with a quiet "Busy" label so the rows still scan as schedule blocks. */
+.calendar-event.calendar-event-busy-only { grid-template-columns: 120px 1fr; cursor: default; }
+.calendar-event.calendar-event-busy-only:hover { background: var(--bg); }
+.calendar-event-busy-label { color: var(--muted); font-size: 13px; font-style: italic; }
 .calendar-actions-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.9rem; color: var(--muted); }
 
 /* Event drawer (read-only) */

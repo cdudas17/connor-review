@@ -3,6 +3,9 @@ import type { CalendarEvent } from '../types.js';
 
 interface Props {
   events: CalendarEvent[];
+  /** Click handler — only fires for events that actually have a title;
+   * title-less "busy block" rows are non-interactive because there's
+   * nothing to drill into. */
   onOpen: (event: CalendarEvent) => void;
 }
 
@@ -63,10 +66,26 @@ export function CalendarAgenda({ events, onOpen }: Props) {
           <ul className="calendar-day-list">
             {day.events.map((e) => {
               const declined = e.myResponseStatus === 'declined';
+              // A "real" event has a title and is worth opening a drawer
+              // for. A title-less row is a free/busy block (when the
+              // calendar share is restricted to free/busy only); render
+              // it as a non-interactive time chip with no title column.
+              const hasTitle = !!e.title && e.title !== '(no title)';
+              const className = `calendar-event${hasTitle ? '' : ' calendar-event-busy-only'}${declined ? ' calendar-event-declined' : ''}${e.myResponseStatus === 'tentative' ? ' calendar-event-tentative' : ''}`;
+              if (!hasTitle) {
+                return (
+                  <li key={e.id} className={className}>
+                    <span className="calendar-event-time" style={{ color: responseColor(e.myResponseStatus) }}>
+                      {e.isAllDay ? 'All day' : `${fmtTime(e.start)}${e.end ? ' – ' + fmtTime(e.end) : ''}`}
+                    </span>
+                    <span className="calendar-event-busy-label">Busy</span>
+                  </li>
+                );
+              }
               return (
                 <li
                   key={e.id}
-                  className={`calendar-event${declined ? ' calendar-event-declined' : ''}${e.myResponseStatus === 'tentative' ? ' calendar-event-tentative' : ''}`}
+                  className={className}
                   onClick={() => onOpen(e)}
                   role="button"
                   tabIndex={0}

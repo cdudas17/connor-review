@@ -127,9 +127,21 @@ export async function registerCalendarRoutes(app: FastifyInstance) {
     const start = req.query.start ? new Date(req.query.start) : startOfToday;
     const end = req.query.end ? new Date(req.query.end) : new Date(now.getTime() + 7 * 24 * 60 * 60_000);
 
+    // CALENDAR_NAMES env var (comma-separated) restricts gcalcli to only
+    // those calendar(s). Useful when a shared calendar is the only one
+    // worth surfacing (e.g. only the @gusto.com work calendar — personal
+    // events are noise). Run `gcalcli list` locally to see the exact
+    // names. When unset we fetch from every calendar gcalcli has access to.
+    const calendarNames = (process.env.CALENDAR_NAMES ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const calendarFlags = calendarNames.flatMap((n) => ['--calendar', n]);
+
     try {
       const stdout = await gcalcliExec([
         '--nocolor',
+        ...calendarFlags,
         'agenda',
         '--tsv',
         ymd(start),
