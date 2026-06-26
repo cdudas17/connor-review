@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -k --kill-signal SIGINT -n server,web,telemetry -c cyan,magenta,yellow \"cd server && FIX_CI_TELEMETRY_URL=http://127.0.0.1:5180 exec ./node_modules/.bin/tsx watch src/index.ts\" \"cd web && exec ./node_modules/.bin/vite\" \"cd services/fix-ci-telemetry && exec ./node_modules/.bin/tsx watch src/index.ts\"",
+    "dev": "concurrently -k --kill-signal SIGINT -n server,web,telemetry -c cyan,magenta,yellow \"cd server && cross-env FIX_CI_TELEMETRY_URL=http://127.0.0.1:5180 npm run dev\" \"cd web && npm run dev\" \"cd services/fix-ci-telemetry && npm run dev\"",
     "test": "npm --prefix server test && npm --prefix web test",
     "typecheck": "npm --prefix server run typecheck && npm --prefix web run typecheck && npm --prefix services/fix-ci-telemetry run typecheck",
     "install:all": "npm install && npm --prefix server install && npm --prefix web install && npm --prefix services/fix-ci-telemetry install"
   },
   "engines": { "node": ">=20" },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3"
   }
 }

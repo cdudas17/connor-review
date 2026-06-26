@@ -5,6 +5,7 @@ const envLoad = loadEnvFile();
 
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import { pathToFileURL } from 'node:url';
 import { registerPullsRoutes } from './routes/pulls.js';
 import { registerTeamRoutes } from './routes/team.js';
 import { registerNotesRoutes } from './routes/notes.js';
@@ -25,7 +26,10 @@ export async function buildServer() {
   return app;
 }
 
-const isMain = import.meta.url === `file://${process.argv[1]}`;
+// Compare as file URLs so this works on Windows too: `file://${argv[1]}` would
+// be `file://C:\...` (backslashes, no encoding) and never match import.meta.url's
+// `file:///C:/...%20...` form. pathToFileURL normalizes both to the same shape.
+const isMain = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   const app = await buildServer();
   await app.listen({ port: 5174, host: '127.0.0.1' });

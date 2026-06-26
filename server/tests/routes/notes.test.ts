@@ -29,7 +29,8 @@ describe('notes routes', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.notes).toBe('');
-    expect(body.path).toContain(NOTES_FILE_REL);
+    // Normalize separators so the assertion holds on Windows (backslash) too.
+    expect(body.path.replace(/\\/g, '/')).toContain(NOTES_FILE_REL);
     await app.close();
   });
 

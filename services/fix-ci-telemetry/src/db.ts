@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export type RunStatus =
   | 'started'
@@ -53,8 +54,11 @@ export interface SuggestionRow {
   shipped: number;
 }
 
+// fileURLToPath handles Windows correctly: `new URL(...).pathname` yields a
+// leading-slash, percent-encoded path (e.g. `/C:/My%20App/...`) that breaks
+// `resolve` on Windows. fileURLToPath decodes it to a real OS path.
 export const DEFAULT_DB_PATH = resolve(
-  new URL('.', import.meta.url).pathname,
+  dirname(fileURLToPath(import.meta.url)),
   '..',
   'data',
   'telemetry.db',
