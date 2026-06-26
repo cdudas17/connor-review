@@ -35,6 +35,11 @@ function dayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function isWeekday(d: Date): boolean {
+  const dow = d.getDay();
+  return dow !== 0 && dow !== 6;
+}
+
 interface DayBucket {
   date: Date;
   /** Events that fall inside DAY_START_HOUR..DAY_END_HOUR — rendered as
@@ -63,23 +68,31 @@ export function CalendarAgenda({ events, onOpen }: Props) {
   }, []);
 
   const days = useMemo(() => {
-    // Seed a row per day from today through today+6 so empty days
-    // (including today, when nothing's scheduled) still get a row.
+    // Seed the next 5 weekdays starting today (or the next weekday if
+    // today is Sat/Sun). Empty weekdays still render so the user can see
+    // "no meetings today" rather than the row vanishing. Weekends are
+    // hidden entirely — both seeded and event-bearing.
     const byDay = new Map<string, DayBucket>();
     const today = new Date();
     const seedToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(seedToday.getTime() + i * 86_400_000);
-      byDay.set(dayKey(d), { date: d, inWindow: [], allDay: [], outOfWindow: [] });
+    let cursor = seedToday;
+    let added = 0;
+    while (added < 5) {
+      if (isWeekday(cursor)) {
+        byDay.set(dayKey(cursor), { date: new Date(cursor), inWindow: [], allDay: [], outOfWindow: [] });
+        added++;
+      }
+      cursor = new Date(cursor.getTime() + 86_400_000);
     }
     for (const e of events) {
       if (!e.start) continue;
       const startDate = new Date(e.start);
       if (Number.isNaN(startDate.getTime())) continue;
       const localMidnight = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+      // Drop Sat/Sun events entirely so they don't add weekend rows or
+      // pollute the timeline.
+      if (!isWeekday(localMidnight)) continue;
       const key = dayKey(localMidnight);
-      // Preserve out-of-range days (events beyond the 7-day seed) too;
-      // those land in extra rows after today+6.
       const bucket = byDay.get(key) ?? { date: localMidnight, inWindow: [], allDay: [], outOfWindow: [] };
       if (e.isAllDay) {
         bucket.allDay.push(e);
