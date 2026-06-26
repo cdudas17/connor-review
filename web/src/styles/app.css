@@ -83,11 +83,10 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
   position: relative;
   padding: 14px 36px;
 }
-/* Absolutely-positioned overlay holding the shader orbs. `pointer-events: none`
- * so the orbs never intercept hover/clicks on the title. Each `.app-title-star`
- * is centered on its top/left via translate(-50%, -50%). */
-.app-title-stars { position: absolute; inset: 0; pointer-events: none; }
-.app-title-star { position: absolute; transform: translate(-50%, -50%); display: inline-block; }
+/* Single-canvas constellation overlay. One WebGL context draws all the
+ * orbs at their configured positions, avoiding the per-orb context cap
+ * that was killing half of them in dev. */
+.shader-constellation { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .app-header-actions { display: flex; gap: 8px; align-items: center; }
 .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin: 8px 0 12px; }
 .tab { padding: 8px 14px; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); cursor: pointer; font: inherit; display: inline-flex; align-items: center; gap: 8px; }

@@ -12,7 +12,7 @@ import { BulkActionsBar } from './components/BulkActionsBar.js';
 import { MemberFilter } from './components/MemberFilter.js';
 import { TagFilter } from './components/TagFilter.js';
 import { NONE_TAG, effectiveTags } from './lib/extractTags.js';
-import { ShaderLoader } from './components/ShaderLoader.js';
+import { ShaderConstellation } from './components/ShaderConstellation.js';
 import { CalendarAgenda } from './components/CalendarAgenda.js';
 import { EventDrawer } from './components/EventDrawer.js';
 import { NextMeetingFab } from './components/NextMeetingFab.js';
@@ -754,13 +754,7 @@ export function App() {
       <header className="app-header">
         <h1 className="app-title">
           <span className="app-title-starfield">
-            <span className="app-title-stars" aria-hidden="true">
-              {titleStars.map((s, i) => (
-                <span key={i} className="app-title-star" style={{ top: s.top, left: s.left }}>
-                  <ShaderLoader size={s.size} timeOffset={s.offset} label="" />
-                </span>
-              ))}
-            </span>
+            <ShaderConstellation orbs={titleStars} />
             Connor Command Center
           </span>
         </h1>
