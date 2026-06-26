@@ -541,10 +541,61 @@ button.ci-badge { cursor: pointer; }
 .next-meeting-fab:hover { background: var(--bg-subtle); }
 .next-meeting-fab-dragging { cursor: grabbing; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); transition: none; }
 .next-meeting-fab-label { line-height: 1; }
-.next-meeting-fab-live { color: #fff; background: #cf222e; border-color: #cf222e; }
-.next-meeting-fab-live:hover { background: #b21f2a; }
-.next-meeting-fab-soon { color: #1f2328; background: #ffd33d; border-color: #ffd33d; }
-.next-meeting-fab-soon:hover { background: #f0c500; }
+/* Live + Soon both use an animated doubled-rainbow gradient with a
+ * coloured glow. The "live" variant paints the body fill; the "soon"
+ * variant paints just the border (via the two-layer padding-box +
+ * border-box trick). Same seamless-loop math in both: image is 200% of
+ * container width, contains the rainbow cycle twice with matching red
+ * bookends, and the animation shifts exactly one cycle so the snap is
+ * visually identical to the start. */
+.next-meeting-fab-live {
+  color: #fff;
+  border-color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    #ff5d73 0%, #ffa657 8.33%, #56d364 16.66%, #79c0ff 25%,
+    #d2a8ff 33.33%, #f778ba 41.66%,
+    #ff5d73 50%, #ffa657 58.33%, #56d364 66.66%, #79c0ff 75%,
+    #d2a8ff 83.33%, #f778ba 91.66%, #ff5d73 100%
+  );
+  background-size: 200% 100%;
+  animation: rainbow-shift-fill 2.5s linear infinite;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.45);
+  box-shadow:
+    0 0 14px rgba(255, 138, 220, 0.45),
+    0 0 24px rgba(121, 192, 255, 0.30),
+    0 4px 16px rgba(0, 0, 0, 0.35);
+}
+@keyframes rainbow-shift-fill {
+  from { background-position:   0% 50%; }
+  to   { background-position: 100% 50%; }
+}
+.next-meeting-fab-soon {
+  color: #fff;
+  border: 3px solid transparent;
+  background:
+    linear-gradient(var(--bg), var(--bg)) padding-box,
+    linear-gradient(
+      90deg,
+      #ff5d73 0%, #ffa657 8.33%, #56d364 16.66%, #79c0ff 25%,
+      #d2a8ff 33.33%, #f778ba 41.66%,
+      #ff5d73 50%, #ffa657 58.33%, #56d364 66.66%, #79c0ff 75%,
+      #d2a8ff 83.33%, #f778ba 91.66%, #ff5d73 100%
+    ) border-box;
+  background-size: 100% 100%, 200% 100%;
+  animation: rainbow-shift-border 2.5s linear infinite;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.45);
+  box-shadow:
+    0 0 14px rgba(255, 138, 220, 0.45),
+    0 0 24px rgba(121, 192, 255, 0.30),
+    0 4px 16px rgba(0, 0, 0, 0.35);
+}
+/* Layer 1 (the padding-box solid) stays fixed; only layer 2 (the rainbow
+ * border) animates. */
+@keyframes rainbow-shift-border {
+  from { background-position: 0 0,   0% 50%; }
+  to   { background-position: 0 0, 100% 50%; }
+}
 .next-meeting-fab-idle { color: var(--accent); }
 .next-meeting-fab-free { color: #3fb950; opacity: 0.85; }
 .notes-fab svg { display: block; pointer-events: none; }
