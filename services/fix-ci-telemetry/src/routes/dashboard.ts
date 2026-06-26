@@ -1,12 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Re-read the HTML on every request so edits to dashboard.html show up
 // without restarting the service. tsx watch only reloads on TS changes,
 // and the dashboard is tiny, so the per-request file read is fine.
+// fileURLToPath (not `.pathname`) so the path is correct on Windows.
 const DASHBOARD_HTML_PATH = resolve(
-  new URL('.', import.meta.url).pathname, '..', 'views', 'dashboard.html',
+  dirname(fileURLToPath(import.meta.url)), '..', 'views', 'dashboard.html',
 );
 
 export function registerDashboardRoute(app: FastifyInstance): void {

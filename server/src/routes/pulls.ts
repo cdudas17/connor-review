@@ -1300,7 +1300,18 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       // fails with "command not found" or picks the wrong Ruby. `-l` sources
       // login files; `-i` sources interactive files (.zshrc / .bashrc), which
       // is where most tool managers register themselves on macOS.
-      const userShell = process.env.SHELL ?? '/bin/zsh';
+      // POSIX: use the user's login shell so per-project tool managers (mise /
+      // rbenv / nvm / volta / asdf) activate before we run `bundle` / `yarn`.
+      // Windows has no login-shell concept; use ComSpec (cmd.exe), which already
+      // inherits the user's PATH so the install tools resolve normally.
+      const isWindows = process.platform === 'win32';
+      const userShell = isWindows
+        ? (process.env.ComSpec ?? 'cmd.exe')
+        : (process.env.SHELL ?? '/bin/zsh');
+      // `-il` (POSIX) keeps the env close to a real terminal so mise/rbenv hooks
+      // fire; `/d /s /c` is the cmd.exe equivalent (skip AutoRun, run then exit).
+      const shellArgs = (cmd: string): string[] =>
+        isWindows ? ['/d', '/s', '/c', cmd] : ['-ilc', cmd];
       // mise refuses to load configs in unknown paths and aborts the
       // surrounding command — every fresh worktree under /tmp counts as
       // "unknown". Pre-trust this run's worktree via the env var so the
@@ -1321,10 +1332,9 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       };
       const runShell = (cmd: string, label: string, timeoutMs: number): Promise<void> => {
         return new Promise((res, rej) => {
-          // `-il` keeps the env close to a real terminal so mise/rbenv hooks
-          // fire. Stdin is closed below so even an interactive shell can't
-          // hang waiting for input.
-          const child = execFile(userShell, ['-ilc', cmd], { cwd: worktreePath, env: childEnv, timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
+          // Stdin is closed below so even an interactive shell can't hang
+          // waiting for input.
+          const child = execFile(userShell, shellArgs(cmd), { cwd: worktreePath, env: childEnv, timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
             if (err) {
               const killed = (err as NodeJS.ErrnoException & { killed?: boolean }).killed;
               const exitCode = (err as NodeJS.ErrnoException & { code?: number | string }).code;
