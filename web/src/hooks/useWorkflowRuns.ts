@@ -64,11 +64,17 @@ export function useWorkflowRuns() {
   useEffect(() => { saveStore(store); }, [store]);
 
   const inFlightRef = useRef<Set<string>>(new Set());
+  // Synchronous step counters per run, so appendStep can return the
+  // new step's index immediately. Returning the index from inside a
+  // setStore updater would be unreliable — the updater runs async,
+  // and the caller needs the index right away to pass to updateStep.
+  const stepCountsRef = useRef<Record<string, number>>({});
 
   const start = useCallback((workflowId: string, t: PRTarget): boolean => {
     const k = entryKey(workflowId, t);
     if (inFlightRef.current.has(k)) return false;
     inFlightRef.current.add(k);
+    stepCountsRef.current[k] = 0;
     const now = Date.now();
     setStore((s) => ({
       ...s,
@@ -86,14 +92,14 @@ export function useWorkflowRuns() {
 
   const appendStep = useCallback((workflowId: string, t: PRTarget, step: WorkflowStep): number => {
     const k = entryKey(workflowId, t);
-    let appendedIndex = -1;
+    const idx = stepCountsRef.current[k] ?? 0;
+    stepCountsRef.current[k] = idx + 1;
     setStore((s) => {
       const cur = s[k];
       if (!cur) return s;
-      appendedIndex = cur.steps.length;
       return { ...s, [k]: { ...cur, steps: [...cur.steps, step] } };
     });
-    return appendedIndex;
+    return idx;
   }, []);
 
   const updateStep = useCallback((workflowId: string, t: PRTarget, idx: number, patch: Partial<WorkflowStep>) => {
@@ -110,6 +116,7 @@ export function useWorkflowRuns() {
   const finish = useCallback((workflowId: string, t: PRTarget, kind: WorkflowRunKind, error?: string) => {
     const k = entryKey(workflowId, t);
     inFlightRef.current.delete(k);
+    // The counter stays — if the user dismisses + re-runs, `start` resets it.
     setStore((s) => {
       const cur = s[k];
       if (!cur) return s;
@@ -120,6 +127,7 @@ export function useWorkflowRuns() {
   const dismiss = useCallback((workflowId: string, t: PRTarget) => {
     const k = entryKey(workflowId, t);
     inFlightRef.current.delete(k);
+    delete stepCountsRef.current[k];
     setStore((s) => {
       if (!s[k]) return s;
       const { [k]: _drop, ...rest } = s;
