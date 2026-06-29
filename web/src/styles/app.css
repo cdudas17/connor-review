@@ -1006,6 +1006,11 @@ button.ci-badge { cursor: pointer; }
 .thread-card-toggle-caret { display: inline-flex; color: var(--accent); }
 .thread-card-toggle-label { color: var(--fg); font-weight: 500; }
 .thread-card-collapsed .thread-card-toggle-label { color: var(--muted); font-weight: 400; }
+/* Avatar cluster on the collapsed inline thread header — shares the
+ * `.conversations-commenter[…]` styling from the section header. The
+ * ring colour wants to match the row's flat background, not the section
+ * bg, so the overlap stays legible on the tinted comment-row tone. */
+.thread-card-commenters .conversations-commenter { box-shadow: 0 0 0 2px var(--bg-subtle); }
 .thread-card-body { padding: 12px 14px; border-top: 1px solid var(--border); }
 .thread-card-header { color: var(--muted); font-size: 0.85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-bottom: 6px; }
 .thread-anchor { color: var(--muted); }

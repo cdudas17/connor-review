@@ -98,6 +98,20 @@ function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, 
   const t = thread;
   const summaryAuthor = t.comments[0]?.authorLogin ?? '?';
   const count = t.comments.length;
+  // Unique commenters across this thread, first-appearance order, for the
+  // small avatar cluster on the collapsed header. Matches the cluster on
+  // the parent Conversations panel.
+  const seenLogins = new Set<string>();
+  const commenters: Array<{ login: string; avatarUrl: string | null | undefined }> = [];
+  for (const c of t.comments) {
+    const key = c.authorLogin ?? '';
+    if (!key || seenLogins.has(key)) continue;
+    seenLogins.add(key);
+    commenters.push({ login: key, avatarUrl: c.authorAvatarUrl });
+  }
+  const MAX_AVATARS = 5;
+  const shownCommenters = commenters.slice(0, MAX_AVATARS);
+  const overflow = commenters.length - shownCommenters.length;
   const replyDraft = replyState?.threadId === t.id ? replyState.body.trim() : '';
   const askClaude = () => {
     if (!onAskClaude || !replyDraft) return;
@@ -120,6 +134,22 @@ function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, 
         <span className="thread-card-toggle-label">
           {open ? 'Comment' : `${summaryAuthor} · ${count} comment${count === 1 ? '' : 's'}`} on line {t.line}
         </span>
+        {!open && commenters.length > 0 && (
+          <span
+            className="conversations-commenters thread-card-commenters"
+            aria-label={`Commenters: ${commenters.map((c) => c.login).join(', ')}`}
+            title={commenters.map((c) => c.login).join(', ')}
+          >
+            {shownCommenters.map((c) => (
+              <span key={c.login} className="conversations-commenter">
+                <Avatar url={c.avatarUrl} login={c.login} size={18} />
+              </span>
+            ))}
+            {overflow > 0 && (
+              <span className="conversations-commenter-overflow" title={commenters.slice(MAX_AVATARS).map((c) => c.login).join(', ')}>+{overflow}</span>
+            )}
+          </span>
+        )}
         {t.isOutdated && <span className="thread-outdated-badge" title="The line this comment was made on has changed in a later commit">Outdated</span>}
       </button>
       {open && (
