@@ -132,7 +132,9 @@ function ConversationCard({ thread, onReply, claudeState, onAskClaude, onDismiss
 }
 
 export function ConversationsList({ threads, onReply, claudeStateFor, onAskClaude, onDismissClaude }: Props) {
-  const [sectionOpen, setSectionOpen] = useState(true);
+  // Collapsed by default — the diff is usually what the user actually
+  // wants to see first; conversations are background context.
+  const [sectionOpen, setSectionOpen] = useState(false);
   const active = threads.filter((t) => !t.isResolved);
   if (active.length === 0) return null;
   return (
