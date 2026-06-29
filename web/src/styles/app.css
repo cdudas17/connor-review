@@ -1160,3 +1160,126 @@ button.ci-badge { cursor: pointer; }
 .workflow-step-toast-info    { background: rgba(99, 102, 241, 0.10); color: var(--accent); }
 .workflow-step-toast-success { background: rgba(63, 185, 80, 0.10); color: #3fb950; }
 .workflow-step-toast-error   { background: rgba(248, 81, 73, 0.10); color: #f85149; }
+
+/* === In-app workflow editor ============================================= */
+
+/* Toolbar row that holds the tag filter + the Workflows entry button on
+ * the My PRs tab. Flex with auto-pushed entry button on the right. */
+.mine-tab-toolbar { display: flex; align-items: center; gap: 12px; }
+.mine-tab-toolbar > :first-child { flex: 1; min-width: 0; }
+.workflows-entry-button {
+  font: inherit; font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-subtle); color: var(--fg);
+  cursor: pointer; white-space: nowrap;
+  align-self: flex-start;
+}
+.workflows-entry-button:hover { background: var(--border-muted); }
+
+/* Drawer container — sits on top of the standard .drawer chrome. */
+.workflows-manager { width: 560px; min-width: 480px; }
+.workflows-manager-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 12px; margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.workflows-manager-header h2 { margin: 0; font-size: 18px; }
+.workflows-manager-close {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 24px; line-height: 1; cursor: pointer; padding: 0 6px;
+}
+.workflows-manager-close:hover { color: var(--fg); }
+
+.workflows-manager-list { list-style: none; padding: 0; margin: 0 0 16px; display: flex; flex-direction: column; gap: 10px; }
+.workflows-manager-item {
+  display: flex; gap: 14px; align-items: flex-start; justify-content: space-between;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-subtle);
+}
+.workflows-manager-item-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.workflows-manager-item-body strong { font-size: 14px; }
+.workflows-manager-item-tag {
+  font-size: 11px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.workflows-manager-item-desc { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.workflows-manager-item-steps { margin: 4px 0 0; font-size: 11px; color: var(--muted); }
+.workflows-manager-item-actions { display: flex; gap: 6px; }
+.workflows-manager-item-actions button {
+  font: inherit; font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--bg); color: var(--fg);
+  cursor: pointer;
+}
+.workflows-manager-item-actions button:hover { background: var(--bg-subtle); }
+
+.workflows-manager-footer { display: flex; flex-direction: column; gap: 8px; }
+.workflows-manager-new {
+  font: inherit; font-size: 13px;
+  padding: 8px 14px;
+  border: 1px dashed var(--border); border-radius: 6px;
+  background: transparent; color: var(--accent);
+  cursor: pointer;
+}
+.workflows-manager-new:hover { background: var(--bg-subtle); }
+.workflows-manager-note { font-size: 11px; color: var(--muted); margin: 0; }
+.workflows-manager-note code { background: var(--bg-subtle); padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+
+/* Editor form */
+.workflow-editor { display: flex; flex-direction: column; gap: 12px; }
+.workflow-editor-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.workflow-editor-field input, .workflow-editor-field select {
+  font: inherit; font-size: 13px;
+  padding: 6px 10px;
+  background: var(--bg); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 4px;
+}
+.workflow-editor h3 { margin: 8px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+.workflow-editor-steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.workflow-editor-step {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg);
+}
+.workflow-editor-step-header { display: flex; gap: 8px; align-items: center; }
+.workflow-editor-step-header select { flex: 1; }
+.workflow-editor-step-remove {
+  background: transparent; border: 1px solid var(--border); border-radius: 4px;
+  color: var(--muted); cursor: pointer;
+  width: 26px; height: 26px; font-size: 16px; line-height: 1;
+}
+.workflow-editor-step-remove:hover { color: #f85149; border-color: rgba(248, 81, 73, 0.4); }
+.workflow-editor-step textarea, .workflow-editor-step input[type="text"], .workflow-editor-step select {
+  font: inherit; font-size: 13px;
+  padding: 6px 10px;
+  background: var(--bg); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 4px;
+  resize: vertical;
+}
+.workflow-editor-step-flag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.workflow-editor-add-step {
+  font: inherit; font-size: 12px;
+  padding: 6px 12px; align-self: flex-start;
+  border: 1px dashed var(--border); border-radius: 4px;
+  background: transparent; color: var(--accent);
+  cursor: pointer;
+}
+.workflow-editor-errors {
+  margin: 8px 0 0; padding: 8px 12px;
+  list-style: none; font-size: 12px;
+  background: rgba(248, 81, 73, 0.08);
+  border: 1px solid rgba(248, 81, 73, 0.3); border-radius: 4px;
+  color: #f85149;
+}
+.workflow-editor-errors li { padding: 2px 0; }
+.workflow-editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.workflow-editor-actions button {
+  font: inherit; font-size: 13px;
+  padding: 6px 16px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--bg); color: var(--fg);
+  cursor: pointer;
+}
+.workflow-editor-save { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
+.workflow-editor-save:disabled { opacity: 0.5; cursor: not-allowed; }

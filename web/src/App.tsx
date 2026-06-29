@@ -33,7 +33,10 @@ import { useClaudeResponses } from './hooks/useClaudeResponses.js';
 import { useConflictResolutions } from './hooks/useConflictResolutions.js';
 import { useCiFixes } from './hooks/useCiFixes.js';
 import { useWorkflowRuns } from './hooks/useWorkflowRuns.js';
+import { useUserWorkflows } from './hooks/useUserWorkflows.js';
 import { runWorkflow, prToWorkflowPr } from './lib/runWorkflow.js';
+import { userWorkflowToPr } from './lib/userWorkflowToPr.js';
+import { WorkflowsManager } from './components/WorkflowsManager.js';
 import type { PrWorkflow } from './lib/workflowTypes.js';
 import { MentionsProvider } from './contexts/MentionsContext.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
@@ -208,6 +211,16 @@ export function App() {
   // Same idea for the "Fix failing CI" flow — its own localStorage bucket.
   const ciFixes = useCiFixes();
   const workflowRuns = useWorkflowRuns();
+  const userWorkflows = useUserWorkflows();
+  const [workflowsManagerOpen, setWorkflowsManagerOpen] = useState(false);
+
+  /** Code-authored workflows in config.local.ts + user-authored ones in
+   *  localStorage. Merged here so PRList renders both as pills and so
+   *  workflowLabelOf in the drawer can resolve either. */
+  const mergedWorkflows = useMemo(
+    () => [...APP_CONFIG.prWorkflows, ...userWorkflows.workflows.map(userWorkflowToPr)],
+    [userWorkflows.workflows],
+  );
 
   /** Click handler for a workflow pill on a PR row. Builds the runtime
    *  bus, kicks off the workflow's async run, and lets the bus stream
@@ -1242,15 +1255,33 @@ export function App() {
       <EventDrawer current={currentEvent} onClose={() => setCurrentEvent(null)} />
 
       {tab === 'mine' && (
-        <TagFilter
-          tags={tagList}
-          selected={tagFilter ?? new Set(tagList)}
-          countsByTag={tagCounts}
-          onToggle={toggleTag}
-          onSelectAll={selectAllTags}
-          onClearAll={clearAllTags}
-        />
+        <div className="mine-tab-toolbar">
+          <TagFilter
+            tags={tagList}
+            selected={tagFilter ?? new Set(tagList)}
+            countsByTag={tagCounts}
+            onToggle={toggleTag}
+            onSelectAll={selectAllTags}
+            onClearAll={clearAllTags}
+          />
+          <button
+            type="button"
+            className="workflows-entry-button"
+            onClick={() => setWorkflowsManagerOpen(true)}
+            title="Add, edit, or delete tag-driven Claude workflows"
+          >
+            ⚙ Workflows{userWorkflows.workflows.length > 0 ? ` (${userWorkflows.workflows.length})` : ''}
+          </button>
+        </div>
       )}
+
+      <WorkflowsManager
+        open={workflowsManagerOpen}
+        onClose={() => setWorkflowsManagerOpen(false)}
+        workflows={userWorkflows.workflows}
+        onUpsert={userWorkflows.upsert}
+        onRemove={userWorkflows.remove}
+      />
 
       {tab !== 'issues' && tab !== 'calendar' && <PRList
         prs={activePRs}
@@ -1267,7 +1298,7 @@ export function App() {
         // Only on the My PRs tab — those are PRs the viewer can typically merge.
         // Fire-and-forget toggle: optimistically flip the row, toast on failure.
         showCopyLink={tab === 'mine'}
-        workflows={tab === 'mine' ? APP_CONFIG.prWorkflows : undefined}
+        workflows={tab === 'mine' ? mergedWorkflows : undefined}
         workflowStateFor={tab === 'mine' ? workflowRuns.stateFor : undefined}
         onRunWorkflow={tab === 'mine' ? (w, pr) => void runOneWorkflow(w, pr) : undefined}
         onToggleAutoMerge={tab === 'mine' ? (id) => {
@@ -1401,7 +1432,7 @@ export function App() {
             onDismissCiFix={() => ciFixes.dismiss(current)}
             onOpenCiChecks={() => setCiChecksTarget({ owner: current.owner, repo: current.repo, number: current.number })}
             workflowRun={workflowRuns.latestForPR(current)}
-            workflowLabelOf={(workflowId) => APP_CONFIG.prWorkflows.find((w) => w.id === workflowId)?.label ?? workflowId}
+            workflowLabelOf={(workflowId) => mergedWorkflows.find((w) => w.id === workflowId)?.label ?? workflowId}
             onDismissWorkflowRun={(workflowId) => workflowRuns.dismiss(workflowId, current)}
           />
         );
