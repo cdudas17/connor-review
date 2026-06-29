@@ -1286,6 +1286,15 @@ button.ci-badge { cursor: pointer; }
 
 /* === My PRs tab — Add PR entry + modal ================================= */
 
+/* Tag filter on the My PRs toolbar — naked chips, no wrapper box. The
+ * .member-filter class (still used by Team PR's MemberFilter) carries
+ * a bordered card; the tag filter doesn't need it since the chips sit
+ * on the My PRs toolbar row directly next to Workflows + Add PR. */
+.tag-filter { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0; margin: 0; }
+.tag-filter .member-filter-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.tag-filter .member-filter-bulk button { padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); color: inherit; cursor: pointer; font: inherit; font-size: 12px; }
+.tag-filter .member-filter-bulk button:hover { background: var(--border-muted); }
+
 /* +Add PR button on the My PRs toolbar — matches the visual weight of the
  * Workflows button next to it. Subtle accent so it reads as "create"
  * without competing with the row actions. */

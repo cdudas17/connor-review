@@ -24,7 +24,7 @@ export function TagFilter({ tags, selected, countsByTag, onToggle, onSelectAll, 
   if (tags.length < 2) return null;
   const allOn = tags.every((t) => selected.has(t));
   return (
-    <div className="member-filter" role="toolbar" aria-label="Filter by tag">
+    <div className="tag-filter" role="toolbar" aria-label="Filter by tag">
       <div className="member-filter-chips">
         {tags.map((t) => {
           const isOn = selected.has(t);
