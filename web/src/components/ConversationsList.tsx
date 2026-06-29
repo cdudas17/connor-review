@@ -137,12 +137,44 @@ export function ConversationsList({ threads, onReply, claudeStateFor, onAskClaud
   const [sectionOpen, setSectionOpen] = useState(false);
   const active = threads.filter((t) => !t.isResolved);
   if (active.length === 0) return null;
+  // Unique commenters across all active threads, ordered by their first
+  // appearance. Used to render a compact avatar cluster in the header so
+  // you can see who's chiming in without expanding the section.
+  const seenLogins = new Set<string>();
+  const commenters: Array<{ login: string; avatarUrl: string | null | undefined }> = [];
+  for (const t of active) {
+    for (const c of t.comments) {
+      const key = c.authorLogin ?? '';
+      if (!key || seenLogins.has(key)) continue;
+      seenLogins.add(key);
+      commenters.push({ login: key, avatarUrl: c.authorAvatarUrl });
+    }
+  }
+  const MAX_AVATARS = 5;
+  const shownCommenters = commenters.slice(0, MAX_AVATARS);
+  const overflow = commenters.length - shownCommenters.length;
   return (
     <section className="conversations">
       <header className="conversations-header">
         <button type="button" className="conversations-toggle" onClick={() => setSectionOpen((o) => !o)} aria-expanded={sectionOpen}>
           <span className="caret" aria-hidden="true">{sectionOpen ? '▾' : '▸'}</span>
           <h3>Conversations <span className="conversations-count">{active.length}</span></h3>
+          {commenters.length > 0 && (
+            <span
+              className="conversations-commenters"
+              aria-label={`Commenters: ${commenters.map((c) => c.login).join(', ')}`}
+              title={commenters.map((c) => c.login).join(', ')}
+            >
+              {shownCommenters.map((c) => (
+                <span key={c.login} className="conversations-commenter">
+                  <Avatar url={c.avatarUrl} login={c.login} size={18} />
+                </span>
+              ))}
+              {overflow > 0 && (
+                <span className="conversations-commenter-overflow" title={commenters.slice(MAX_AVATARS).map((c) => c.login).join(', ')}>+{overflow}</span>
+              )}
+            </span>
+          )}
         </button>
       </header>
       {sectionOpen && (

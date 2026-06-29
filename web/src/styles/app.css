@@ -920,6 +920,14 @@ button.ci-badge { cursor: pointer; }
 .conversations-toggle { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: none; background: transparent; cursor: pointer; color: var(--fg); font: inherit; }
 .conversations-toggle h3 { margin: 0; font-size: 1.05rem; display: inline-flex; align-items: center; gap: 8px; }
 .conversations-count { font-size: 0.75rem; padding: 1px 8px; border-radius: 999px; background: var(--bg-subtle); border: 1px solid var(--border); color: var(--muted); font-weight: 500; }
+/* Commenter avatar cluster in the section header — slight overlap so the
+ * row reads as "who's involved" at a glance. Each avatar gets a ring of
+ * the panel background so the overlap stays legible. */
+.conversations-commenters { display: inline-flex; align-items: center; margin-left: 4px; }
+.conversations-commenter { display: inline-flex; margin-left: -6px; border-radius: 50%; box-shadow: 0 0 0 2px var(--bg); }
+.conversations-commenter:first-child { margin-left: 0; }
+.conversations-commenter .avatar { display: block; border-radius: 50%; }
+.conversations-commenter-overflow { font-size: 11px; color: var(--muted); margin-left: 6px; }
 .conversations-list { display: flex; flex-direction: column; gap: 8px; }
 .caret { display: inline-block; width: 14px; text-align: center; color: var(--muted); }
 
