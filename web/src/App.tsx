@@ -217,6 +217,15 @@ export function App() {
   const workflowRuns = useWorkflowRuns();
   const userWorkflows = useUserWorkflows();
   const [workflowsManagerOpen, setWorkflowsManagerOpen] = useState(false);
+  const [addPrModalOpen, setAddPrModalOpen] = useState(false);
+  // Escape closes the Add PR modal — matches the rest of the app's modal
+  // pattern (drawer, workflows manager, event drawer).
+  useEffect(() => {
+    if (!addPrModalOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAddPrModalOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [addPrModalOpen]);
 
   /** Code-authored workflows in config.local.ts + user-authored ones in
    *  localStorage. Merged here so PRList renders both as pills and so
@@ -954,7 +963,6 @@ export function App() {
               onDismiss={minePRs.dismissError}
             />
           )}
-          <AddPRBar onAdd={handleAddMine} />
           {addError && <ErrorToast message={addError} onDismiss={() => setAddError(null)} />}
         </>
       )}
@@ -1275,7 +1283,39 @@ export function App() {
           >
             ⚙ Workflows{userWorkflows.workflows.length > 0 ? ` (${userWorkflows.workflows.length})` : ''}
           </button>
+          <button
+            type="button"
+            className="add-pr-entry-button"
+            onClick={() => setAddPrModalOpen(true)}
+            title="Track a PR by URL"
+          >
+            + Add PR
+          </button>
         </div>
+      )}
+
+      {addPrModalOpen && (
+        <>
+          <div className="drawer-backdrop" onClick={() => setAddPrModalOpen(false)} aria-hidden="true" />
+          <div className="add-pr-modal" role="dialog" aria-label="Add PR">
+            <header className="add-pr-modal-header">
+              <h2>Add PR(s)</h2>
+              <button
+                type="button"
+                className="add-pr-modal-close"
+                onClick={() => setAddPrModalOpen(false)}
+                aria-label="Close"
+              >×</button>
+            </header>
+            <p className="add-pr-modal-hint">Paste one or more GitHub PR URLs, one per line.</p>
+            <AddPRBar
+              onAdd={async (urls) => {
+                await handleAddMine(urls);
+                setAddPrModalOpen(false);
+              }}
+            />
+          </div>
+        </>
       )}
 
       <WorkflowsManager

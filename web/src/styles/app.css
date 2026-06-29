@@ -1283,3 +1283,41 @@ button.ci-badge { cursor: pointer; }
 }
 .workflow-editor-save { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
 .workflow-editor-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* === My PRs tab — Add PR entry + modal ================================= */
+
+/* +Add PR button on the My PRs toolbar — matches the visual weight of the
+ * Workflows button next to it. Subtle accent so it reads as "create"
+ * without competing with the row actions. */
+.add-pr-entry-button {
+  font: inherit; font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  border-radius: 6px;
+  background: var(--bg-subtle); color: var(--accent);
+  cursor: pointer; white-space: nowrap;
+}
+.add-pr-entry-button:hover { background: rgba(99, 102, 241, 0.10); }
+
+/* Centered modal card on top of the existing .drawer-backdrop. */
+.add-pr-modal {
+  position: fixed;
+  top: 80px; left: 50%; transform: translateX(-50%);
+  width: 560px; max-width: calc(100vw - 40px);
+  z-index: 60;
+  background: var(--bg);
+  border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  padding: 16px 18px 20px;
+}
+.add-pr-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px;
+}
+.add-pr-modal-header h2 { margin: 0; font-size: 16px; }
+.add-pr-modal-close {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 24px; line-height: 1; cursor: pointer; padding: 0 6px;
+}
+.add-pr-modal-close:hover { color: var(--fg); }
+.add-pr-modal-hint { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
