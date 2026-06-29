@@ -1,16 +1,17 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * Single-canvas WebGL constellation. Draws N small "orbs" (the same wobbling
- * color-cycling circle as ShaderLoader) inside ONE WebGL context, instead of
- * mounting one canvas per orb.
+ * color-cycling circle as ShaderLoader) inside ONE WebGL context.
  *
- * Why: each `<ShaderLoader>` instance allocates its own WebGL context, and
- * browsers cap simultaneous contexts per origin (~16). With 12 title orbs
- * plus the occasional drawer-loading shader plus Vite HMR leakage during
- * dev, we routinely blew the limit and the browser killed the oldest
- * contexts — orbs visually died and rendered as the broken-canvas
- * placeholder. One context, many orbs in the shader = no cap pressure.
+ * Resilience: WebGL contexts can be lost at any time (Vite HMR accumulation,
+ * GPU process restart, tab backgrounding, OS-level GPU pressure). When that
+ * happens browsers paint the broken-image placeholder on the canvas. We
+ * handle `webglcontextlost`/`webglcontextrestored` to re-initialize the
+ * shader on the new context, and hide the canvas while the context is dead
+ * so the user never sees the placeholder. On unmount we explicitly call
+ * `WEBGL_lose_context.loseContext()` so HMR doesn't pile up orphaned
+ * contexts.
  */
 
 export interface ConstellationOrb {
@@ -22,10 +23,7 @@ export interface ConstellationOrb {
   size: number;
   /** Time offset in seconds for desynchronisation. */
   offset: number;
-  /** Static rotation in radians. Applied to each orb's local UV before the
-   * wobble + color-cycle is evaluated, so the directional wobble pattern
-   * sits at a different angle on every orb — no two look identical, none
-   * actually spin. */
+  /** Static rotation in radians. */
   rotation: number;
 }
 
@@ -54,8 +52,6 @@ const FRAGMENT_SHADER = `
   uniform float u_orb_rotations[${MAX_ORBS}];   // radians
 
   void main() {
-    // Convert from WebGL's bottom-left origin to top-left so the JS
-    // coordinates we pass in match what we see on screen.
     vec2 pos = vec2(gl_FragCoord.x, u_resolution.y - gl_FragCoord.y);
     vec4 outColor = vec4(0.0);
 
@@ -64,13 +60,11 @@ const FRAGMENT_SHADER = `
 
       vec2 center = u_orb_positions[i];
       float r = u_orb_radii[i];
-      vec2 local = (pos - center) / r;            // -1..1 within bounding box
+      vec2 local = (pos - center) / r;
       if (abs(local.x) > 1.0 || abs(local.y) > 1.0) continue;
 
-      vec2 uv = local * 0.5 + 0.5;                 // 0..1
+      vec2 uv = local * 0.5 + 0.5;
 
-      // Rotate uv around (0.5, 0.5) so the wobble + colour gradient sit at
-      // a per-orb angle. Static (no time component) — orbs do NOT spin.
       float a = u_orb_rotations[i];
       float ca = cos(a);
       float sa = sin(a);
@@ -93,16 +87,45 @@ const FRAGMENT_SHADER = `
 
 export function ShaderConstellation({ orbs }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [contextLost, setContextLost] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const parent = canvas.parentElement;
     if (!parent) return;
-    const gl = canvas.getContext('webgl', { antialias: true, premultipliedAlpha: false });
-    if (!gl) return;
+
+    // Per-mount mutable WebGL state. Lives in closure so setup/teardown can
+    // tear it down + rebuild it on context-lost without re-running the
+    // useEffect.
+    let gl: WebGLRenderingContext | null = null;
+    let program: WebGLProgram | null = null;
+    let buffer: WebGLBuffer | null = null;
+    let vs: WebGLShader | null = null;
+    let fs: WebGLShader | null = null;
+    let raf = 0;
+    let cancelled = false;
+    let start = performance.now();
+    let uRes: WebGLUniformLocation | null = null;
+    let uTime: WebGLUniformLocation | null = null;
+    let uOrbCount: WebGLUniformLocation | null = null;
+    let uOrbPositions: WebGLUniformLocation | null = null;
+    let uOrbRadii: WebGLUniformLocation | null = null;
+    let uOrbOffsets: WebGLUniformLocation | null = null;
+    let uOrbRotations: WebGLUniformLocation | null = null;
+
+    const orbCount = Math.min(orbs.length, MAX_ORBS);
+    const radiiPx = new Float32Array(MAX_ORBS);
+    const offsets = new Float32Array(MAX_ORBS);
+    const rotations = new Float32Array(MAX_ORBS);
+    for (let i = 0; i < orbCount; i++) {
+      radiiPx[i] = orbs[i].size / 2;
+      offsets[i] = orbs[i].offset;
+      rotations[i] = orbs[i].rotation;
+    }
 
     const compile = (type: number, source: string): WebGLShader | null => {
+      if (!gl) return null;
       const s = gl.createShader(type);
       if (!s) return null;
       gl.shaderSource(s, source);
@@ -114,65 +137,71 @@ export function ShaderConstellation({ orbs }: Props) {
       return s;
     };
 
-    const vs = compile(gl.VERTEX_SHADER, VERTEX_SHADER);
-    const fs = compile(gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
-    if (!vs || !fs) return;
-    const program = gl.createProgram();
-    if (!program) return;
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error('[ShaderConstellation] program link failed:', gl.getProgramInfoLog(program));
-      return;
+    function setup(): boolean {
+      gl = canvas!.getContext('webgl', { antialias: true, premultipliedAlpha: false });
+      if (!gl) return false;
+      vs = compile(gl.VERTEX_SHADER, VERTEX_SHADER);
+      fs = compile(gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
+      if (!vs || !fs) return false;
+      program = gl.createProgram();
+      if (!program) return false;
+      gl.attachShader(program, vs);
+      gl.attachShader(program, fs);
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error('[ShaderConstellation] program link failed:', gl.getProgramInfoLog(program));
+        return false;
+      }
+      const quad = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
+      buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+      const aPos = gl.getAttribLocation(program, 'a_position');
+      gl.enableVertexAttribArray(aPos);
+      gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+      uRes = gl.getUniformLocation(program, 'u_resolution');
+      uTime = gl.getUniformLocation(program, 'u_time');
+      uOrbCount = gl.getUniformLocation(program, 'u_orb_count');
+      uOrbPositions = gl.getUniformLocation(program, 'u_orb_positions');
+      uOrbRadii = gl.getUniformLocation(program, 'u_orb_radii');
+      uOrbOffsets = gl.getUniformLocation(program, 'u_orb_offsets');
+      uOrbRotations = gl.getUniformLocation(program, 'u_orb_rotations');
+      gl.useProgram(program);
+      start = performance.now();
+      return true;
     }
 
-    const quad = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
-    const aPos = gl.getAttribLocation(program, 'a_position');
-    gl.enableVertexAttribArray(aPos);
-    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
-
-    const uRes = gl.getUniformLocation(program, 'u_resolution');
-    const uTime = gl.getUniformLocation(program, 'u_time');
-    const uOrbCount = gl.getUniformLocation(program, 'u_orb_count');
-    const uOrbPositions = gl.getUniformLocation(program, 'u_orb_positions');
-    const uOrbRadii = gl.getUniformLocation(program, 'u_orb_radii');
-    const uOrbOffsets = gl.getUniformLocation(program, 'u_orb_offsets');
-    const uOrbRotations = gl.getUniformLocation(program, 'u_orb_rotations');
-
-    gl.useProgram(program);
-
-    // Build the flat uniform arrays once per orbs-change. We compute orb
-    // positions inside the render loop using the parent's bounding rect so
-    // the canvas sizes correctly when the title text wraps / window resizes.
-    const orbCount = Math.min(orbs.length, MAX_ORBS);
-    const radiiPx = new Float32Array(MAX_ORBS);
-    const offsets = new Float32Array(MAX_ORBS);
-    const rotations = new Float32Array(MAX_ORBS);
-    for (let i = 0; i < orbCount; i++) {
-      radiiPx[i] = orbs[i].size / 2;
-      offsets[i] = orbs[i].offset;
-      rotations[i] = orbs[i].rotation;
+    function teardownGl() {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      if (!gl) return;
+      try { if (buffer) gl.deleteBuffer(buffer); } catch { /* ignore */ }
+      try { if (program) gl.deleteProgram(program); } catch { /* ignore */ }
+      try { if (vs) gl.deleteShader(vs); } catch { /* ignore */ }
+      try { if (fs) gl.deleteShader(fs); } catch { /* ignore */ }
+      buffer = null;
+      program = null;
+      vs = null;
+      fs = null;
     }
 
-    const start = performance.now();
-    let raf = 0;
-    let cancelled = false;
-
-    const render = () => {
-      if (cancelled) return;
-      const rect = parent.getBoundingClientRect();
+    function render() {
+      if (cancelled || !gl) return;
+      if (gl.isContextLost()) {
+        // Context died but the event hasn't fired yet — bail and wait for
+        // the restored event.
+        raf = 0;
+        return;
+      }
+      const rect = parent!.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const wCss = Math.max(1, rect.width);
       const hCss = Math.max(1, rect.height);
       const w = Math.round(wCss * dpr);
       const h = Math.round(hCss * dpr);
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w;
-        canvas.height = h;
+      if (canvas!.width !== w || canvas!.height !== h) {
+        canvas!.width = w;
+        canvas!.height = h;
         gl.viewport(0, 0, w, h);
       }
 
@@ -197,23 +226,61 @@ export function ShaderConstellation({ orbs }: Props) {
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
       raf = requestAnimationFrame(render);
+    }
+
+    function startRendering() {
+      if (cancelled || raf) return;
+      raf = requestAnimationFrame(render);
+    }
+
+    // The browser fires this when the GPU context is dropped. Default
+    // behaviour without preventDefault is to NEVER fire the restored event,
+    // so we always preventDefault to opt in to recovery.
+    const onLost = (e: Event) => {
+      e.preventDefault();
+      cancelAnimationFrame(raf);
+      raf = 0;
+      setContextLost(true);
     };
-    render();
+
+    // Restored: the browser has given us a fresh context. Reset our pointers
+    // and re-run setup against it.
+    const onRestored = () => {
+      teardownGl();
+      if (setup()) {
+        setContextLost(false);
+        startRendering();
+      }
+    };
+
+    canvas.addEventListener('webglcontextlost', onLost as EventListener);
+    canvas.addEventListener('webglcontextrestored', onRestored);
+
+    if (setup()) {
+      startRendering();
+    }
 
     return () => {
       cancelled = true;
-      cancelAnimationFrame(raf);
-      gl.deleteBuffer(buffer);
-      gl.deleteProgram(program);
-      gl.deleteShader(vs);
-      gl.deleteShader(fs);
+      canvas.removeEventListener('webglcontextlost', onLost as EventListener);
+      canvas.removeEventListener('webglcontextrestored', onRestored);
+      // Force-drop the context so HMR / unmount doesn't accumulate orphaned
+      // ones. WEBGL_lose_context is supported everywhere we care about.
+      if (gl && !gl.isContextLost()) {
+        try {
+          const ext = gl.getExtension('WEBGL_lose_context');
+          ext?.loseContext();
+        } catch { /* ignore */ }
+      }
+      teardownGl();
+      gl = null;
     };
   }, [orbs]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="shader-constellation"
+      className={`shader-constellation${contextLost ? ' shader-constellation-lost' : ''}`}
       aria-hidden="true"
     />
   );

@@ -1,15 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
- * Vibey WebGL loader — a wobbling, color-cycling circle that pulses on a
- * black background. Used for the drawer's "loading PR / issue…" state.
+ * Vibey WebGL loader — a wobbling, color-cycling circle that pulses.
+ * Used for the drawer's "loading PR / issue…" state.
  *
- * Falls back to nothing if WebGL is unavailable; the caller already wraps
- * this with a textual label, so the spinner missing is graceful.
- *
- * Each instance owns its own WebGL context. Don't render dozens of these
- * at once — this is for the single full-drawer-loading slot, not for
- * inline tiny spinners (those still use `.loading-spinner` CSS).
+ * Same context-loss handling as ShaderConstellation: listens for
+ * webglcontextlost/restored, hides the canvas while the context is
+ * dead so the broken-image placeholder never shows, explicitly drops
+ * the context on unmount via WEBGL_lose_context.
  */
 
 const VERTEX_SHADER = `
@@ -37,104 +35,147 @@ const FRAGMENT_SHADER = `
 `;
 
 interface Props {
-  /** Rendered pixel size of the square canvas. */
   size?: number;
-  /** Accessible label — surfaces to screen readers via aria-label.
-   * Pass an empty string for decorative uses (the orb is rendered as
-   * `aria-hidden` so screen readers skip it). */
   label?: string;
-  /** Seconds added to `u_time` so multiple instances animate out of
-   * phase. Defaults to 0. Pick a random value per instance to
-   * desynchronise a field of orbs. */
   timeOffset?: number;
 }
 
 export function ShaderLoader({ size = 96, label = 'Loading', timeOffset = 0 }: Props) {
   const decorative = label === '';
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [contextLost, setContextLost] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const gl = canvas.getContext('webgl', { antialias: true, premultipliedAlpha: false });
-    if (!gl) return; // graceful no-op when WebGL is unavailable
+
+    let gl: WebGLRenderingContext | null = null;
+    let program: WebGLProgram | null = null;
+    let buffer: WebGLBuffer | null = null;
+    let vs: WebGLShader | null = null;
+    let fs: WebGLShader | null = null;
+    let uRes: WebGLUniformLocation | null = null;
+    let uTime: WebGLUniformLocation | null = null;
+    let raf = 0;
+    let cancelled = false;
+    let start = performance.now();
 
     const compile = (type: number, source: string): WebGLShader | null => {
+      if (!gl) return null;
       const s = gl.createShader(type);
       if (!s) return null;
       gl.shaderSource(s, source);
       gl.compileShader(s);
       if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
         console.error('[ShaderLoader] shader compile failed:', gl.getShaderInfoLog(s));
-        gl.deleteShader(s);
         return null;
       }
       return s;
     };
 
-    const vs = compile(gl.VERTEX_SHADER, VERTEX_SHADER);
-    const fs = compile(gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
-    if (!vs || !fs) return;
-
-    const program = gl.createProgram();
-    if (!program) return;
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error('[ShaderLoader] program link failed:', gl.getProgramInfoLog(program));
-      return;
+    function setup(): boolean {
+      gl = canvas!.getContext('webgl', { antialias: true, premultipliedAlpha: false });
+      if (!gl) return false;
+      vs = compile(gl.VERTEX_SHADER, VERTEX_SHADER);
+      fs = compile(gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
+      if (!vs || !fs) return false;
+      program = gl.createProgram();
+      if (!program) return false;
+      gl.attachShader(program, vs);
+      gl.attachShader(program, fs);
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error('[ShaderLoader] program link failed:', gl.getProgramInfoLog(program));
+        return false;
+      }
+      const quad = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
+      buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+      const aPos = gl.getAttribLocation(program, 'a_position');
+      gl.enableVertexAttribArray(aPos);
+      gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+      uRes = gl.getUniformLocation(program, 'u_resolution');
+      uTime = gl.getUniformLocation(program, 'u_time');
+      gl.useProgram(program);
+      start = performance.now();
+      return true;
     }
 
-    // Fullscreen quad — two triangles covering [-1, 1] in clip space.
-    const quad = new Float32Array([-1, -1,  1, -1, -1, 1,  -1, 1,  1, -1,  1, 1]);
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
-    const aPos = gl.getAttribLocation(program, 'a_position');
-    gl.enableVertexAttribArray(aPos);
-    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+    function teardownGl() {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      if (!gl) return;
+      try { if (buffer) gl.deleteBuffer(buffer); } catch { /* ignore */ }
+      try { if (program) gl.deleteProgram(program); } catch { /* ignore */ }
+      try { if (vs) gl.deleteShader(vs); } catch { /* ignore */ }
+      try { if (fs) gl.deleteShader(fs); } catch { /* ignore */ }
+      buffer = null; program = null; vs = null; fs = null;
+    }
 
-    const uRes = gl.getUniformLocation(program, 'u_resolution');
-    const uTime = gl.getUniformLocation(program, 'u_time');
-
-    gl.useProgram(program);
-
-    const start = performance.now();
-    let raf = 0;
-    let cancelled = false;
-
-    const render = () => {
-      if (cancelled) return;
+    function render() {
+      if (cancelled || !gl) return;
+      if (gl.isContextLost()) { raf = 0; return; }
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
-      const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w;
-        canvas.height = h;
+      const w = Math.max(1, Math.round(canvas!.clientWidth * dpr));
+      const h = Math.max(1, Math.round(canvas!.clientHeight * dpr));
+      if (canvas!.width !== w || canvas!.height !== h) {
+        canvas!.width = w;
+        canvas!.height = h;
         gl.viewport(0, 0, w, h);
       }
       gl.uniform2f(uRes, w, h);
       gl.uniform1f(uTime, (performance.now() - start) / 1000 + timeOffset);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       raf = requestAnimationFrame(render);
+    }
+
+    function startRendering() {
+      if (cancelled || raf) return;
+      raf = requestAnimationFrame(render);
+    }
+
+    const onLost = (e: Event) => {
+      e.preventDefault();
+      cancelAnimationFrame(raf);
+      raf = 0;
+      setContextLost(true);
     };
-    render();
+
+    const onRestored = () => {
+      teardownGl();
+      if (setup()) {
+        setContextLost(false);
+        startRendering();
+      }
+    };
+
+    canvas.addEventListener('webglcontextlost', onLost as EventListener);
+    canvas.addEventListener('webglcontextrestored', onRestored);
+
+    if (setup()) {
+      startRendering();
+    }
 
     return () => {
       cancelled = true;
-      cancelAnimationFrame(raf);
-      gl.deleteBuffer(buffer);
-      gl.deleteProgram(program);
-      gl.deleteShader(vs);
-      gl.deleteShader(fs);
+      canvas.removeEventListener('webglcontextlost', onLost as EventListener);
+      canvas.removeEventListener('webglcontextrestored', onRestored);
+      if (gl && !gl.isContextLost()) {
+        try {
+          const ext = gl.getExtension('WEBGL_lose_context');
+          ext?.loseContext();
+        } catch { /* ignore */ }
+      }
+      teardownGl();
+      gl = null;
     };
-  }, []);
+  }, [timeOffset]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="shader-loader"
+      className={`shader-loader${contextLost ? ' shader-loader-lost' : ''}`}
       style={{ width: size, height: size }}
       {...(decorative
         ? { 'aria-hidden': true }

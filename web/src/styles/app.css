@@ -87,6 +87,10 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
  * orbs at their configured positions, avoiding the per-orb context cap
  * that was killing half of them in dev. */
 .shader-constellation { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+/* When the WebGL context is lost (browser revoke, GPU restart, etc.) the
+ * canvas would otherwise show its broken-image placeholder. Hide it while
+ * we wait for the restored event; the title text underneath is intact. */
+.shader-constellation-lost { display: none; }
 .app-header-actions { display: flex; gap: 8px; align-items: center; }
 .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin: 8px 0 12px; }
 .tab { padding: 8px 14px; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); cursor: pointer; font: inherit; display: inline-flex; align-items: center; gap: 8px; }
@@ -123,6 +127,7 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 /* No background / no border-radius — the shader writes alpha=0 outside the
  * wobbly circle, so the page background shows through the corners. */
 .shader-loader { display: inline-block; }
+.shader-loader-lost { display: none; }
 @keyframes cr-spin { to { transform: rotate(360deg); } }
 
 /* Centered first-load spinner inside the drawer. */
