@@ -32,9 +32,5 @@ describe('ReviewDrawer flow', () => {
     // Drawer closed → no review summary textarea on screen.
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByLabelText(/review summary/i)).not.toBeInTheDocument();
-
-    // Switch filter to Untouched-only and confirm the empty state.
-    await userEvent.click(screen.getByRole('button', { name: /showing all/i }));
-    await screen.findByText(/no prs to review/i);
   });
 });

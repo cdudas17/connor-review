@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AddPRBar } from './components/AddPRBar.js';
 import { AddLocalBranchBar } from './components/AddLocalBranchBar.js';
 import { PRList } from './components/PRList.js';
-import { FilterToggle, type FilterMode } from './components/FilterToggle.js';
+import { type FilterMode } from './components/FilterToggle.js';
 import { ReviewDrawer } from './components/ReviewDrawer.js';
 import { AuthRequiredBanner } from './components/AuthRequiredBanner.js';
 import { ErrorToast } from './components/ErrorToast.js';
@@ -145,7 +145,11 @@ export function App() {
   useEffect(() => { if (tab === 'issues') setIssuesTabEverSeen(true); }, [tab]);
   const calendar = useCalendarEvents();
   const [currentEvent, setCurrentEvent] = useState<CalendarEvent | null>(null);
-  const [mode, setMode] = useState<FilterMode>('all');
+  // Locked to 'all' — the toggle UI was removed. Existing PRList +
+  // advance plumbing still reads `mode`; useState keeps the type wide
+  // enough that the existing 'untouched-only' branches typecheck even
+  // though we never set them.
+  const [mode] = useState<FilterMode>('all');
   const [current, setCurrent] = useState<Identity | null>(null);
   // Identity of the open issue (Issues tab). Held parallel to `current` so
   // the PR + issue drawer states are independent.
@@ -813,7 +817,6 @@ export function App() {
           >
             {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
-          <FilterToggle mode={mode} onChange={setMode} />
         </div>
       </header>
 
