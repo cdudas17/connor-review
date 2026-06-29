@@ -32,6 +32,9 @@ import { useTrackedPRs } from './hooks/useTrackedPRs.js';
 import { useClaudeResponses } from './hooks/useClaudeResponses.js';
 import { useConflictResolutions } from './hooks/useConflictResolutions.js';
 import { useCiFixes } from './hooks/useCiFixes.js';
+import { useWorkflowRuns } from './hooks/useWorkflowRuns.js';
+import { runWorkflow, prToWorkflowPr } from './lib/runWorkflow.js';
+import type { PrWorkflow } from './lib/workflowTypes.js';
 import { MentionsProvider } from './contexts/MentionsContext.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
 import { useLabeledPRs } from './hooks/useLabeledPRs.js';
@@ -204,6 +207,32 @@ export function App() {
   const conflictResolutions = useConflictResolutions();
   // Same idea for the "Fix failing CI" flow — its own localStorage bucket.
   const ciFixes = useCiFixes();
+  const workflowRuns = useWorkflowRuns();
+
+  /** Click handler for a workflow pill on a PR row. Builds the runtime
+   *  bus, kicks off the workflow's async run, and lets the bus stream
+   *  steps into the store as actions complete. */
+  const runOneWorkflow = useCallback(async (workflow: PrWorkflow, pr: TrackedPR) => {
+    const target = { owner: pr.owner, repo: pr.repo, number: pr.number };
+    if (!workflowRuns.start(workflow.id, target)) {
+      addToast('info', `Workflow "${workflow.label}" is already running for this PR`);
+      return;
+    }
+    const bus = {
+      appendStep: (step: import('./lib/workflowTypes.js').WorkflowStep) => workflowRuns.appendStep(workflow.id, target, step),
+      updateStep: (idx: number, patch: Partial<import('./lib/workflowTypes.js').WorkflowStep>) => workflowRuns.updateStep(workflow.id, target, idx, patch),
+      toast: addToast,
+    };
+    try {
+      await runWorkflow(workflow, prToWorkflowPr(pr), bus, {
+        resolveRepoPath: (repoName) => APP_CONFIG.localRepos?.[repoName] ?? null,
+      });
+      workflowRuns.finish(workflow.id, target, 'success');
+    } catch (e) {
+      workflowRuns.finish(workflow.id, target, 'failed', (e as Error).message);
+      addToast('error', `Workflow "${workflow.label}" failed: ${(e as Error).message}`);
+    }
+  }, [addToast, workflowRuns]);
   const [refreshing, setRefreshing] = useState(false);
   // Bumped after server-side mutations that may invalidate the drawer's
   // cached meta + diff (e.g. fix-CI push). The drawer watches this and
@@ -1238,6 +1267,9 @@ export function App() {
         // Only on the My PRs tab — those are PRs the viewer can typically merge.
         // Fire-and-forget toggle: optimistically flip the row, toast on failure.
         showCopyLink={tab === 'mine'}
+        workflows={tab === 'mine' ? APP_CONFIG.prWorkflows : undefined}
+        workflowStateFor={tab === 'mine' ? workflowRuns.stateFor : undefined}
+        onRunWorkflow={tab === 'mine' ? (w, pr) => void runOneWorkflow(w, pr) : undefined}
         onToggleAutoMerge={tab === 'mine' ? (id) => {
           const target = activePRs.find((p) => p.owner === id.owner && p.repo === id.repo && p.number === id.number);
           const isTrunk = (APP_CONFIG.trunkMergeRepos ?? []).includes(id.repo);
@@ -1368,6 +1400,9 @@ export function App() {
             onFixCi={() => fixCi(current)}
             onDismissCiFix={() => ciFixes.dismiss(current)}
             onOpenCiChecks={() => setCiChecksTarget({ owner: current.owner, repo: current.repo, number: current.number })}
+            workflowRun={workflowRuns.latestForPR(current)}
+            workflowLabelOf={(workflowId) => APP_CONFIG.prWorkflows.find((w) => w.id === workflowId)?.label ?? workflowId}
+            onDismissWorkflowRun={(workflowId) => workflowRuns.dismiss(workflowId, current)}
           />
         );
       })()}

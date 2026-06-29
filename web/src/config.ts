@@ -8,6 +8,8 @@
  * your environment.
  */
 
+import type { PrWorkflow } from './lib/workflowTypes.js';
+
 export interface ExternalLink {
   /** Visible label, can include leading emoji. */
   label: string;
@@ -56,6 +58,16 @@ export interface AppConfig {
    * Example: { newtonry: ['Comments left by reviewer'] }
    */
   autoLabelOnReview: Record<string, string[]>;
+  /**
+   * Tag-driven Claude workflows on the My PRs tab. Each entry is a user-
+   * authored async function that takes a PR + an action API and chains as
+   * many Claude/Fix-CI/rebase/toast calls as needed. Workflows surface as
+   * pill buttons on PR rows whose title contains the workflow's bracket-tag
+   * (and optionally match the configured `matchCi` status). Empty = no
+   * workflow buttons. See `web/src/lib/workflowTypes.ts` for the contract
+   * and `config.local.example.ts` for usage.
+   */
+  prWorkflows: PrWorkflow[];
 }
 
 const DEFAULTS: AppConfig = {
@@ -70,6 +82,7 @@ const DEFAULTS: AppConfig = {
   markReadyRemoveLabels: [],
   myIssuesOwner: '',
   trunkMergeRepos: [],
+  prWorkflows: [],
 };
 
 // Vite's import.meta.glob lets us optionally pull in config.local.ts if it

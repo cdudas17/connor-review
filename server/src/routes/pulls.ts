@@ -877,6 +877,31 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     return { ok: true, action, body };
   });
 
+  // Equivalent of GitHub's "Update branch" button — merges the PR's base
+  // branch into its head. Used by tag-driven workflows that want to catch
+  // a PR up with main without rewriting history (rebase is the Fix CI
+  // sentinel's job; this is the lighter complement).
+  app.post<{ Params: { owner: string; repo: string; number: string } }>(
+    '/api/pulls/:owner/:repo/:number/update-branch',
+    async (req, reply) => {
+      const params = parsePullParams(req.params);
+      try {
+        await ghExec([
+          'api',
+          '-X', 'PUT',
+          `repos/${params.owner}/${params.repo}/pulls/${params.number}/update-branch`,
+        ]);
+        return { ok: true };
+      } catch (e) {
+        if (e instanceof GhCliError) {
+          reply.code(502).send({ code: 'UPDATE_BRANCH_FAILED', message: e.message, stderr: e.stderr });
+          return;
+        }
+        throw e;
+      }
+    },
+  );
+
   // Ask Claude to resolve the PR's merge conflicts locally and push the
   // resolution back to GitHub. Safety-first: every git operation runs in a
   // throwaway worktree, Claude is constrained to Read/Edit only, and three

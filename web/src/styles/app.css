@@ -1074,3 +1074,89 @@ button.ci-badge { cursor: pointer; }
 .auth-banner { background: rgba(239, 68, 68, 0.12); border: 1px solid var(--danger); color: var(--danger); padding: 8px 12px; border-radius: 6px; margin: 8px 0; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .auth-banner button { padding: 4px 8px; font-size: 0.85rem; border: 1px solid var(--danger); background: transparent; color: var(--danger); border-radius: 4px; cursor: pointer; }
 .empty { color: var(--muted); padding: 16px 0; }
+
+/* === Tag-driven PR workflows (My PRs tab) ============================ */
+
+/* Per-row pill in the PR list's trailing cluster. Sized to fit alongside
+ * the CopyLinkButton / auto-merge toggle without crowding. */
+.workflow-button {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px;
+  font-size: 11px; font-weight: 500;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--bg-subtle); color: var(--fg);
+  cursor: pointer; font-family: inherit;
+}
+.workflow-button:hover:not(:disabled) { background: var(--border-muted); }
+.workflow-button:disabled { opacity: 0.7; cursor: default; }
+.workflow-button-running { color: var(--accent); border-color: var(--accent); }
+.workflow-button-success { color: #3fb950; border-color: rgba(63, 185, 80, 0.5); }
+.workflow-button-failed  { color: #f85149; border-color: rgba(248, 81, 73, 0.5); }
+.workflow-button-spinner { width: 10px; height: 10px; border-width: 1.5px; margin: 0; color: currentColor; }
+
+/* Result card inside the drawer — mirrors CiFixCard/ConflictResolutionCard
+ * placement (just below the PR description). */
+.workflow-run-card {
+  margin: 12px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  overflow: hidden;
+}
+.workflow-run-card-running { border-color: rgba(99, 102, 241, 0.45); }
+.workflow-run-card-success { border-color: rgba(63, 185, 80, 0.45); }
+.workflow-run-card-failed  { border-color: rgba(248, 81, 73, 0.45); }
+.workflow-run-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.workflow-run-card-header h3 { margin: 0; font-size: 13px; display: inline-flex; align-items: center; gap: 12px; }
+.workflow-run-card-label { color: var(--fg); }
+.workflow-run-card-status { color: var(--muted); font-size: 12px; font-weight: 400; display: inline-flex; align-items: center; gap: 6px; }
+.workflow-run-card-success .workflow-run-card-status { color: #3fb950; }
+.workflow-run-card-failed  .workflow-run-card-status { color: #f85149; }
+.workflow-run-card-dismiss {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px;
+}
+.workflow-run-card-dismiss:hover { color: var(--fg); }
+
+.workflow-step-list { list-style: none; margin: 0; padding: 0; }
+.workflow-step { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.workflow-step:last-child { border-bottom: none; }
+.workflow-step-running { background: rgba(99, 102, 241, 0.05); }
+.workflow-step-header {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--muted); font-weight: 600;
+  margin-bottom: 8px;
+}
+.workflow-step-action { color: var(--fg); }
+.workflow-step-duration { color: var(--muted); font-weight: 400; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.workflow-step-spinner { width: 10px; height: 10px; border-width: 1.5px; margin: 0; }
+.workflow-step-body { font-size: 13px; }
+.workflow-step-error {
+  margin: 0; padding: 8px 10px;
+  background: rgba(248, 81, 73, 0.08); border: 1px solid rgba(248, 81, 73, 0.3); border-radius: 4px;
+  color: #f85149; font-size: 12px; white-space: pre-wrap; word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.workflow-step-pending { color: var(--muted); font-style: italic; margin: 0; }
+.workflow-step-note    { color: var(--muted); margin: 0; }
+.workflow-step-prompt  { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.workflow-step-prompt summary { cursor: pointer; }
+.workflow-step-prompt pre {
+  margin: 6px 0 0; padding: 8px 10px;
+  background: var(--bg); border-radius: 4px;
+  white-space: pre-wrap; word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+}
+.workflow-step-claude-body { font-size: 13px; line-height: 1.55; }
+.workflow-step-summary p { margin: 4px 0; font-size: 13px; }
+.workflow-step-summary code { background: var(--bg); padding: 1px 4px; border-radius: 3px; }
+.workflow-step-toast { margin: 0; font-size: 12px; padding: 6px 10px; border-radius: 4px; }
+.workflow-step-toast-info    { background: rgba(99, 102, 241, 0.10); color: var(--accent); }
+.workflow-step-toast-success { background: rgba(63, 185, 80, 0.10); color: #3fb950; }
+.workflow-step-toast-error   { background: rgba(248, 81, 73, 0.10); color: #f85149; }

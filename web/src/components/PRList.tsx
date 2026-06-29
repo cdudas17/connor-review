@@ -8,6 +8,9 @@ import { ConflictBadge } from './ConflictBadge.js';
 import { LabelChips } from './LabelChips.js';
 import type { FilterMode } from './FilterToggle.js';
 import { GitMergeIcon, GitMergeQueueIcon, CopyIcon, CheckIcon } from '@primer/octicons-react';
+import { WorkflowButton } from './WorkflowButton.js';
+import type { PrWorkflow, WorkflowRun } from '../lib/workflowTypes.js';
+import { workflowMatches } from '../lib/runWorkflow.js';
 
 interface Identity {
   owner: string;
@@ -63,6 +66,14 @@ interface Props {
   /** When true, each row renders a small "copy PR link" button. Used on the
    * My PRs tab — handy for pasting your own PRs into Slack / Jira / etc. */
   showCopyLink?: boolean;
+  /** Tag-driven workflows the row may surface as pill buttons. Each
+   *  workflow is rendered if it matches the row's title-tag + ciStatus. */
+  workflows?: PrWorkflow[];
+  /** Latest state for a given (workflow, PR) so the button can spin while
+   *  running, dim while errored, etc. */
+  workflowStateFor?: (workflowId: string, id: { owner: string; repo: string; number: number }) => WorkflowRun | null;
+  /** Invoked when the user clicks a workflow pill. */
+  onRunWorkflow?: (workflow: PrWorkflow, pr: TrackedPR) => void;
 }
 
 /** Per-row copy button: copies the PR's github.com URL and flashes a checkmark
@@ -90,7 +101,7 @@ function CopyLinkButton({ owner, repo, number }: { owner: string; repo: string; 
   );
 }
 
-export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictStateFor, onResolveConflicts, ciFixStateFor, onOpenCiChecks, onToggleAutoMerge, showCopyLink }: Props) {
+export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictStateFor, onResolveConflicts, ciFixStateFor, onOpenCiChecks, onToggleAutoMerge, showCopyLink, workflows, workflowStateFor, onRunWorkflow }: Props) {
   const filtered = mode === 'untouched-only' ? prs.filter((p) => p.status === 'untouched') : prs;
   if (filtered.length === 0) {
     return <p className="empty">No PRs to review.</p>;
@@ -183,6 +194,19 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictS
               {p.ghStatus !== 'draft' && p.ghStatus !== 'closed' && p.ghStatus !== 'approved' && (
                 <GhStatusBadge status={p.ghStatus} approvers={p.approvers} />
               )}
+              {/* Tag-driven workflows: a pill button per workflow whose tag
+                  + ciStatus match this row. Only rendered when the parent
+                  passes `workflows` (My PRs tab only in v1). */}
+              {workflows && workflows.length > 0 && onRunWorkflow && workflows
+                .filter((w) => workflowMatches(w, { title: p.title ?? '', ciStatus: p.ciStatus ?? null }))
+                .map((w) => (
+                  <WorkflowButton
+                    key={w.id}
+                    workflow={w}
+                    state={workflowStateFor ? workflowStateFor(w.id, { owner: p.owner, repo: p.repo, number: p.number }) : null}
+                    onClick={() => onRunWorkflow(w, p)}
+                  />
+                ))}
               {/* My PRs tab: per-row "Copy PR link" button. Renders to the
                   left of the auto-merge toggle so both action icons sit in
                   the same trailing cluster. */}

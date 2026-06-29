@@ -8,6 +8,7 @@ import { ReviewFooter, LocalReviewFooter } from './ReviewFooter.js';
 import { ErrorToast } from './ErrorToast.js';
 import { ConflictResolutionCard } from './ConflictResolutionCard.js';
 import { CiFixCard } from './CiFixCard.js';
+import { WorkflowRunCard } from './WorkflowRunCard.js';
 import { usePRDetails } from '../hooks/usePRDetails.js';
 import { computeDiffStats } from '../lib/diffStats.js';
 import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
@@ -126,6 +127,14 @@ interface Props {
   /** Click handler for the CI badge in the drawer header — opens the
    * per-check breakdown drawer. */
   onOpenCiChecks?: () => void;
+  /** Most-recent tag-driven workflow run for this PR (any workflow id).
+   *  null when no workflow has run against this PR. */
+  workflowRun?: import('../lib/workflowTypes.js').WorkflowRun | null;
+  /** Resolve a workflow id to its display label (so the run card can show
+   *  "Check loaders" instead of "loaders-check"). */
+  workflowLabelOf?: (workflowId: string) => string;
+  /** Dismiss the stored workflow run entry (× on the card). */
+  onDismissWorkflowRun?: (workflowId: string) => void;
 }
 
 export function ReviewDrawer(props: Props) {
@@ -140,6 +149,7 @@ export function ReviewDrawer(props: Props) {
     ciFix, onFixCi, onDismissCiFix,
     reloadNonce,
     onOpenCiChecks,
+    workflowRun, workflowLabelOf, onDismissWorkflowRun,
   } = props;
   const { meta, diff, loading, error, reload, metaFetchedAt } = usePRDetails(current);
   // GitHub-style +N -M totals for the PR header. Memoised on diff identity
@@ -529,6 +539,16 @@ export function ReviewDrawer(props: Props) {
           entry={ciFix}
           onRetry={onFixCi}
           onDismiss={onDismissCiFix}
+        />
+      )}
+      {/* Tag-driven workflow run card. Renders the most-recent run for
+          this PR (any workflow id). Dismiss strips the entry from the
+          store; the next run replaces it. */}
+      {meta.source !== 'local' && workflowRun && onDismissWorkflowRun && (
+        <WorkflowRunCard
+          workflowLabel={workflowLabelOf ? workflowLabelOf(workflowRun.workflowId) : workflowRun.workflowId}
+          run={workflowRun}
+          onDismiss={() => onDismissWorkflowRun(workflowRun.workflowId)}
         />
       )}
       {meta.source !== 'local' && <ReviewSummaryList reviews={meta.reviews ?? []} />}

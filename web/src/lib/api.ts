@@ -205,6 +205,13 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
+  /** Equivalent to GitHub's "Update branch" button — server hits
+   *  `gh api -X PUT repos/.../pulls/N/update-branch`. Merges the PR's
+   *  base branch into its head; CI re-runs on the up-to-date branch.
+   *  Used by tag-driven workflows. */
+  updateBranch(owner: string, repo: string, number: number): Promise<{ ok: true }> {
+    return call(`/api/pulls/${owner}/${repo}/${number}/update-branch`, { method: 'POST' });
+  },
   /** The viewer's open GitHub issues (assigned + authored, most-recent first).
    * Pass `owner` (e.g. 'Gusto') to scope the search to a single GitHub org/user. */
   getMyIssues(opts?: { scope?: 'assigned' | 'authored' | 'either'; limit?: number; owner?: string }): Promise<{
