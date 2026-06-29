@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFabPosition } from '../hooks/useFabPosition.js';
 import type { CalendarEvent } from '../types.js';
 
@@ -100,11 +100,12 @@ export function NextMeetingFab({ events, hasCalendar, onOpen }: Props) {
     moved: boolean;
   } | null>(null);
 
-  // Tick every 30s so countdowns stay close to truth without burning a render
-  // every second.
+  // Tick every 60s so the countdown ticks down minute-by-minute when a
+  // meeting is approaching. The recompute is purely local — no calendar
+  // refetch — so the cost is one re-render per minute.
   const [, setTick] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setTick((n) => n + 1), 30_000);
+    const id = setInterval(() => setTick((n) => n + 1), 60_000);
     return () => clearInterval(id);
   }, []);
 
@@ -142,7 +143,12 @@ export function NextMeetingFab({ events, hasCalendar, onOpen }: Props) {
     setIsDragging(true);
   };
 
-  const status = useMemo(() => computeStatus(events, new Date()), [events]);
+  // Compute fresh on every render. The 60s tick above forces a re-render
+  // each minute so `new Date()` actually advances (a useMemo on [events]
+  // would cache the result between calendar refetches and the countdown
+  // would never tick down). Recompute is cheap — pure JS over a small
+  // event list.
+  const status = computeStatus(events, new Date());
 
   if (!hasCalendar) return null;
 
