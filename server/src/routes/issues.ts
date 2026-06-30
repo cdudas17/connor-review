@@ -168,6 +168,13 @@ export async function registerIssuesRoutes(app: FastifyInstance) {
                 createdAt: string;
                 updatedAt: string;
                 url: string;
+                comments?: { nodes?: Array<{
+                  id: string;
+                  bodyHTML: string;
+                  createdAt: string;
+                  url?: string;
+                  author?: { login?: string; avatarUrl?: string; url?: string };
+                }> };
               };
             };
           };
@@ -194,6 +201,15 @@ export async function registerIssuesRoutes(app: FastifyInstance) {
           createdAt: issue.createdAt,
           updatedAt: issue.updatedAt,
           url: issue.url,
+          comments: (issue.comments?.nodes ?? []).map((c) => ({
+            id: c.id,
+            bodyHtml: c.bodyHTML ?? '',
+            createdAt: c.createdAt,
+            url: c.url ?? null,
+            authorLogin: c.author?.login ?? null,
+            authorAvatarUrl: c.author?.avatarUrl ?? null,
+            authorUrl: c.author?.url ?? null,
+          })),
         };
       } catch (e) {
         if (e instanceof GhCliError) {

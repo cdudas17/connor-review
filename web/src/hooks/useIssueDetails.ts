@@ -37,6 +37,17 @@ export interface IssueDetail {
   createdAt: string;
   updatedAt: string;
   url: string;
+  comments: IssueComment[];
+}
+
+export interface IssueComment {
+  id: string;
+  bodyHtml: string;
+  createdAt: string;
+  url: string | null;
+  authorLogin: string | null;
+  authorAvatarUrl: string | null;
+  authorUrl: string | null;
 }
 
 export interface IssueId { owner: string; repo: string; number: number; }

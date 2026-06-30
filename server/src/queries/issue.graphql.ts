@@ -13,6 +13,15 @@ export const ISSUE_DETAIL_QUERY = /* GraphQL */ `
         createdAt
         updatedAt
         url
+        comments(first: 100) {
+          nodes {
+            id
+            bodyHTML
+            createdAt
+            url
+            author { login avatarUrl url }
+          }
+        }
       }
     }
   }

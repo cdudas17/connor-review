@@ -41,6 +41,12 @@ function formatDate(iso: string): string {
   return new Date(t).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function formatDateTime(iso: string): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return '';
+  return new Date(t).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
 interface Props {
   current: IssueId | null;
   onClose: () => void;
@@ -150,6 +156,23 @@ export function IssueDrawer({ current, onClose }: Props) {
             {issue.bodyHtml
               ? <div className="markdown-body issue-body" dangerouslySetInnerHTML={{ __html: issue.bodyHtml }} />
               : <p className="issue-body-empty">No description provided.</p>}
+            {issue.comments.map((c) => (
+              <section key={c.id} className="issue-comment" aria-label={`Comment by ${c.authorLogin ?? 'unknown'}`}>
+                <hr className="issue-comment-divider" />
+                <p className="issue-comment-meta">
+                  {c.authorAvatarUrl && (
+                    <img className="issue-comment-avatar" src={c.authorAvatarUrl} alt="" width={20} height={20} />
+                  )}
+                  {c.authorUrl
+                    ? <a href={c.authorUrl} target="_blank" rel="noopener noreferrer">{c.authorLogin ?? 'unknown'}</a>
+                    : <span>{c.authorLogin ?? 'unknown'}</span>}
+                  {c.url
+                    ? <a className="issue-comment-when" href={c.url} target="_blank" rel="noopener noreferrer">{formatDateTime(c.createdAt)}</a>
+                    : <span className="issue-comment-when">{formatDateTime(c.createdAt)}</span>}
+                </p>
+                <div className="markdown-body issue-body" dangerouslySetInnerHTML={{ __html: c.bodyHtml }} />
+              </section>
+            ))}
           </>
         )}
       </aside>

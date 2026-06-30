@@ -251,6 +251,15 @@ export const api = {
     createdAt: string;
     updatedAt: string;
     url: string;
+    comments: Array<{
+      id: string;
+      bodyHtml: string;
+      createdAt: string;
+      url: string | null;
+      authorLogin: string | null;
+      authorAvatarUrl: string | null;
+      authorUrl: string | null;
+    }>;
   }> {
     return call(`/api/issues/${owner}/${repo}/${number}`);
   },

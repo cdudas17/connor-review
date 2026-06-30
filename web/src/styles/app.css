@@ -664,6 +664,19 @@ button.ci-badge { cursor: pointer; }
 .issue-state-closed { color: #a371f7; }
 .issue-body { margin-top: 16px; padding: 16px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 8px; }
 .issue-body-empty { color: var(--muted); font-style: italic; margin-top: 16px; }
+/* Comments on issues — visually almost the same as the description; just a thin
+   page-break and a small commenter row separate them. */
+.issue-comment { margin-top: 16px; }
+.issue-comment-divider { border: 0; border-top: 1px solid var(--border); margin: 0 0 12px 0; }
+.issue-comment-meta { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.85rem; margin: 0 0 8px 0; }
+.issue-comment-meta a { color: var(--muted); }
+.issue-comment-meta a:hover { color: var(--text); }
+.issue-comment-avatar { width: 20px; height: 20px; border-radius: 50%; display: block; }
+.issue-comment-when { color: var(--muted); }
+.issue-comment-when::before { content: '·'; margin-right: 8px; color: var(--muted); display: inline-block; text-decoration: none; }
+a.issue-comment-when { text-decoration: none; }
+a.issue-comment-when:hover { text-decoration: underline; }
+.issue-comment .issue-body { margin-top: 0; }
 
 /* Calendar tab — agenda list grouped by day. */
 .calendar-empty { color: var(--muted); font-style: italic; padding: 24px; text-align: center; }
