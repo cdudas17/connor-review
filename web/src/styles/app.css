@@ -1178,7 +1178,10 @@ a.issue-comment-when:hover { text-decoration: underline; }
 
 /* Toolbar row that holds the tag filter + the Workflows entry button on
  * the My PRs tab. Flex with auto-pushed entry button on the right. */
-.mine-tab-toolbar { display: flex; align-items: center; gap: 12px; }
+/* Anchor to the top so the Workflows / + Add PR buttons stay aligned with
+ * the FIRST row of tag chips when the tag list wraps to multiple rows,
+ * rather than drifting to the vertical midpoint of the whole block. */
+.mine-tab-toolbar { display: flex; align-items: flex-start; gap: 12px; }
 .mine-tab-toolbar > :first-child { flex: 1; min-width: 0; }
 .workflows-entry-button {
   font: inherit; font-size: 12px;
