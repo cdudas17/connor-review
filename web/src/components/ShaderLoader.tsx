@@ -161,12 +161,10 @@ export function ShaderLoader({ size = 96, label = 'Loading', timeOffset = 0 }: P
       cancelled = true;
       canvas.removeEventListener('webglcontextlost', onLost as EventListener);
       canvas.removeEventListener('webglcontextrestored', onRestored);
-      if (gl && !gl.isContextLost()) {
-        try {
-          const ext = gl.getExtension('WEBGL_lose_context');
-          ext?.loseContext();
-        } catch { /* ignore */ }
-      }
+      // See ShaderConstellation for why loseContext() is NOT called on
+      // unmount: StrictMode's cleanup+remount cycle loses the context
+      // then can't recover it, and shaders never re-compile on the
+      // second mount.
       teardownGl();
       gl = null;
     };

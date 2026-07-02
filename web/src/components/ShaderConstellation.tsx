@@ -264,14 +264,15 @@ export function ShaderConstellation({ orbs }: Props) {
       cancelled = true;
       canvas.removeEventListener('webglcontextlost', onLost as EventListener);
       canvas.removeEventListener('webglcontextrestored', onRestored);
-      // Force-drop the context so HMR / unmount doesn't accumulate orphaned
-      // ones. WEBGL_lose_context is supported everywhere we care about.
-      if (gl && !gl.isContextLost()) {
-        try {
-          const ext = gl.getExtension('WEBGL_lose_context');
-          ext?.loseContext();
-        } catch { /* ignore */ }
-      }
+      // NOTE: don't call WEBGL_lose_context.loseContext() here. React
+      // StrictMode double-invokes effects in dev (mount → cleanup →
+      // mount) and canvas.getContext('webgl') returns the SAME (now-
+      // lost) context on the second mount — restoration only happens
+      // via restoreContext(), which the browser doesn't call
+      // automatically. Result: shaders never re-compile and nothing
+      // draws. Browser GC cleans up the context when the canvas is
+      // removed from the DOM, and HMR-accumulated contexts hit the
+      // browser's LRU eviction at 16 contexts anyway.
       teardownGl();
       gl = null;
     };
