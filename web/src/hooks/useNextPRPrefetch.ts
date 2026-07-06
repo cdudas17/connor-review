@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { api } from '../lib/api.js';
 import type { TrackedPR } from '../types.js';
+import { prefetchPR } from './usePRDetails.js';
 
 interface Identity {
   owner: string;
@@ -42,18 +42,11 @@ export function useNextPRPrefetch({ current, prs }: Args) {
   useEffect(() => {
     const next = nextUntouchedAfter(current, prs);
     if (!next) return;
-    // best-effort prefetch; swallow errors. Route local entries to /api/local/*
-    // (don't try to ask GitHub for a repo called 'local/<name>').
-    if (next.source === 'local' && next.localPath && next.branch) {
-      Promise.allSettled([
-        api.getLocalMeta(next.repo, next.localPath, next.branch),
-        api.getLocalDiff(next.localPath, next.branch),
-      ]);
-    } else {
-      Promise.allSettled([
-        api.getPullRequest(next.owner, next.repo, next.number),
-        api.getDiff(next.owner, next.repo, next.number),
-      ]);
-    }
+    // prefetchPR stashes the parsed response in a client-side cache so
+    // usePRDetails can hydrate synchronously when the user clicks Next
+    // — avoiding the loading spinner that shows up if we only warm the
+    // server-side cache. Swallows errors; the real fetch will surface
+    // them normally when the drawer actually opens the PR.
+    void prefetchPR(next);
   }, [current?.owner, current?.repo, current?.number, prs]);
 }
