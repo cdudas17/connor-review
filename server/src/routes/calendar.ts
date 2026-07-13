@@ -147,8 +147,26 @@ export async function registerCalendarRoutes(app: FastifyInstance) {
       return { events, start: start.toISOString(), end: end.toISOString() };
     } catch (e) {
       if (e instanceof GcalcliError) {
-        const status = e.code === 'GCALCLI_NOT_INSTALLED' ? 503 : e.code === 'GCALCLI_NOT_AUTHENTICATED' ? 401 : 502;
-        return reply.code(status).send({ code: e.code, message: e.message, stderr: e.stderr });
+        // Translate the raw CLI stderr (Python traceback for invalid_grant,
+        // "not found" text, etc.) into the same short setup hints the
+        // /auth-status endpoint returns. The client renders `message`
+        // directly in the needs-setup panel — dumping a full traceback
+        // there is unhelpful.
+        if (e.code === 'GCALCLI_NOT_INSTALLED') {
+          return reply.code(503).send({
+            code: e.code,
+            message: 'gcalcli is not installed. Run: `brew install gcalcli` (or `pipx install gcalcli`).',
+            stderr: e.stderr,
+          });
+        }
+        if (e.code === 'GCALCLI_NOT_AUTHENTICATED') {
+          return reply.code(401).send({
+            code: e.code,
+            message: 'gcalcli authentication has expired or been revoked. Run `gcalcli init` in your shell, sign in again with the Google account you want to use, then come back.',
+            stderr: e.stderr,
+          });
+        }
+        return reply.code(502).send({ code: e.code, message: e.message, stderr: e.stderr });
       }
       return reply.code(502).send({ code: 'CALENDAR_API_ERROR', message: (e as Error).message });
     }
