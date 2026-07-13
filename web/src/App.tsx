@@ -1080,6 +1080,10 @@ export function App() {
             selectedCount={selectedKeys.size}
             totalVisible={selectableVisible.length}
             allSelected={selectableVisible.length > 0 && selectableVisible.every((p) => selectedKeys.has(prKey(p)))}
+            // Added PRs is where bulk operations (Select all → Copy links,
+            // delete stale rows) are the primary workflow; keep the bar up
+            // so the affordance is always reachable without pre-selecting.
+            alwaysShow={tab === 'my'}
             onSelectAll={() => setSelectedKeys(new Set(selectableVisible.map(prKey)))}
             onClear={clearSelection}
             onDelete={canDelete ? deleteSelected : undefined}
