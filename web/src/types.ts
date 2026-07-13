@@ -19,6 +19,18 @@ export interface ReviewSummary {
   url: string;
 }
 
+/** Top-level "conversation" comment on a PR — same shape as an issue
+ *  comment, not anchored to the diff (that's a `ReviewThread`). */
+export interface PrComment {
+  id: string;
+  bodyHtml: string;
+  createdAt: string;
+  url: string | null;
+  authorLogin: string | null;
+  authorAvatarUrl: string | null;
+  authorUrl: string | null;
+}
+
 export interface TrackedPR {
   owner: string;
   repo: string;
@@ -94,6 +106,9 @@ export interface PullRequestMeta {
   labels: PRLabel[];
   assignees: PRAssignee[];
   reviews: ReviewSummary[];
+  /** Top-level PR conversation comments (issue-style, not diff-anchored).
+   *  Interleaved with `reviews` in the drawer's Conversation timeline. */
+  comments: PrComment[];
   createdAt: string | null;
   /** Pre-rendered GitHub-flavored markdown HTML for the PR body. Safe — GitHub sanitizes. */
   bodyHtml: string | null;

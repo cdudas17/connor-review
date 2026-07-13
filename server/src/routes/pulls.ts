@@ -62,6 +62,8 @@ interface PullRequestMeta {
   labels: PRLabel[];
   assignees: PRAssignee[];
   reviews: ReviewSummary[];
+  /** Top-level PR conversation comments (issue-style, not diff-anchored). */
+  comments: PrComment[];
   reviewThreads: ReviewThread[];
   /** Auto-merge ("merge when ready") state. null when not enabled. */
   autoMergeRequest: { mergeMethod: 'MERGE' | 'SQUASH' | 'REBASE'; enabledBy: string | null; enabledAt: string | null } | null;
@@ -91,6 +93,16 @@ interface ReviewSummary {
   authorAvatarUrl: string | null;
   createdAt: string;
   url: string;
+}
+
+interface PrComment {
+  id: string;
+  bodyHtml: string;
+  createdAt: string;
+  url: string | null;
+  authorLogin: string | null;
+  authorAvatarUrl: string | null;
+  authorUrl: string | null;
 }
 
 interface ReviewThread {
@@ -254,6 +266,19 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
       } satisfies ReviewSummary))
       // Drop pending drafts, empty bodies, and bot accounts (login ends in [bot]).
       .filter((r: ReviewSummary) => r.state !== 'PENDING' && r.body.trim().length > 0 && !(r.authorLogin ?? '').endsWith('[bot]')),
+    comments: (pr.comments?.nodes ?? [])
+      .map((c: { id: string; bodyHTML?: string; createdAt: string; url?: string; author?: { login?: string; avatarUrl?: string; url?: string } }) => ({
+        id: c.id,
+        bodyHtml: c.bodyHTML ?? '',
+        createdAt: c.createdAt,
+        url: c.url ?? null,
+        authorLogin: c.author?.login ?? null,
+        authorAvatarUrl: c.author?.avatarUrl ?? null,
+        authorUrl: c.author?.url ?? null,
+      } satisfies PrComment))
+      // Drop bot comments (auto-labeling, CI, etc.) that would clutter the
+      // conversation with noise.
+      .filter((c: PrComment) => !(c.authorLogin ?? '').endsWith('[bot]')),
     reviewThreads: (pr.reviewThreads?.nodes ?? []).map((t: {
       id: string;
       isResolved: boolean;

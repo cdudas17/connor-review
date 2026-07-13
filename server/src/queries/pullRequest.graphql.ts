@@ -54,6 +54,18 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
             url
           }
         }
+        # Top-level "conversation" comments on the PR (issue-style, not
+        # anchored to the diff). Same shape as issue comments — think of a
+        # PR as an issue with a diff attached.
+        comments(first: 100) {
+          nodes {
+            id
+            bodyHTML
+            createdAt
+            url
+            author { login avatarUrl url }
+          }
+        }
         commits(last: 1) {
           nodes {
             commit {

@@ -23,6 +23,7 @@ interface LocalMeta {
   labels: [];
   assignees: [];
   reviews: [];
+  comments: [];
   reviewThreads: [];
   createdAt: string | null;
   bodyHtml: string | null;
@@ -110,6 +111,7 @@ export async function registerLocalRoutes(app: FastifyInstance) {
           labels: [],
           assignees: [],
           reviews: [],
+          comments: [],
           reviewThreads: [],
           createdAt: isoDate || null,
           bodyHtml: null,

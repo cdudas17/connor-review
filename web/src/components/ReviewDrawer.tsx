@@ -551,7 +551,7 @@ export function ReviewDrawer(props: Props) {
           onDismiss={() => onDismissWorkflowRun(workflowRun.workflowId)}
         />
       )}
-      {meta.source !== 'local' && <ReviewSummaryList reviews={meta.reviews ?? []} />}
+      {meta.source !== 'local' && <ReviewSummaryList reviews={meta.reviews ?? []} comments={meta.comments ?? []} />}
       {meta.source !== 'local' && (
         <ClaudeChatPanel
           chat={claudeChat}
