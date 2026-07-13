@@ -57,13 +57,17 @@ export const PULL_REQUEST_QUERY = /* GraphQL */ `
         # Top-level "conversation" comments on the PR (issue-style, not
         # anchored to the diff). Same shape as issue comments — think of a
         # PR as an issue with a diff attached.
+        # __typename on author lets the server filter out Bot authors while
+        # keeping User comments. bodyText is only used for the "Web preview
+        # deployments" allowlist match — not returned to the client.
         comments(first: 100) {
           nodes {
             id
             bodyHTML
+            bodyText
             createdAt
             url
-            author { login avatarUrl url }
+            author { __typename login avatarUrl url }
           }
         }
         commits(last: 1) {

@@ -267,6 +267,24 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
       // Drop pending drafts, empty bodies, and bot accounts (login ends in [bot]).
       .filter((r: ReviewSummary) => r.state !== 'PENDING' && r.body.trim().length > 0 && !(r.authorLogin ?? '').endsWith('[bot]')),
     comments: (pr.comments?.nodes ?? [])
+      // Filter first (needs raw __typename + bodyText), then normalize. Keep
+      // every real User comment. Drop every Bot comment EXCEPT the deploy-
+      // preview one — Trunk / Danger / Fresh Eyes / CI status bots are pure
+      // noise in the conversation, but the Web-preview-deployments table
+      // has the click-through links reviewers need on Gusto/web PRs.
+      //
+      // The __typename discriminator is what makes this reliable: bots
+      // authored via GitHub Apps don't always have a `[bot]` suffix on
+      // their login (e.g. `gusto-builds-1`, `trunk-io`), so string
+      // matching on login alone under-filters. The allowlist is body-
+      // shape based (the "Web preview deployments" heading is what Gusto's
+      // CI reliably emits) so it doesn't hard-code an App id.
+      .filter((c: { author?: { __typename?: string }; bodyText?: string }) => {
+        const isBot = c.author?.__typename === 'Bot';
+        if (!isBot) return true;
+        const body = (c.bodyText ?? '').trimStart();
+        return body.startsWith('Web preview deployments');
+      })
       .map((c: { id: string; bodyHTML?: string; createdAt: string; url?: string; author?: { login?: string; avatarUrl?: string; url?: string } }) => ({
         id: c.id,
         bodyHtml: c.bodyHTML ?? '',
@@ -275,10 +293,7 @@ async function fetchMeta(owner: string, repo: string, number: number): Promise<P
         authorLogin: c.author?.login ?? null,
         authorAvatarUrl: c.author?.avatarUrl ?? null,
         authorUrl: c.author?.url ?? null,
-      } satisfies PrComment))
-      // Drop bot comments (auto-labeling, CI, etc.) that would clutter the
-      // conversation with noise.
-      .filter((c: PrComment) => !(c.authorLogin ?? '').endsWith('[bot]')),
+      } satisfies PrComment)),
     reviewThreads: (pr.reviewThreads?.nodes ?? []).map((t: {
       id: string;
       isResolved: boolean;
