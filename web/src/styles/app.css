@@ -539,8 +539,9 @@ button.ci-badge { cursor: pointer; }
 .notes-fab-dragging { cursor: grabbing; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); transition: none; }
 /* "Next meeting" FAB — pill-shaped so the countdown ("in 12m") fits next to
  * the clock icon. Defaults to bottom-right. Colour shifts by state:
- * red while you're in a meeting, amber when one's within 5 min, muted
- * accent otherwise, dim green when there's nothing left today. */
+ * rainbow fill while you're in a meeting, rainbow border when one's within
+ * 30 min, muted accent otherwise, dim green when there's nothing left
+ * today. */
 .next-meeting-fab { position: fixed; z-index: 70; height: 44px; padding: 0 14px 0 12px; border-radius: 22px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); cursor: grab; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; user-select: none; touch-action: none; transition: background 80ms, color 80ms, border-color 80ms, box-shadow 80ms; }
 .next-meeting-fab:hover { background: var(--bg-subtle); }
 .next-meeting-fab-dragging { cursor: grabbing; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); transition: none; }
