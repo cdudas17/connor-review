@@ -25,8 +25,9 @@ function ClockIcon({ size = 18 }: { size?: number }) {
 interface NextOrNow {
   /** What the FAB should say. Always short — the FAB is small. */
   label: string;
-  /** 'live' = currently in a meeting; 'soon' = ≤30 min away; 'idle' = later
-   * today but > 30 min out; 'free' = no more events today. Drives colour. */
+  /** 'live' = currently in a meeting OR ≤5 min before one starts;
+   * 'soon' = 5–30 min away; 'idle' = later today but > 30 min out;
+   * 'free' = no more events today. Drives colour. */
   state: 'live' | 'soon' | 'idle' | 'free';
 }
 
@@ -65,6 +66,10 @@ function computeStatus(events: CalendarEvent[], now: Date): NextOrNow {
   const next = upcoming[0];
   if (next) {
     const until = Math.round((next.startMs - nowMs) / 60_000);
+    // The last 5 min before a meeting count as "live" too — you should
+    // already have the tab open, camera on, etc. — so it gets the filled
+    // rainbow. 5–30 min out is the rainbow-border "soon" warning.
+    if (until <= 5) return { state: 'live', label: fmtMins(until) };
     if (until <= 30) return { state: 'soon', label: fmtMins(until) };
     // Idle only when the next event is TODAY. If your next meeting isn't
     // until tomorrow (or later), the FAB shows "Free" — a "2d4h"
