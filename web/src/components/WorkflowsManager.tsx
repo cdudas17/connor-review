@@ -17,6 +17,7 @@ function blankStep(action: ActionKind): UserWorkflowStep {
   if (action === 'askClaude') return { action: 'askClaude', prompt: '' };
   if (action === 'fixCi') return { action: 'fixCi' };
   if (action === 'resolveConflicts') return { action: 'resolveConflicts' };
+  if (action === 'resolveThreads') return { action: 'resolveThreads', authorLogin: '' };
   if (action === 'updateBranch') return { action: 'updateBranch' };
   return { action: 'toast', level: 'info', message: '' };
 }
@@ -179,6 +180,7 @@ function WorkflowEditor({ initial, existingIds, onSave, onCancel }: {
                 <option value="askClaude">askClaude — run a prompt</option>
                 <option value="fixCi">fixCi — Fix failing CI</option>
                 <option value="resolveConflicts">resolveConflicts — Claude resolves merge conflicts</option>
+                <option value="resolveThreads">resolveThreads — resolve review threads (optionally by author)</option>
                 <option value="updateBranch">updateBranch — merge base into PR</option>
                 <option value="toast">toast — show a notification</option>
               </select>
@@ -190,6 +192,14 @@ function WorkflowEditor({ initial, existingIds, onSave, onCancel }: {
                 onChange={(e) => updateStep(i, { prompt: e.target.value })}
                 placeholder="The prompt sent to Claude (with the PR diff as context)."
                 rows={4}
+              />
+            )}
+            {step.action === 'resolveThreads' && (
+              <input
+                type="text"
+                value={step.authorLogin ?? ''}
+                onChange={(e) => updateStep(i, { authorLogin: e.target.value })}
+                placeholder="Author login to filter by (e.g. gusto-fresh-eyes). Blank = all unresolved."
               />
             )}
             {step.action === 'toast' && (

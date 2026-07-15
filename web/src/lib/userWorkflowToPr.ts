@@ -56,6 +56,10 @@ async function runStep(
     const r = await actions.resolveConflicts();
     return !r.ok;
   }
+  if (step.action === 'resolveThreads') {
+    const r = await actions.resolveThreads({ authorLogin: step.authorLogin });
+    return !r.ok;
+  }
   if (step.action === 'updateBranch') {
     const r = await actions.updateBranch();
     return !r.ok;

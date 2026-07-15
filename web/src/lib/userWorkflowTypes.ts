@@ -15,6 +15,10 @@ export type UserWorkflowStep =
   | { action: 'askClaude'; prompt: string; skipIfPrevFailed?: boolean }
   | { action: 'fixCi'; skipIfPrevFailed?: boolean }
   | { action: 'resolveConflicts'; skipIfPrevFailed?: boolean }
+  /** Bulk-resolve threads. `authorLogin` restricts to threads started by
+   *  that account (e.g. 'gusto-fresh-eyes'); leave blank to resolve
+   *  every unresolved thread on the PR. */
+  | { action: 'resolveThreads'; authorLogin?: string; skipIfPrevFailed?: boolean }
   | { action: 'updateBranch'; skipIfPrevFailed?: boolean }
   | { action: 'toast'; level: 'info' | 'success' | 'error'; message: string; onlyIfPrevFailed?: boolean };
 

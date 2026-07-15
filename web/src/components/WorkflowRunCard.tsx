@@ -59,6 +59,28 @@ function StepBody({ step }: { step: WorkflowStep }) {
       </div>
     );
   }
+  if (step.action === 'resolveThreads') {
+    const out = step.output as { ok?: boolean; resolved?: number; matched?: number; authorLogin?: string | null; errors?: Array<{ threadId: string; message: string }>; code?: string; message?: string } | undefined;
+    if (!out) return <p className="workflow-step-pending">Resolving threads…</p>;
+    if (!out.ok) return <pre className="workflow-step-error">{out.code}: {out.message}</pre>;
+    const scope = out.authorLogin ? <>started by <code>{out.authorLogin}</code></> : <>on the PR</>;
+    if (out.matched === 0) {
+      return <p className="workflow-step-note">No unresolved threads {scope}.</p>;
+    }
+    return (
+      <div className="workflow-step-summary">
+        <p>Resolved {out.resolved} of {out.matched} unresolved thread{out.matched === 1 ? '' : 's'} {scope}.</p>
+        {out.errors && out.errors.length > 0 && (
+          <details>
+            <summary>{out.errors.length} error{out.errors.length === 1 ? '' : 's'}</summary>
+            <ul>
+              {out.errors.map((e) => <li key={e.threadId}><code>{e.threadId}</code>: {e.message}</li>)}
+            </ul>
+          </details>
+        )}
+      </div>
+    );
+  }
   if (step.action === 'updateBranch') {
     const out = step.output as { ok?: boolean; code?: string; message?: string } | undefined;
     if (!out) return <p className="workflow-step-pending">Updating branch…</p>;

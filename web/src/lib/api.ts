@@ -284,6 +284,23 @@ export const api = {
       body: JSON.stringify({ body }),
     });
   },
+  /** Bulk-resolve unresolved review threads on a PR. Pass `authorLogin` to
+   *  restrict to threads STARTED BY that account (matched against the
+   *  first comment's author). No filter → resolves every unresolved
+   *  thread. Backs the `resolveThreads` workflow action. */
+  resolveThreads(owner: string, repo: string, number: number, opts?: { authorLogin?: string }): Promise<{
+    resolved: number;
+    resolvedIds: string[];
+    matched: number;
+    authorLogin: string | null;
+    errors: Array<{ threadId: string; message: string }>;
+  }> {
+    return call(`/api/pulls/${owner}/${repo}/${number}/threads/resolve`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ authorLogin: opts?.authorLogin ?? undefined }),
+    });
+  },
   // --- Calendar (via local gcalcli CLI) ---
   getCalendarAuthStatus(): Promise<{ connected: boolean; configured: boolean; configurationError: string | null }> {
     return call('/api/calendar/auth-status');

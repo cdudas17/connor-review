@@ -1,5 +1,5 @@
 import { api, ApiCallError } from './api.js';
-import type { PrWorkflow, WorkflowActions, WorkflowPr, WorkflowStep, FixCiOutput, ResolveConflictsOutput } from './workflowTypes.js';
+import type { PrWorkflow, WorkflowActions, WorkflowPr, WorkflowStep, FixCiOutput, ResolveConflictsOutput, ResolveThreadsOutput } from './workflowTypes.js';
 import { extractTags } from './extractTags.js';
 import type { PullRequestMeta, TrackedPR } from '../types.js';
 
@@ -106,6 +106,30 @@ export async function runWorkflow(
         const code = e instanceof ApiCallError ? e.code : 'FIXCI_FAILED';
         const message = e instanceof ApiCallError ? e.message : (e as Error).message;
         const output: FixCiOutput = { ok: false, code, message };
+        bus.updateStep(idx, { output, error: message, finishedAt: Date.now() });
+        return output;
+      }
+    },
+
+    resolveThreads: async (opts?: { authorLogin?: string }): Promise<ResolveThreadsOutput> => {
+      const authorLogin = opts?.authorLogin;
+      const label = authorLogin ? `resolveThreads by ${authorLogin}` : 'resolveThreads (all)';
+      const idx = bus.appendStep({ action: 'resolveThreads', input: label, startedAt: Date.now() });
+      try {
+        const result = await api.resolveThreads(pr.owner, pr.repo, pr.number, { authorLogin });
+        const output: ResolveThreadsOutput = {
+          ok: true,
+          resolved: result.resolved,
+          matched: result.matched,
+          authorLogin: result.authorLogin,
+          errors: result.errors,
+        };
+        bus.updateStep(idx, { output, finishedAt: Date.now() });
+        return output;
+      } catch (e) {
+        const code = e instanceof ApiCallError ? e.code : 'RESOLVE_THREADS_FAILED';
+        const message = e instanceof ApiCallError ? e.message : (e as Error).message;
+        const output: ResolveThreadsOutput = { ok: false, code, message };
         bus.updateStep(idx, { output, error: message, finishedAt: Date.now() });
         return output;
       }

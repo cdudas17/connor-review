@@ -58,6 +58,10 @@ export type ResolveConflictsOutput =
   | { ok: true; commitSha: string; trivial?: boolean }
   | { ok: false; code: string; message: string };
 
+export type ResolveThreadsOutput =
+  | { ok: true; resolved: number; matched: number; authorLogin: string | null; errors: Array<{ threadId: string; message: string }> }
+  | { ok: false; code: string; message: string };
+
 export interface WorkflowActions {
   /** Run an arbitrary Claude prompt with the PR diff as context. Returns
    *  Claude's response string. Backed by POST /api/pulls/.../claude/ask. */
@@ -68,6 +72,12 @@ export interface WorkflowActions {
   fixCi(): Promise<FixCiOutput>;
   /** Resolve merge conflicts via Claude. Same not-throwing convention. */
   resolveConflicts(): Promise<ResolveConflictsOutput>;
+  /** Bulk-resolve review threads on the PR via GitHub's resolveReviewThread
+   *  mutation. Pass `authorLogin` (e.g. 'gusto-fresh-eyes') to restrict to
+   *  threads started by that account; omit to resolve every unresolved
+   *  thread. Same not-throwing convention — HTTP errors land as
+   *  `{ ok: false, code, message }`. */
+  resolveThreads(opts?: { authorLogin?: string }): Promise<ResolveThreadsOutput>;
   /** Equivalent to GitHub's "Update branch" button. Merges base→head on
    *  the PR via `gh api repos/:o/:r/pulls/:n/update-branch -X POST`. */
   updateBranch(): Promise<{ ok: true } | { ok: false; code: string; message: string }>;
@@ -83,7 +93,7 @@ export interface WorkflowContext {
 /** One step of a workflow run — what action fired, when, with what
  *  input + output. Stored on the run so the result card can replay the
  *  whole timeline (including across page reloads). */
-export type WorkflowStepAction = 'askClaude' | 'fixCi' | 'resolveConflicts' | 'updateBranch' | 'toast';
+export type WorkflowStepAction = 'askClaude' | 'fixCi' | 'resolveConflicts' | 'resolveThreads' | 'updateBranch' | 'toast';
 
 export interface WorkflowStep {
   action: WorkflowStepAction;

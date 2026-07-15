@@ -7,6 +7,7 @@ import { PULL_REQUEST_QUERY } from '../queries/pullRequest.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_MUTATION } from '../queries/addPullRequestReview.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_THREAD_MUTATION } from '../queries/addPullRequestReviewThread.graphql.js';
 import { ADD_PULL_REQUEST_REVIEW_THREAD_REPLY_MUTATION } from '../queries/addPullRequestReviewThreadReply.graphql.js';
+import { RESOLVE_REVIEW_THREAD_MUTATION } from '../queries/resolveReviewThread.graphql.js';
 import { SUBMIT_PULL_REQUEST_REVIEW_MUTATION } from '../queries/submitPullRequestReview.graphql.js';
 import { MARK_READY_FOR_REVIEW_MUTATION } from '../queries/markReadyForReview.graphql.js';
 import { CLOSE_PULL_REQUEST_MUTATION } from '../queries/closePullRequest.graphql.js';
@@ -580,6 +581,63 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     const text = Buffer.from(b64, 'base64').toString('utf8');
     reply.type('text/plain; charset=utf-8');
     return text;
+  });
+
+  // Bulk-resolve review threads on a PR. Optional `authorLogin` filters to
+  // threads STARTED BY that login (matched against the first comment's
+  // author) — leave off to resolve every unresolved thread on the PR.
+  // Backs the `resolveThreads` workflow action.
+  app.post<{
+    Params: { owner: string; repo: string; number: string };
+    Body: { authorLogin?: string };
+  }>('/api/pulls/:owner/:repo/:number/threads/resolve', async (req, reply) => {
+    const params = parsePullParams(req.params);
+    const authorLogin = typeof req.body?.authorLogin === 'string' && req.body.authorLogin.trim().length > 0
+      ? req.body.authorLogin.trim()
+      : null;
+    try {
+      // Refresh meta so we don't try to resolve threads that were already
+      // resolved via the GitHub UI since our last cache write.
+      const meta = await fetchMeta(params.owner, params.repo, params.number);
+      metaCache.set(metaKey(params), meta);
+      const targets = meta.reviewThreads.filter((t) => {
+        if (t.isResolved) return false;
+        const starter = t.comments[0]?.authorLogin ?? null;
+        return authorLogin ? starter === authorLogin : true;
+      });
+      const resolvedIds: string[] = [];
+      const errors: Array<{ threadId: string; message: string }> = [];
+      // Serial, not parallel — a bulk-mutation misfire is easier to diagnose
+      // when errors land next to the exact thread they came from, and this
+      // rarely runs against more than a few threads.
+      for (const t of targets) {
+        try {
+          await ghExec([
+            'api', 'graphql',
+            '-f', `query=${RESOLVE_REVIEW_THREAD_MUTATION}`,
+            '-F', `threadId=${t.id}`,
+          ]);
+          resolvedIds.push(t.id);
+        } catch (e) {
+          errors.push({ threadId: t.id, message: e instanceof Error ? e.message : String(e) });
+        }
+      }
+      // Invalidate the meta cache so the drawer's next read shows the
+      // updated isResolved flags.
+      metaCache.delete(metaKey(params));
+      if (errors.length > 0 && resolvedIds.length === 0) {
+        reply.code(502).send({ code: 'RESOLVE_FAILED', message: errors[0].message, errors });
+        return;
+      }
+      return { resolved: resolvedIds.length, resolvedIds, errors, authorLogin, matched: targets.length };
+    } catch (e) {
+      if (e instanceof GhCliError) {
+        const status = e.code === 'AUTH_REQUIRED' ? 401 : e.code === 'RATE_LIMITED' ? 429 : 500;
+        reply.code(status).send({ code: e.code, message: e.message, stderr: e.stderr });
+        return;
+      }
+      throw e;
+    }
   });
 
   app.post<{
