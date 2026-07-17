@@ -19,13 +19,30 @@ export function hideKeyOf(event: CalendarEvent): string {
   return `id:${event.id}`;
 }
 
+/** Events longer than this get auto-hidden — day-spanning holds
+ *  ("OOO", "Focus Fridays", quarterly-planning-blocks) drown out the
+ *  actual meetings on the busy-block timeline. Threshold is 4h. */
+const LONG_EVENT_MS = 4 * 60 * 60 * 1000;
+
 /** True when the event is on the user's hide list. */
 export function isHidden(event: CalendarEvent, hidden: ReadonlySet<string>): boolean {
   return hidden.has(hideKeyOf(event));
 }
 
-/** Convenience — filter out hidden events in one pass. */
+/** True when the event exceeds the auto-hide duration cap. All-day
+ *  events don't count — they have their own visual (allDay chips)
+ *  and shouldn't be auto-suppressed. */
+export function isLongEvent(event: CalendarEvent): boolean {
+  if (event.isAllDay) return false;
+  if (!event.start || !event.end) return false;
+  const s = Date.parse(event.start);
+  const e = Date.parse(event.end);
+  if (Number.isNaN(s) || Number.isNaN(e)) return false;
+  return e - s > LONG_EVENT_MS;
+}
+
+/** Convenience — filter out user-hidden events AND events over the
+ *  duration cap in one pass. */
 export function filterVisible(events: CalendarEvent[], hidden: ReadonlySet<string>): CalendarEvent[] {
-  if (hidden.size === 0) return events;
-  return events.filter((e) => !isHidden(e, hidden));
+  return events.filter((e) => !isHidden(e, hidden) && !isLongEvent(e));
 }
