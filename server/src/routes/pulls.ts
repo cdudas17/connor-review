@@ -12,6 +12,7 @@ import { SUBMIT_PULL_REQUEST_REVIEW_MUTATION } from '../queries/submitPullReques
 import { MARK_READY_FOR_REVIEW_MUTATION } from '../queries/markReadyForReview.graphql.js';
 import { CLOSE_PULL_REQUEST_MUTATION } from '../queries/closePullRequest.graphql.js';
 import { claudeExec, ClaudeCliError } from '../lib/claudeExec.js';
+import { codexExec, CodexCliError } from '../lib/codexExec.js';
 import { gitExec, GitCliError } from '../lib/gitExec.js';
 import { getFixCiPrompt } from '../prompts/index.js';
 import { FIX_CI_PROMPT_VERSION, emitFixCiEvent } from '../lib/fixCiTelemetry.js';
@@ -843,11 +844,14 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     }
 
     try {
-      const response = await claudeExec(prompt, { cwd: claudeCwd });
+      // Ask-Claude review-chat backend swapped to Codex (per user
+      // preference). read-only sandbox — this endpoint reviews the
+      // implementation and returns prose; it never edits files.
+      const response = await codexExec(prompt, { cwd: claudeCwd, sandbox: 'read-only' });
       return { response: response.trim(), truncatedDiff: truncated };
     } catch (e) {
-      if (e instanceof ClaudeCliError) {
-        const status = e.code === 'CLAUDE_NOT_INSTALLED' ? 502 : e.code === 'TIMEOUT' ? 504 : 500;
+      if (e instanceof CodexCliError) {
+        const status = e.code === 'CODEX_NOT_INSTALLED' ? 502 : e.code === 'TIMEOUT' ? 504 : 500;
         reply.code(status).send({ code: e.code, message: e.message, stderr: e.stderr });
         return;
       }
