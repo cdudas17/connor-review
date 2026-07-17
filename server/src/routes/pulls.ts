@@ -1349,6 +1349,317 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     }
   });
 
+  // Rebase the PR onto its base branch, letting Claude resolve any
+  // conflicts that come up along the way. Mirrors resolve-conflicts
+  // exactly for safety: throwaway worktree, Read/Edit-only, per-step
+  // marker + overcommit checks, force-with-lease push. The only
+  // structural difference is the loop — a rebase can pause at every
+  // conflicting commit, not just once — so we iterate up to MAX_STEPS
+  // times and bail if it drags on longer than that.
+  app.post<{
+    Params: { owner: string; repo: string; number: string };
+    Body: { repoPath?: string };
+  }>('/api/pulls/:owner/:repo/:number/rebase', async (req, reply) => {
+    const params = parsePullParams(req.params);
+    const repoPath = (req.body?.repoPath ?? '').trim();
+    if (!repoPath) {
+      reply.code(400).send({ code: 'BAD_REPO_PATH', message: 'repoPath is required (configure localRepos for this repo)' });
+      return;
+    }
+    let absRepoPath: string;
+    try {
+      const abs = resolvePath(repoPath);
+      if (!existsSync(abs) || !statSync(abs).isDirectory() || !existsSync(resolvePath(abs, '.git'))) {
+        reply.code(400).send({ code: 'BAD_REPO_PATH', message: `Not a git checkout: ${abs}` });
+        return;
+      }
+      absRepoPath = abs;
+    } catch (e) {
+      reply.code(400).send({ code: 'BAD_REPO_PATH', message: (e as Error).message });
+      return;
+    }
+
+    const meta = metaCache.get(metaKey(params)) ?? (await fetchMeta(params.owner, params.repo, params.number));
+    const baseRef = meta.baseRefName;
+    const headRef = meta.headRefName;
+    const remoteHead = `origin/${headRef}`;
+    const remoteBase = `origin/${baseRef}`;
+
+    const stamp = Date.now();
+    const worktreePath = resolvePath(tmpdir(),
+      `connor-review-rebase-${params.owner}-${params.repo}-${params.number}-${stamp}`);
+    const tempBranch = `connor-review-rebase-${params.number}-${stamp}`;
+
+    /** Hard cap on the number of conflict-resolution rounds. Real PRs
+     *  should never need more than a handful of these; a runaway loop is
+     *  usually a sign the rebase is fighting itself and no amount of
+     *  Claude passes will help. */
+    const MAX_STEPS = 20;
+
+    const cleanup = async () => {
+      // Abort any in-flight rebase before removing the worktree — otherwise
+      // git leaves .git/worktrees/<name>/rebase-merge behind and the next
+      // rebase attempt on the same repo can trip over it.
+      try { await gitExec(['rebase', '--abort'], { cwd: worktreePath }); } catch { /* not in a rebase */ }
+      try { await gitExec(['worktree', 'remove', '--force', worktreePath], { cwd: absRepoPath }); } catch (e) {
+        try {
+          if (existsSync(worktreePath)) {
+            const { rmSync } = await import('node:fs');
+            rmSync(worktreePath, { recursive: true, force: true });
+          }
+        } catch { /* give up */ }
+        console.warn(`[rebase] worktree cleanup failed for ${worktreePath}:`, (e as Error).message);
+      }
+      try { await gitExec(['branch', '-D', tempBranch], { cwd: absRepoPath }); } catch { /* not created or already gone */ }
+    };
+
+    /** Returns true when git says we're mid-rebase (rebase-merge or
+     *  rebase-apply state exists inside the worktree's git dir). Belt-
+     *  and-suspenders check after --continue: even if the previous
+     *  gitExec resolved without throwing, we want to be sure the rebase
+     *  actually finished before we push. */
+    const isMidRebase = async (): Promise<boolean> => {
+      try {
+        const merge = (await gitExec(['rev-parse', '--git-path', 'rebase-merge'], { cwd: worktreePath })).trim();
+        const apply = (await gitExec(['rev-parse', '--git-path', 'rebase-apply'], { cwd: worktreePath })).trim();
+        return existsSync(resolvePath(worktreePath, merge)) || existsSync(resolvePath(worktreePath, apply));
+      } catch { return false; }
+    };
+
+    try {
+      // 1) Get the latest refs.
+      await gitExec(['fetch', 'origin', baseRef, headRef], { cwd: absRepoPath });
+
+      // 2) Worktree pinned at origin/<headRef>. Ephemeral branch name
+      // (never the PR's own branch — the PR branch may be checked out
+      // elsewhere in the user's setup).
+      await gitExec(['worktree', 'add', '-B', tempBranch, worktreePath, remoteHead], { cwd: absRepoPath });
+
+      // 3) Start the rebase. `-c core.editor=true` (i.e. /usr/bin/true)
+      // silently accepts any commit-message editor prompt git tries to
+      // open during --continue / --edit-todo — headless mode must never
+      // block on stdin.
+      const REBASE = ['-c', 'core.editor=true', '-c', 'sequence.editor=true', 'rebase'];
+      let rebaseComplete = false;
+      try {
+        await gitExec([...REBASE, remoteBase], { cwd: worktreePath });
+        rebaseComplete = true;
+      } catch (e) {
+        if (!(e instanceof GitCliError)) throw e;
+        // Non-zero exit is expected on conflict — we'll handle below.
+      }
+
+      let stepsResolved = 0;
+      let stepIdx = 0;
+      while (!rebaseComplete && stepIdx < MAX_STEPS) {
+        stepIdx++;
+
+        const conflictListRaw = (await gitExec(['diff', '--name-only', '--diff-filter=U'], { cwd: worktreePath })).trim();
+        const conflictFiles = conflictListRaw.split('\n').map((s) => s.trim()).filter(Boolean);
+        if (conflictFiles.length === 0) {
+          // Rebase is paused but no conflict files — could be an empty
+          // commit prompt, a --edit-todo pause, or state we don't know
+          // how to unblock in headless mode. Fail loud rather than
+          // guessing.
+          if (await isMidRebase()) {
+            reply.code(409).send({
+              code: 'REBASE_STUCK',
+              message: 'Rebase paused with no conflict files — the branch may contain empty / already-applied commits that need manual handling.',
+              stepsResolved,
+            });
+            return;
+          }
+          rebaseComplete = true;
+          break;
+        }
+
+        // Snapshot which commit git stopped at, so Claude has context on
+        // what it's resolving. Falls back gracefully — if git can't
+        // resolve REBASE_HEAD we just skip the label.
+        let currentPatchSubject = '';
+        try {
+          currentPatchSubject = (await gitExec(['log', '-1', '--format=%h %s', 'REBASE_HEAD'], { cwd: worktreePath })).trim();
+        } catch { /* ignore */ }
+
+        // Pre-Claude hash snapshot — same safety logic as resolve-conflicts.
+        const conflictSet = new Set(conflictFiles);
+        const statusOutPre = await gitExec(['status', '--porcelain', '-z'], { cwd: worktreePath });
+        const stepStatusPaths = new Set<string>(
+          statusOutPre.split('\0').filter(Boolean).map((r) => r.slice(3)),
+        );
+        const hashFile = (rel: string): string | null => {
+          const abs = resolvePath(worktreePath, rel);
+          if (!existsSync(abs)) return null;
+          try { return createHash('sha256').update(readFileSync(abs)).digest('hex'); }
+          catch { return null; }
+        };
+        const preHashes = new Map<string, string | null>();
+        for (const p of stepStatusPaths) preHashes.set(p, hashFile(p));
+
+        // Same tight prompt style as the merge-conflict route — the user
+        // explicitly asked for this framing because rebasing is
+        // error-prone for the model when given room to improvise.
+        const prompt = [
+          `You are resolving git REBASE conflicts in a local checkout of ${params.owner}/${params.repo}`,
+          `for PR #${params.number} ("${meta.title}") by @${meta.authorLogin ?? 'unknown'}.`,
+          '',
+          `The repo lives at ${worktreePath} and is your CWD.`,
+          '',
+          `IMPORTANT: We are REBASING ${headRef} onto origin/${baseRef}.`,
+          'Each PR commit is being replayed on top of base. The rebase paused',
+          `at commit${currentPatchSubject ? ' ' + currentPatchSubject : ` #${stepIdx}`} because of conflicts.`,
+          '',
+          'Conflict-marker orientation for a REBASE:',
+          '  <<<<<<< HEAD                    → the rebased-so-far state (base + earlier replayed commits)',
+          '  =======',
+          '  >>>>>>> <replayed commit>       → the CURRENT PR COMMIT being replayed',
+          '',
+          "This is the OPPOSITE of a merge: HEAD is now the base side, and the incoming",
+          "side is the PR's own commit. Prefer keeping the PR commit's intent intact",
+          'while adapting to the base-side changes that landed since the branch forked.',
+          '',
+          'The following files have conflict markers:',
+          '',
+          ...conflictFiles.map((f) => `  - ${f}`),
+          '',
+          'Your task:',
+          '1. Open each file and resolve every conflict marker.',
+          '2. Combine both sides so each intent is preserved.',
+          `3. Do NOT modify any file not in the list above. Do NOT create or delete files.`,
+          '   Do NOT run any commands — no git, no shell. Use only Read and Edit.',
+          '4. Do NOT run `git rebase --continue`, `git add`, or any git command. A',
+          '   subsequent step will do that after verifying your resolution.',
+          '5. When you are done, briefly summarise how you resolved each file.',
+          '   Do not propose follow-up changes.',
+          '',
+          'Verification will reject the resolution if any conflict markers remain, or if',
+          'any file outside the conflict list changes hash.',
+        ].join('\n');
+
+        try {
+          await claudeExec(prompt, {
+            cwd: worktreePath,
+            allowedTools: ['Read', 'Edit'],
+            permissionMode: 'acceptEdits',
+            timeoutMs: 15 * 60_000,
+          });
+        } catch (e) {
+          if (e instanceof ClaudeCliError) {
+            const status = e.code === 'CLAUDE_NOT_INSTALLED' ? 502 : e.code === 'TIMEOUT' ? 504 : 500;
+            reply.code(status).send({ code: e.code, message: e.message, stderr: e.stderr, stepsResolved });
+            return;
+          }
+          throw e;
+        }
+
+        // Safety check #1 — markers gone.
+        const markerOffenders: string[] = [];
+        for (const rel of conflictFiles) {
+          const abs = resolvePath(worktreePath, rel);
+          if (!existsSync(abs)) { markerOffenders.push(`${rel} (deleted by Claude)`); continue; }
+          const content = readFileSync(abs, 'utf8');
+          if (content.includes('<<<<<<<') || content.includes('=======\n') || content.includes('>>>>>>>')) {
+            markerOffenders.push(rel);
+          }
+        }
+        if (markerOffenders.length > 0) {
+          reply.code(409).send({
+            code: 'LEFTOVER_MARKERS',
+            message: `Conflict markers remain in ${markerOffenders.length} file(s) at rebase step ${stepIdx}.`,
+            files: markerOffenders,
+            stepsResolved,
+          });
+          return;
+        }
+
+        // Safety check #2 — no drift outside the conflict set.
+        const overcommit: string[] = [];
+        for (const [path, preHash] of preHashes) {
+          if (conflictSet.has(path)) continue;
+          const postHash = hashFile(path);
+          if (postHash !== preHash) overcommit.push(path);
+        }
+        const statusOutPost = await gitExec(['status', '--porcelain', '-z'], { cwd: worktreePath });
+        for (const record of statusOutPost.split('\0').filter(Boolean)) {
+          const path = record.slice(3);
+          if (conflictSet.has(path)) continue;
+          if (stepStatusPaths.has(path)) continue;
+          overcommit.push(path);
+        }
+        if (overcommit.length > 0) {
+          reply.code(409).send({
+            code: 'OVERCOMMIT_DETECTED',
+            message: `Claude modified ${overcommit.length} file(s) outside the conflict set at rebase step ${stepIdx}.`,
+            files: overcommit,
+            stepsResolved,
+          });
+          return;
+        }
+
+        // Stage the resolutions and continue the rebase.
+        await gitExec(['add', '--', ...conflictFiles], { cwd: worktreePath });
+        try {
+          await gitExec([...REBASE, '--continue'], { cwd: worktreePath });
+          // If --continue succeeds but rebase is still in progress, more
+          // commits are queued — the outer loop iterates.
+          if (!(await isMidRebase())) rebaseComplete = true;
+        } catch (e) {
+          if (!(e instanceof GitCliError)) throw e;
+          // Next commit conflicts — outer loop resolves it.
+        }
+        stepsResolved++;
+      }
+
+      if (!rebaseComplete) {
+        reply.code(409).send({
+          code: 'REBASE_TOO_LONG',
+          message: `Rebase paused for conflicts more than ${MAX_STEPS} times; aborting so it can be finished manually.`,
+          stepsResolved,
+        });
+        return;
+      }
+
+      // Final safety: verify HEAD is now a linear descendant of origin/<base>.
+      // git rebase would normally guarantee this, but a partial state (aborted
+      // mid-flight then --continue on a fresh conflict-free step) could still
+      // leave us in a weird spot; better to fail loud than push a bad ref.
+      try {
+        await gitExec(['merge-base', '--is-ancestor', remoteBase, 'HEAD'], { cwd: worktreePath });
+      } catch {
+        reply.code(409).send({
+          code: 'REBASE_MISSHAPED',
+          message: `After rebase, HEAD is not a descendant of origin/${baseRef}; aborting.`,
+          stepsResolved,
+        });
+        return;
+      }
+
+      // Push. `--force-with-lease` because rebase rewrites history — a
+      // plain `--force` would blow over any concurrent push to the PR
+      // branch. The lease means: only overwrite if the remote still
+      // matches what we fetched at the start.
+      try {
+        await gitExec(['push', '--force-with-lease', '--no-verify', 'origin', `HEAD:${headRef}`], { cwd: worktreePath });
+      } catch (e) {
+        const stderr = e instanceof GitCliError ? e.stderr : (e as Error).message;
+        reply.code(502).send({ code: 'PUSH_FAILED', message: `git push failed: ${stderr.trim()}`, stderr, stepsResolved });
+        return;
+      }
+
+      metaCache.delete(metaKey(params));
+      const commitSha = (await gitExec(['rev-parse', 'HEAD'], { cwd: worktreePath })).trim();
+      reply.send({ ok: true, commitSha, stepsResolved, trivial: stepsResolved === 0 });
+    } catch (e) {
+      if (e instanceof GitCliError) {
+        reply.code(502).send({ code: 'REBASE_FAILED', message: e.message, stderr: e.stderr });
+        return;
+      }
+      throw e;
+    } finally {
+      await cleanup();
+    }
+  });
+
   // Ask AI to fix the PR's failing CI builds locally and push the
   // result. Mirrors the resolve-conflicts route's pattern: throwaway
   // worktree, safety-bounded prompt, --no-verify commit + push. Different

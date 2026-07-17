@@ -208,6 +208,24 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
+  /** Rebase the PR's head onto its base, letting Claude resolve any
+   *  conflicts that come up along the way. Same tight safety envelope as
+   *  resolveConflicts (throwaway worktree, Read/Edit-only, marker +
+   *  overcommit checks per rebase step) but multi-step: a rebase can
+   *  pause on any conflicting commit. Returns `stepsResolved` so the UI
+   *  can show how many rounds it took (0 = trivial no-conflict rebase). */
+  rebase(
+    owner: string,
+    repo: string,
+    number: number,
+    body: { repoPath: string },
+  ): Promise<{ ok: true; commitSha: string; stepsResolved: number; trivial: boolean }> {
+    return call(`/api/pulls/${owner}/${repo}/${number}/rebase`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
   /** Equivalent to GitHub's "Update branch" button — server hits
    *  `gh api -X PUT repos/.../pulls/N/update-branch`. Merges the PR's
    *  base branch into its head; CI re-runs on the up-to-date branch.

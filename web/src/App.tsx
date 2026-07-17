@@ -214,6 +214,10 @@ export function App() {
   const conflictResolutions = useConflictResolutions();
   // Same idea for the "Fix failing CI" flow — its own localStorage bucket.
   const ciFixes = useCiFixes();
+  // Rebase is short-lived and drawer-only, so we don't need a persistent
+  // hook for it — an in-memory Set of PR keys is enough to drive the
+  // button's loading state.
+  const [rebasesRunning, setRebasesRunning] = useState<Set<string>>(new Set());
   const workflowRuns = useWorkflowRuns();
   const userWorkflows = useUserWorkflows();
   const [workflowsManagerOpen, setWorkflowsManagerOpen] = useState(false);
@@ -671,6 +675,47 @@ export function App() {
       addToast('error', `Conflict resolution failed for ${prRef}: ${err.message ?? 'unknown error'}`);
     }
   }, [addToast, conflictResolutions, handleMetaLoaded]);
+
+  /** Rebase the PR onto its base branch, letting Claude resolve any
+   *  conflict rounds under the same tight guidance the resolve-conflicts
+   *  flow uses. In-memory running set drives the footer button's spinner
+   *  state; toasts carry the terminal result. */
+  const rebase = useCallback(async (id: Identity) => {
+    const repoPath = APP_CONFIG.localRepos?.[id.repo];
+    if (!repoPath) {
+      addToast('error', `Configure localRepos["${id.repo}"] in config.local.ts to rebase`);
+      return;
+    }
+    const key = `${id.owner}/${id.repo}#${id.number}`;
+    setRebasesRunning((cur) => {
+      if (cur.has(key)) return cur; // concurrent click; already running
+      const next = new Set(cur);
+      next.add(key);
+      return next;
+    });
+    try {
+      const result = await api.rebase(id.owner, id.repo, id.number, { repoPath });
+      const roundsMsg = result.trivial
+        ? 'trivial (no conflicts)'
+        : `${result.stepsResolved} conflict round${result.stepsResolved === 1 ? '' : 's'}`;
+      addToast('success', `Rebased ${key} — ${roundsMsg}, pushed ${result.commitSha.slice(0, 8)}`);
+      // Refresh meta so hasConflicts + headSha update on the row + drawer.
+      try {
+        const fresh = await api.getPullRequest(id.owner, id.repo, id.number, { fresh: true });
+        handleMetaLoaded(id, fresh);
+      } catch { /* best-effort; auto-refresh will pick it up */ }
+    } catch (e) {
+      const err = e as ApiCallError & { code?: string };
+      addToast('error', `Rebase failed for ${key}: ${err.message ?? 'unknown error'}`);
+    } finally {
+      setRebasesRunning((cur) => {
+        if (!cur.has(key)) return cur;
+        const next = new Set(cur);
+        next.delete(key);
+        return next;
+      });
+    }
+  }, [addToast, handleMetaLoaded]);
 
   /** Fire the server-side fix-CI flow and patch list state on success. The
    * server installs deps + runs Claude in a worktree with broader tools
@@ -1477,6 +1522,8 @@ export function App() {
             ciFix={ciFixes.stateFor(current)}
             onFixCi={() => fixCi(current)}
             onDismissCiFix={() => ciFixes.dismiss(current)}
+            onRebase={() => rebase(current)}
+            rebaseRunning={rebasesRunning.has(`${current.owner}/${current.repo}#${current.number}`)}
             onOpenCiChecks={() => setCiChecksTarget({ owner: current.owner, repo: current.repo, number: current.number })}
             workflowRun={workflowRuns.latestForPR(current)}
             workflowLabelOf={(workflowId) => mergedWorkflows.find((w) => w.id === workflowId)?.label ?? workflowId}

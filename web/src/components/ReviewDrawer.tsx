@@ -124,6 +124,13 @@ interface Props {
   onFixCi: () => void;
   /** Clear the stored CI-fix entry. */
   onDismissCiFix: () => void;
+  /** Rebase this PR onto its base branch. Runs the deterministic rebase
+   *  route, letting Claude resolve any conflict rounds under strict
+   *  guidance. Rendered as a footer button; parent controls whether the
+   *  handler is wired at all (missing for local-branch entries). */
+  onRebase?: () => void;
+  /** True while the rebase is running — drives the footer button spinner. */
+  rebaseRunning?: boolean;
   /** Click handler for the CI badge in the drawer header — opens the
    * per-check breakdown drawer. */
   onOpenCiChecks?: () => void;
@@ -147,6 +154,7 @@ export function ReviewDrawer(props: Props) {
     localAIThreads, onAskInlineAIForLine, onDismissLocalAIThread,
     conflictResolution, onResolveConflicts, onDismissConflictResolution,
     ciFix, onFixCi, onDismissCiFix,
+    onRebase, rebaseRunning,
     reloadNonce,
     onOpenCiChecks,
     workflowRun, workflowLabelOf, onDismissWorkflowRun,
@@ -642,6 +650,8 @@ export function ReviewDrawer(props: Props) {
           })()}
           ciFixRunning={ciFix?.kind === 'running'}
           failingCheckCount={(meta.ciContexts ?? []).filter((c) => c.isFailure).length}
+          onRebase={onRebase}
+          rebaseRunning={!!rebaseRunning}
           onAskAI={() => {
             // Drain the summary textarea into the chat as the next user turn,
             // then clear it so the box is free for an actual review summary.

@@ -161,6 +161,12 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .btn-fix-ci { border: 1px solid #d29922 !important; color: #d29922 !important; background: transparent !important; }
 .btn-fix-ci:hover:not(:disabled) { background: rgba(210, 153, 34, 0.12) !important; }
 .btn-fix-ci:disabled { opacity: 0.7; cursor: progress; }
+/* Rebase button — teal outline to differentiate from Approve (green),
+ * Ask AI (accent blue), Fix CI (amber). Sits in the review footer next
+ * to Fix CI. */
+.btn-rebase { border: 1px solid #58a6ff !important; color: #58a6ff !important; background: transparent !important; }
+.btn-rebase:hover:not(:disabled) { background: rgba(88, 166, 255, 0.12) !important; }
+.btn-rebase:disabled { opacity: 0.7; cursor: progress; }
 
 /* Inline local Claude thread — rendered on the diff, anchored to a line range.
  * Persisted per (PR, anchor), never sent to GitHub. Multi-turn.

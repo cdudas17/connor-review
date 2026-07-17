@@ -43,15 +43,15 @@ describe('ReviewFooter', () => {
     expect(onSummary).toHaveBeenLastCalledWith('lgtm');
   });
 
-  it('calls onSubmit with APPROVE / REQUEST_CHANGES / COMMENT', async () => {
+  it('calls onSubmit with APPROVE / COMMENT (Request changes intentionally removed)', async () => {
     const onSubmit = vi.fn();
     render(<Harness onSubmit={onSubmit} />);
     await userEvent.click(screen.getByRole('button', { name: /approve/i }));
     expect(onSubmit).toHaveBeenLastCalledWith('APPROVE');
-    await userEvent.click(screen.getByRole('button', { name: /request changes/i }));
-    expect(onSubmit).toHaveBeenLastCalledWith('REQUEST_CHANGES');
     await userEvent.click(screen.getByRole('button', { name: /^comment$/i }));
     expect(onSubmit).toHaveBeenLastCalledWith('COMMENT');
+    // Request changes should no longer render.
+    expect(screen.queryByRole('button', { name: /request changes/i })).toBeNull();
   });
 
   it('disables submit buttons when canSubmit is false', () => {

@@ -47,6 +47,11 @@ interface Props {
   ciFixRunning?: boolean;
   /** Number of failing checks (drives the tooltip text). */
   failingCheckCount?: number;
+  /** Fire the rebase-onto-base flow. Rendered when the parent has a
+   *  local repo path configured (rebase runs against a checkout). */
+  onRebase?: () => void;
+  /** When true, the Rebase button shows its loading state. */
+  rebaseRunning?: boolean;
   /** Close the PR on GitHub without merging. Footer renders a destructive-
    * styled button when provided; the parent gates with a confirm prompt. */
   onClosePR?: () => Promise<void>;
@@ -68,8 +73,8 @@ function ChevronRightIcon() {
 }
 
 /** Stripped-down footer for local-branch entries: just "Reviewed" + prev/next nav,
- * no review-publish surface (Approve / Comment / Request changes / Mark ready), since
- * there's no GitHub PR to publish against. */
+ * no review-publish surface (Approve / Comment / Mark ready), since there's
+ * no GitHub PR to publish against. */
 export function LocalReviewFooter({
   onReviewed, onPrev, onNextPR, canReviewed, canPrev, canNextPR,
 }: {
@@ -103,6 +108,7 @@ export function ReviewFooter({
   onAskAI, aiChatLoading, onToggleAutoMerge, autoMergeEnabled, mergeQueueQueued,
   commentsVisible, onToggleComments,
   onFixCi, ciFixRunning, failingCheckCount,
+  onRebase, rebaseRunning,
   onClosePR,
 }: Props) {
   const [markingReady, setMarkingReady] = useState(false);
@@ -120,7 +126,6 @@ export function ReviewFooter({
       />
       <div className="review-footer-actions">
         <button type="button" className="btn-primary" disabled={!canSubmit} onClick={() => onSubmit('APPROVE')}>Approve</button>
-        <button type="button" disabled={!canSubmit} onClick={() => onSubmit('REQUEST_CHANGES')}>Request changes</button>
         <button type="button" disabled={!canSubmit} onClick={() => onSubmit('COMMENT')}>Comment</button>
         {onAskAI && (
           <button
@@ -142,6 +147,17 @@ export function ReviewFooter({
             title={`Spin up a worktree, install deps, and ask Claude to fix the ${failingCheckCount ?? ''} failing CI check${failingCheckCount === 1 ? '' : 's'} on this PR`}
           >
             {ciFixRunning ? 'Fixing CI…' : `Fix CI${failingCheckCount ? ` (${failingCheckCount})` : ''}`}
+          </button>
+        )}
+        {onRebase && (
+          <button
+            type="button"
+            className="btn-rebase"
+            disabled={!!rebaseRunning}
+            onClick={onRebase}
+            title="Rebase this PR onto its base branch. Runs in a throwaway worktree; Claude resolves any conflict markers under the same strict guidance the merge-conflict flow uses. Force-pushes with lease when done."
+          >
+            {rebaseRunning ? 'Rebasing…' : 'Rebase'}
           </button>
         )}
         <button type="button" disabled={!canReviewed} onClick={onReviewed}>Reviewed</button>
