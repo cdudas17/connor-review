@@ -8,14 +8,14 @@ import type { CalendarEvent } from '../types.js';
  * Meeting FAB. We never write anything back to Google — this is
  * app-local visibility filtering only.
  *
- * Hide keys use the event's title when it has one, so a recurring
- * hold like "Focus time" is hidden across every occurrence with one
- * click. Untitled blocks (Gusto free/busy-only view) fall back to the
- * per-occurrence id.
+ * Hide keys are per-occurrence (id-based). An earlier version keyed by
+ * title so a recurring "Focus time" collapsed to one click, but under
+ * Gusto's free/busy-only sharing every event carries the same generic
+ * title (e.g. "Busy"), which meant one hide-click wiped the whole day.
+ * Per-occurrence hiding is safe — the user re-hides new occurrences,
+ * but that's a click per week, not a footgun.
  */
 export function hideKeyOf(event: CalendarEvent): string {
-  const title = event.title?.trim();
-  if (title && title !== '(no title)') return `title:${title}`;
   return `id:${event.id}`;
 }
 
