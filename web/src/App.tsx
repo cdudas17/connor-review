@@ -1291,24 +1291,6 @@ export function App() {
         const showIframeMode = !!iframeUrl && calendarView === 'iframe';
         return (
           <section className="calendar-tab" style={tab === 'calendar' ? undefined : { display: 'none' }}>
-            {iframeUrl && (
-              <div className="calendar-view-toggle" role="tablist" aria-label="Calendar view">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={calendarView === 'agenda'}
-                  className={calendarView === 'agenda' ? 'calendar-view-toggle-on' : ''}
-                  onClick={() => setCalendarView('agenda')}
-                >Agenda</button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={calendarView === 'iframe'}
-                  className={calendarView === 'iframe' ? 'calendar-view-toggle-on' : ''}
-                  onClick={() => setCalendarView('iframe')}
-                >Embed</button>
-              </div>
-            )}
             {showIframeMode ? (
               // Iframe mode bypasses the gcalcli needs-setup / unknown panels
               // entirely — the embed doesn't depend on the local CLI. The
@@ -1362,6 +1344,27 @@ export function App() {
                   <p className="empty"><span className="loading-spinner" aria-hidden="true" /> Checking calendar connection…</p>
                 )}
               </>
+            )}
+            {iframeUrl && (
+              // Toggle lives below the calendar body — the user rarely flips
+              // back to the Agenda view, so hiding it below the fold keeps
+              // the primary surface (iframe) uncluttered on load.
+              <div className="calendar-view-toggle calendar-view-toggle-below" role="tablist" aria-label="Calendar view">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={calendarView === 'agenda'}
+                  className={calendarView === 'agenda' ? 'calendar-view-toggle-on' : ''}
+                  onClick={() => setCalendarView('agenda')}
+                >Agenda</button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={calendarView === 'iframe'}
+                  className={calendarView === 'iframe' ? 'calendar-view-toggle-on' : ''}
+                  onClick={() => setCalendarView('iframe')}
+                >Embed</button>
+              </div>
             )}
           </section>
         );

@@ -704,6 +704,9 @@ a.issue-comment-when:hover { text-decoration: underline; }
  * is configured. Same visual weight as .oncall-external-links pills so it
  * blends into the tab header. */
 .calendar-view-toggle { display: inline-flex; gap: 0; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+/* When the toggle sits below the calendar body, drop the bottom-margin
+ * and push it to the top instead — same visual balance flipped. */
+.calendar-view-toggle-below { margin-bottom: 0; margin-top: 12px; }
 .calendar-view-toggle button { padding: 4px 12px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: 0.85rem; }
 .calendar-view-toggle button + button { border-left: 1px solid var(--border); }
 .calendar-view-toggle button:hover:not(.calendar-view-toggle-on) { background: var(--bg-subtle); color: var(--fg); }
