@@ -18,9 +18,9 @@ import { api } from '../lib/api.js';
 import { EmojiTextarea } from './EmojiTextarea.js';
 import { Avatar } from './Avatar.js';
 import type { ReviewThread, StagedInlineComment } from '../types.js';
-import { ClaudeResponseCard, type ClaudeResponseState } from './ClaudeResponseCard.js';
-import { LocalClaudeThread } from './LocalClaudeThread.js';
-import type { ClaudeChat, LocalThreadAnchor } from '../hooks/useClaudeResponses.js';
+import { AIResponseCard, type AIResponseState } from './AIResponseCard.js';
+import { LocalAIThread } from './LocalAIThread.js';
+import type { AIChat, LocalThreadAnchor } from '../hooks/useAIResponses.js';
 
 export interface DiffViewerProps {
   diff: string;
@@ -42,23 +42,23 @@ export interface DiffViewerProps {
   onReply: (threadId: string, body: string) => Promise<void>;
   /** When false, the gutter-drag inline composer is disabled (e.g. local-branch entries with nowhere to post). Defaults to true. */
   commentsEnabled?: boolean;
-  /** When provided, the inline composer renders an "Ask Claude" button next to
+  /** When provided, the inline composer renders an "Ask AI" button next to
    * Comment / Add to review. Clicking it creates (or appends to) a *local*
    * Claude thread anchored to the selected line range. The composer closes;
    * the thread persists, renders inline on the diff, and supports follow-ups. */
   onAskInlineClaude?: (anchor: LocalThreadAnchor, draft: string) => void;
   /** All local Claude threads on this PR. DiffViewer anchors them to their
    * (path, line, side) on top of the diff. */
-  localClaudeThreads?: Array<ClaudeChat & { anchor: LocalThreadAnchor; key: string }>;
+  localAIThreads?: Array<AIChat & { anchor: LocalThreadAnchor; key: string }>;
   /** Continue an existing local thread (follow-up turn). */
   onAskLocalThread?: (anchor: LocalThreadAnchor, draft: string) => void;
   /** Drop a local thread (the × button on the card). */
   onDismissLocalThread?: (anchor: LocalThreadAnchor) => void;
   /** Per-thread Claude state lookup. Owned at App level + persisted; used by InlineThreadCard. */
-  threadClaudeStateFor?: (threadId: string) => ClaudeResponseState | null;
-  /** Ask Claude for an InlineThreadCard reply. App-owned handler — survives drawer close. */
-  onAskThreadClaude?: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
-  onDismissThreadClaude?: (threadId: string) => void;
+  threadAiStateFor?: (threadId: string) => AIResponseState | null;
+  /** Ask AI for an InlineThreadCard reply. App-owned handler — survives drawer close. */
+  onAskThreadAI?: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
+  onDismissThreadAI?: (threadId: string) => void;
 }
 
 type ChangeTone = 'add' | 'del' | 'normal';
@@ -87,13 +87,13 @@ interface InlineThreadCardProps {
   onReply: (threadId: string, body: string) => Promise<void>;
   setReplyBusy: (b: boolean) => void;
   /** Per-thread Claude state (owned at App level, persisted across drawer close). */
-  claudeState: ClaudeResponseState | null;
-  /** Ask Claude for a specific thread reply — App's handler will toast if drawer is closed. */
-  onAskClaude?: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
-  onDismissClaude?: (threadId: string) => void;
+  aiState: AIResponseState | null;
+  /** Ask AI for a specific thread reply — App's handler will toast if drawer is closed. */
+  onAskAI?: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
+  onDismissAI?: (threadId: string) => void;
 }
 
-function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, setReplyBusy, onReply, claudeState, onAskClaude, onDismissClaude }: InlineThreadCardProps) {
+function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, setReplyBusy, onReply, aiState, onAskAI, onDismissAI }: InlineThreadCardProps) {
   const [open, setOpen] = useState(true);
   const t = thread;
   const summaryAuthor = t.comments[0]?.authorLogin ?? '?';
@@ -113,9 +113,9 @@ function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, 
   const shownCommenters = commenters.slice(0, MAX_AVATARS);
   const overflow = commenters.length - shownCommenters.length;
   const replyDraft = replyState?.threadId === t.id ? replyState.body.trim() : '';
-  const askClaude = () => {
-    if (!onAskClaude || !replyDraft) return;
-    onAskClaude(t.id, replyDraft, {
+  const askAI = () => {
+    if (!onAskAI || !replyDraft) return;
+    onAskAI(t.id, replyDraft, {
       path: t.path,
       endLine: t.line ?? 0,
       startLine: t.startLine ?? undefined,
@@ -168,9 +168,9 @@ function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, 
               value={replyState?.threadId === t.id ? replyState.body : ''}
               onChange={(e) => setReplyState({ threadId: t.id, body: e.target.value })}
             />
-            <ClaudeResponseCard
-              state={claudeState}
-              onDismiss={onDismissClaude ? () => onDismissClaude(t.id) : undefined}
+            <AIResponseCard
+              state={aiState}
+              onDismiss={onDismissAI ? () => onDismissAI(t.id) : undefined}
             />
             <div className="thread-reply-actions">
               <button
@@ -185,15 +185,15 @@ function InlineThreadCard({ thread, tone, replyState, setReplyState, replyBusy, 
                   } finally { setReplyBusy(false); }
                 }}
               >Reply</button>
-              {onAskClaude && (
+              {onAskAI && (
                 <button
                   type="button"
-                  className="btn-ask-claude"
-                  disabled={!replyDraft || claudeState?.loading}
-                  onClick={askClaude}
+                  className="btn-ask-ai"
+                  disabled={!replyDraft || aiState?.loading}
+                  onClick={askAI}
                   title="Send your draft reply + this thread's line range to your local `claude` CLI"
                 >
-                  {claudeState?.loading ? 'Asking…' : 'Ask Claude'}
+                  {aiState?.loading ? 'Asking…' : 'Ask AI'}
                 </button>
               )}
             </div>
@@ -279,20 +279,20 @@ function DiffFile({
   onReply,
   commentsEnabled = true,
   onAskInlineClaude,
-  localClaudeThreads,
+  localAIThreads,
   onAskLocalThread,
   onDismissLocalThread,
-  threadClaudeStateFor,
-  onAskThreadClaude,
-  onDismissThreadClaude,
+  threadAiStateFor,
+  onAskThreadAI,
+  onDismissThreadAI,
 }: {
   onAskInlineClaude?: (anchor: LocalThreadAnchor, draft: string) => void;
-  localClaudeThreads?: Array<ClaudeChat & { anchor: LocalThreadAnchor; key: string }>;
+  localAIThreads?: Array<AIChat & { anchor: LocalThreadAnchor; key: string }>;
   onAskLocalThread?: (anchor: LocalThreadAnchor, draft: string) => void;
   onDismissLocalThread?: (anchor: LocalThreadAnchor) => void;
-  threadClaudeStateFor?: (threadId: string) => ClaudeResponseState | null;
-  onAskThreadClaude?: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
-  onDismissThreadClaude?: (threadId: string) => void;
+  threadAiStateFor?: (threadId: string) => AIResponseState | null;
+  onAskThreadAI?: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
+  onDismissThreadAI?: (threadId: string) => void;
   file: FileData;
   threads: ReviewThread[];
   hasPendingReview: boolean;
@@ -488,15 +488,15 @@ function DiffFile({
    * line moved in a later commit) is filtered out — the thread still lives in
    * state, it just won't render here until the diff returns to that anchor. */
   const localThreadsByAnchor = useMemo(() => {
-    const byKey: Record<string, Array<ClaudeChat & { anchor: LocalThreadAnchor; key: string }>> = {};
-    for (const lt of (localClaudeThreads ?? []).filter((t) => t.anchor.path === path)) {
+    const byKey: Record<string, Array<AIChat & { anchor: LocalThreadAnchor; key: string }>> = {};
+    for (const lt of (localAIThreads ?? []).filter((t) => t.anchor.path === path)) {
       const anchor = anchors.find((a) => a.line === lt.anchor.line && a.side === lt.anchor.side)
         ?? anchors.find((a) => a.line === lt.anchor.line);
       if (!anchor) continue;
       (byKey[anchor.changeKey] ||= []).push(lt);
     }
     return byKey;
-  }, [localClaudeThreads, anchors, path]);
+  }, [localAIThreads, anchors, path]);
 
   // Pick a tone (add/del/normal) for each anchor based on the change type, used to
   // tint the thread card background to match the diff row underneath.
@@ -537,13 +537,13 @@ function DiffFile({
             replyBusy={replyBusy}
             setReplyBusy={setReplyBusy}
             onReply={onReply}
-            claudeState={threadClaudeStateFor?.(t.id) ?? null}
-            onAskClaude={onAskThreadClaude}
-            onDismissClaude={onDismissThreadClaude}
+            aiState={threadAiStateFor?.(t.id) ?? null}
+            onAskAI={onAskThreadAI}
+            onDismissAI={onDismissThreadAI}
           />
         ))}
         {locals.map((lt) => (
-          <LocalClaudeThread
+          <LocalAIThread
             key={lt.key}
             chat={lt}
             anchor={lt.anchor}
@@ -578,12 +578,12 @@ function DiffFile({
             {onAskInlineClaude && (
               <button
                 type="button"
-                className="btn-ask-claude"
+                className="btn-ask-ai"
                 disabled={busy || editorBody.trim() === ''}
                 onClick={askEditorClaude}
                 title="Post this as a local-only Claude thread on these lines (not sent to GitHub)"
               >
-                Ask Claude
+                Ask AI
               </button>
             )}
           </div>
@@ -702,7 +702,7 @@ function makePseudoChangeForSide(_t: ReviewThread): ChangeData {
   return { type: 'insert', content: '', lineNumber: 0, isInsert: true } as unknown as ChangeData;
 }
 
-export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, onViewedChange, onCommitComment, onAddToReview, onReply, commentsEnabled = true, onAskInlineClaude, localClaudeThreads, onAskLocalThread, onDismissLocalThread, threadClaudeStateFor, onAskThreadClaude, onDismissThreadClaude }: DiffViewerProps) {
+export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, onViewedChange, onCommitComment, onAddToReview, onReply, commentsEnabled = true, onAskInlineClaude, localAIThreads, onAskLocalThread, onDismissLocalThread, threadAiStateFor, onAskThreadAI, onDismissThreadAI }: DiffViewerProps) {
   const files = useMemo(() => parseDiff(diff), [diff]);
 
   if (files.length === 0) {
@@ -727,12 +727,12 @@ export function DiffViewer({ diff, threads, hasPendingReview, pr, viewedPaths, o
             onReply={onReply}
             commentsEnabled={commentsEnabled}
             onAskInlineClaude={onAskInlineClaude}
-            localClaudeThreads={localClaudeThreads}
+            localAIThreads={localAIThreads}
             onAskLocalThread={onAskLocalThread}
             onDismissLocalThread={onDismissLocalThread}
-            threadClaudeStateFor={threadClaudeStateFor}
-            onAskThreadClaude={onAskThreadClaude}
-            onDismissThreadClaude={onDismissThreadClaude}
+            threadAiStateFor={threadAiStateFor}
+            onAskThreadAI={onAskThreadAI}
+            onDismissThreadAI={onDismissThreadAI}
           />
         );
       })}

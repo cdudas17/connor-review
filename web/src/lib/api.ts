@@ -123,22 +123,25 @@ export const api = {
   disableAutoMerge(owner: string, repo: string, number: number): Promise<{ autoMergeRequest: null }> {
     return call(`/api/pulls/${owner}/${repo}/${number}/auto-merge`, { method: 'DELETE' });
   },
-  /** Bounce the user's draft comment off the local `claude` CLI for feedback. Never posts to GitHub. */
-  askClaude(
+  /** Bounce the user's draft off the review-chat AI backend (currently
+   *  Codex) for feedback. Never posts to GitHub. */
+  askAI(
     owner: string,
     repo: string,
     number: number,
     body: {
       draft: string;
       lineRange?: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' };
-      /** Prior turns so Claude has chat context on follow-ups. */
-      conversation?: Array<{ role: 'user' | 'claude'; body: string }>;
-      /** Local checkout path for the repo under review — `claude -p` runs with
-       * this as its cwd so it can grep the actual codebase. */
+      /** Prior turns so the model has chat context on follow-ups. 'claude'
+       *  is accepted as a legacy alias for 'ai' — old persisted chats
+       *  still carry that role tag. */
+      conversation?: Array<{ role: 'user' | 'ai' | 'claude'; body: string }>;
+      /** Local checkout path for the repo under review — the CLI runs with
+       *  this as its cwd so it can grep the actual codebase. */
       repoPath?: string;
     },
   ): Promise<{ response: string; truncatedDiff?: boolean }> {
-    return call(`/api/pulls/${owner}/${repo}/${number}/claude/ask`, {
+    return call(`/api/pulls/${owner}/${repo}/${number}/ai/ask`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),

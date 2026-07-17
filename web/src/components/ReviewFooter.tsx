@@ -21,11 +21,11 @@ interface Props {
   finishLabel?: string | null;
   /** When provided, a "Mark ready for review" button renders alongside the other actions. */
   onMarkReady?: () => Promise<void>;
-  /** Entry point into the persistent Claude chat panel above. Drains the summary
+  /** Entry point into the persistent AI chat panel above. Drains the summary
    * textarea into the chat as the first user turn (or follow-up). */
-  onAskClaude?: () => void;
+  onAskAI?: () => void;
   /** True while the chat has an in-flight ask — disables the button to avoid double-fires. */
-  claudeChatLoading?: boolean;
+  aiChatLoading?: boolean;
   /** When provided, the footer renders a "Merge when ready" toggle (GitHub
    * auto-merge). Only shown for PRs the viewer authored / can merge. */
   onToggleAutoMerge?: () => Promise<void>;
@@ -100,7 +100,7 @@ export function LocalReviewFooter({
 export function ReviewFooter({
   summary, onSummaryChange, onSubmit, onReviewed, onPrev, onNextPR,
   canSubmit, canReviewed, canPrev, canNextPR, finishLabel, onMarkReady,
-  onAskClaude, claudeChatLoading, onToggleAutoMerge, autoMergeEnabled, mergeQueueQueued,
+  onAskAI, aiChatLoading, onToggleAutoMerge, autoMergeEnabled, mergeQueueQueued,
   commentsVisible, onToggleComments,
   onFixCi, ciFixRunning, failingCheckCount,
   onClosePR,
@@ -108,7 +108,7 @@ export function ReviewFooter({
   const [markingReady, setMarkingReady] = useState(false);
   const [togglingAutoMerge, setTogglingAutoMerge] = useState(false);
   const [closing, setClosing] = useState(false);
-  const canAskClaude = !!onAskClaude && summary.trim().length > 0 && !claudeChatLoading;
+  const canAskAI = !!onAskAI && summary.trim().length > 0 && !aiChatLoading;
   return (
     <footer className="review-footer">
       {finishLabel && <h4 className="review-footer-heading">{finishLabel}</h4>}
@@ -122,15 +122,15 @@ export function ReviewFooter({
         <button type="button" className="btn-primary" disabled={!canSubmit} onClick={() => onSubmit('APPROVE')}>Approve</button>
         <button type="button" disabled={!canSubmit} onClick={() => onSubmit('REQUEST_CHANGES')}>Request changes</button>
         <button type="button" disabled={!canSubmit} onClick={() => onSubmit('COMMENT')}>Comment</button>
-        {onAskClaude && (
+        {onAskAI && (
           <button
             type="button"
-            className="btn-ask-claude"
-            disabled={!canAskClaude}
-            onClick={onAskClaude}
-            title="Move your draft into the Claude chat panel above and ask Claude — doesn't post to GitHub"
+            className="btn-ask-ai"
+            disabled={!canAskAI}
+            onClick={onAskAI}
+            title="Move your draft into the AI chat panel above and ask the AI — doesn't post to GitHub"
           >
-            {claudeChatLoading ? 'Asking…' : 'Ask Claude'}
+            {aiChatLoading ? 'Asking…' : 'Ask AI'}
           </button>
         )}
         {onFixCi && (

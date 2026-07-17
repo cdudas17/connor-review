@@ -14,7 +14,7 @@ interface Props {
 type ActionKind = UserWorkflowStep['action'];
 
 function blankStep(action: ActionKind): UserWorkflowStep {
-  if (action === 'askClaude') return { action: 'askClaude', prompt: '' };
+  if (action === 'askAI') return { action: 'askAI', prompt: '' };
   if (action === 'fixCi') return { action: 'fixCi' };
   if (action === 'resolveConflicts') return { action: 'resolveConflicts' };
   if (action === 'resolveThreads') return { action: 'resolveThreads', authorLogin: '' };
@@ -30,7 +30,7 @@ function blankWorkflow(): UserWorkflow {
     description: '',
     tag: '',
     matchCi: 'any',
-    steps: [blankStep('askClaude')],
+    steps: [blankStep('askAI')],
     createdAt: now,
     updatedAt: now,
   };
@@ -114,14 +114,14 @@ function WorkflowEditor({ initial, existingIds, onSave, onCancel }: {
   const [description, setDescription] = useState(initial.description ?? '');
   const [tag, setTag] = useState(initial.tag);
   const [matchCi, setMatchCi] = useState<WorkflowCiMatch>(initial.matchCi ?? 'any');
-  const [steps, setSteps] = useState<UserWorkflowStep[]>(initial.steps.length ? initial.steps : [blankStep('askClaude')]);
+  const [steps, setSteps] = useState<UserWorkflowStep[]>(initial.steps.length ? initial.steps : [blankStep('askAI')]);
 
   const errors: string[] = [];
   if (!label.trim()) errors.push('Label is required.');
   if (!tag.trim()) errors.push('Tag is required.');
   if (steps.length === 0) errors.push('At least one step is required.');
   steps.forEach((s, i) => {
-    if (s.action === 'askClaude' && !s.prompt.trim()) errors.push(`Step ${i + 1}: prompt is required.`);
+    if (s.action === 'askAI' && !s.prompt.trim()) errors.push(`Step ${i + 1}: prompt is required.`);
     if (s.action === 'toast' && !s.message.trim()) errors.push(`Step ${i + 1}: message is required.`);
   });
   const submit = () => {
@@ -177,7 +177,7 @@ function WorkflowEditor({ initial, existingIds, onSave, onCancel }: {
                 value={step.action}
                 onChange={(e) => setSteps((s) => s.map((st, idx) => idx === i ? blankStep(e.target.value as ActionKind) : st))}
               >
-                <option value="askClaude">askClaude — run a prompt</option>
+                <option value="askAI">askAI — run a prompt</option>
                 <option value="fixCi">fixCi — Fix failing CI</option>
                 <option value="resolveConflicts">resolveConflicts — Claude resolves merge conflicts</option>
                 <option value="resolveThreads">resolveThreads — resolve review threads (optionally by author)</option>
@@ -186,7 +186,7 @@ function WorkflowEditor({ initial, existingIds, onSave, onCancel }: {
               </select>
               <button type="button" className="workflow-editor-step-remove" onClick={() => setSteps((s) => s.filter((_, idx) => idx !== i))} aria-label="Remove step">×</button>
             </div>
-            {step.action === 'askClaude' && (
+            {step.action === 'askAI' && (
               <textarea
                 value={step.prompt}
                 onChange={(e) => updateStep(i, { prompt: e.target.value })}
@@ -235,7 +235,7 @@ function WorkflowEditor({ initial, existingIds, onSave, onCancel }: {
           </li>
         ))}
       </ol>
-      <button type="button" className="workflow-editor-add-step" onClick={() => setSteps((s) => [...s, blankStep('askClaude')])}>+ Add step</button>
+      <button type="button" className="workflow-editor-add-step" onClick={() => setSteps((s) => [...s, blankStep('askAI')])}>+ Add step</button>
 
       {errors.length > 0 && (
         <ul className="workflow-editor-errors">

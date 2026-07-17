@@ -143,18 +143,18 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .drawer-error-actions button:hover { background: var(--border-muted); }
 
 /* Inline Claude response card. Used under the review footer + inline composer. */
-.claude-response-card { margin-top: 10px; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; background: var(--bg-subtle); padding: 10px 12px; }
-.claude-response-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.claude-response-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
-.claude-response-dismiss { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; padding: 0 4px; line-height: 1; }
-.claude-response-dismiss:hover { color: var(--fg); }
-.claude-response-loading { display: flex; justify-content: center; padding: 16px 0; }
-.claude-response-body { color: var(--fg); max-height: 60vh; overflow: auto; font-size: 14px; line-height: 1.5; word-wrap: break-word; }
-.claude-response-error { margin: 0; color: var(--err, #cf6679); font-size: 0.9rem; white-space: pre-wrap; }
-.claude-response-note { margin: 6px 0 0; color: var(--muted); font-size: 0.8rem; font-style: italic; }
+.ai-response-card { margin-top: 10px; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; background: var(--bg-subtle); padding: 10px 12px; }
+.ai-response-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.ai-response-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+.ai-response-dismiss { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; padding: 0 4px; line-height: 1; }
+.ai-response-dismiss:hover { color: var(--fg); }
+.ai-response-loading { display: flex; justify-content: center; padding: 16px 0; }
+.ai-response-body { color: var(--fg); max-height: 60vh; overflow: auto; font-size: 14px; line-height: 1.5; word-wrap: break-word; }
+.ai-response-error { margin: 0; color: var(--err, #cf6679); font-size: 0.9rem; white-space: pre-wrap; }
+.ai-response-note { margin: 6px 0 0; color: var(--muted); font-size: 0.8rem; font-style: italic; }
 /* Ask-Claude button visual cue — slightly distinct from publish buttons. */
-.btn-ask-claude { border: 1px solid var(--accent) !important; color: var(--accent) !important; background: transparent !important; }
-.btn-ask-claude:hover:not(:disabled) { background: var(--bg-subtle) !important; }
+.btn-ask-ai { border: 1px solid var(--accent) !important; color: var(--accent) !important; background: transparent !important; }
+.btn-ask-ai:hover:not(:disabled) { background: var(--bg-subtle) !important; }
 /* Fix-CI button — amber to indicate it's a recovery action. Matches the
  * conflict / Trunk amber so the user reads it as "do this when something
  * red needs fixing." Disabled state stays subdued. */
@@ -172,64 +172,64 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
  *
  * Per-turn accent stripes (3px on the left) remain: blue for Claude, grey for
  * You. */
-.thread-stack:has(.local-claude-thread):not(:has(.thread-card)) {
+.thread-stack:has(.local-ai-thread):not(:has(.thread-card)) {
   background: var(--bg);
   padding: 0;
   border-top: none;
   border-bottom: none;
 }
-.local-claude-thread { margin: 0; padding: 0; background: var(--bg); border: none; border-radius: 0; }
-.local-claude-thread-header { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px 6px; }
-.local-claude-thread-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); font-weight: 600; }
-.local-claude-thread-anchor { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.75rem; color: var(--muted); margin-right: auto; }
-.local-claude-thread-dismiss { background: transparent; border: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 1.05rem; line-height: 1; padding: 2px 8px; border-radius: 4px; }
-.local-claude-thread-dismiss:hover { color: var(--fg); background: var(--bg-subtle); }
+.local-ai-thread { margin: 0; padding: 0; background: var(--bg); border: none; border-radius: 0; }
+.local-ai-thread-header { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px 6px; }
+.local-ai-thread-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); font-weight: 600; }
+.local-ai-thread-anchor { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.75rem; color: var(--muted); margin-right: auto; }
+.local-ai-thread-dismiss { background: transparent; border: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 1.05rem; line-height: 1; padding: 2px 8px; border-radius: 4px; }
+.local-ai-thread-dismiss:hover { color: var(--fg); background: var(--bg-subtle); }
 /* Turn cards: flush with the diff edges, separated only by an 8px vertical gap. */
-.local-claude-thread-turns { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-.local-claude-thread-turn { padding: 8px 14px; border-radius: 0; border: 0; background: var(--bg-subtle); border-left: 3px solid transparent; }
-.local-claude-thread-turn-user { border-left-color: var(--muted); }
-.local-claude-thread-turn-claude { border-left-color: var(--accent); }
-.local-claude-thread-turn-header { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 3px; font-weight: 600; }
-.local-claude-thread-turn-body { color: var(--fg); margin: 0; font-size: 0.9rem; line-height: 1.5; }
-.local-claude-thread-turn-user-body { white-space: pre-wrap; word-break: break-word; }
-.local-claude-thread-turn-loading { display: flex; align-items: center; gap: 8px; color: var(--muted); padding: 2px 0; }
-.local-claude-thread-turn-error { color: var(--err, #cf6679); margin: 0; white-space: pre-wrap; font-size: 0.9rem; }
-.local-claude-thread-turn-note { margin: 4px 0 0; color: var(--muted); font-size: 0.75rem; font-style: italic; }
+.local-ai-thread-turns { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.local-ai-thread-turn { padding: 8px 14px; border-radius: 0; border: 0; background: var(--bg-subtle); border-left: 3px solid transparent; }
+.local-ai-thread-turn-user { border-left-color: var(--muted); }
+.local-ai-thread-turn-ai { border-left-color: var(--accent); }
+.local-ai-thread-turn-header { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 3px; font-weight: 600; }
+.local-ai-thread-turn-body { color: var(--fg); margin: 0; font-size: 0.9rem; line-height: 1.5; }
+.local-ai-thread-turn-user-body { white-space: pre-wrap; word-break: break-word; }
+.local-ai-thread-turn-loading { display: flex; align-items: center; gap: 8px; color: var(--muted); padding: 2px 0; }
+.local-ai-thread-turn-error { color: var(--err, #cf6679); margin: 0; white-space: pre-wrap; font-size: 0.9rem; }
+.local-ai-thread-turn-note { margin: 4px 0 0; color: var(--muted); font-size: 0.75rem; font-style: italic; }
 /* Input: also flush, top border to separate from the last turn. Send button sits in a small right-aligned inset. */
-.local-claude-thread-input { padding: 8px 0 12px; display: flex; flex-direction: column; gap: 6px; }
-.local-claude-thread-input textarea { width: 100%; min-height: 50px; padding: 6px 12px; border-top: 1px solid var(--border); border-left: 0; border-right: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: inherit; font: inherit; resize: vertical; box-sizing: border-box; }
-.local-claude-thread-input textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; border-color: transparent; }
-.local-claude-thread-input-actions { display: flex; justify-content: flex-end; padding: 0 12px; }
+.local-ai-thread-input { padding: 8px 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.local-ai-thread-input textarea { width: 100%; min-height: 50px; padding: 6px 12px; border-top: 1px solid var(--border); border-left: 0; border-right: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: inherit; font: inherit; resize: vertical; box-sizing: border-box; }
+.local-ai-thread-input textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; border-color: transparent; }
+.local-ai-thread-input-actions { display: flex; justify-content: flex-end; padding: 0 12px; }
 
 /* Pinned multi-turn Claude chat panel — sits above the diff Conversations
  * section. Persisted per PR across drawer close + navigation.
  *
- * Same full-width treatment as the inline LocalClaudeThread: the outer panel
+ * Same full-width treatment as the inline LocalAIThread: the outer panel
  * has no border/background/border-radius; each turn card is the visible
  * content and reaches edge-to-edge with the drawer's content column. Per-turn
  * accent stripe (3px on the left) — blue for Claude, grey for You. */
-.claude-chat-panel { margin: 12px 0; padding: 0; background: var(--bg); border: none; border-radius: 0; }
-.claude-chat-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 6px; }
-.claude-chat-header h3 { margin: 0; font-size: 0.95rem; color: var(--fg); }
-.claude-chat-count { color: var(--muted); font-weight: 400; font-size: 0.85rem; margin-left: 6px; }
-.claude-chat-clear { background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); padding: 4px 10px; font: inherit; cursor: pointer; font-size: 0.85rem; }
-.claude-chat-clear:hover { background: var(--bg-subtle); color: var(--fg); }
+.ai-chat-panel { margin: 12px 0; padding: 0; background: var(--bg); border: none; border-radius: 0; }
+.ai-chat-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 6px; }
+.ai-chat-header h3 { margin: 0; font-size: 0.95rem; color: var(--fg); }
+.ai-chat-count { color: var(--muted); font-weight: 400; font-size: 0.85rem; margin-left: 6px; }
+.ai-chat-clear { background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); padding: 4px 10px; font: inherit; cursor: pointer; font-size: 0.85rem; }
+.ai-chat-clear:hover { background: var(--bg-subtle); color: var(--fg); }
 /* Turn cards: flush with the drawer column edges, just an 8px vertical gap between them. */
-.claude-chat-turns { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-.claude-chat-turn { padding: 8px 14px; border-radius: 0; border: 0; background: var(--bg-subtle); border-left: 3px solid transparent; }
-.claude-chat-turn-user { border-left-color: var(--muted); }
-.claude-chat-turn-claude { border-left-color: var(--accent); }
-.claude-chat-turn-header { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
-.claude-chat-turn-body { color: var(--fg); margin: 0; line-height: 1.5; }
-.claude-chat-turn-user-body { white-space: pre-wrap; word-break: break-word; }
-.claude-chat-turn-loading { display: flex; align-items: center; gap: 10px; color: var(--muted); padding: 4px 0; }
-.claude-chat-turn-error { color: var(--err, #cf6679); margin: 0; white-space: pre-wrap; }
-.claude-chat-turn-note { margin: 6px 0 0; color: var(--muted); font-size: 0.8rem; font-style: italic; }
+.ai-chat-turns { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.ai-chat-turn { padding: 8px 14px; border-radius: 0; border: 0; background: var(--bg-subtle); border-left: 3px solid transparent; }
+.ai-chat-turn-user { border-left-color: var(--muted); }
+.ai-chat-turn-ai { border-left-color: var(--accent); }
+.ai-chat-turn-header { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+.ai-chat-turn-body { color: var(--fg); margin: 0; line-height: 1.5; }
+.ai-chat-turn-user-body { white-space: pre-wrap; word-break: break-word; }
+.ai-chat-turn-loading { display: flex; align-items: center; gap: 10px; color: var(--muted); padding: 4px 0; }
+.ai-chat-turn-error { color: var(--err, #cf6679); margin: 0; white-space: pre-wrap; }
+.ai-chat-turn-note { margin: 6px 0 0; color: var(--muted); font-size: 0.8rem; font-style: italic; }
 /* Input: also flush. Textarea has top + bottom borders to separate it from the last turn. Send sits right-aligned with a small inset. */
-.claude-chat-input { padding: 8px 0 12px; display: flex; flex-direction: column; gap: 6px; }
-.claude-chat-input textarea { width: 100%; min-height: 60px; padding: 8px 12px; border-top: 1px solid var(--border); border-left: 0; border-right: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: inherit; font: inherit; resize: vertical; box-sizing: border-box; }
-.claude-chat-input textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; border-color: transparent; }
-.claude-chat-input-actions { display: flex; justify-content: flex-end; padding: 0 12px; }
+.ai-chat-input { padding: 8px 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.ai-chat-input textarea { width: 100%; min-height: 60px; padding: 8px 12px; border-top: 1px solid var(--border); border-left: 0; border-right: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: inherit; font: inherit; resize: vertical; box-sizing: border-box; }
+.ai-chat-input textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; border-color: transparent; }
+.ai-chat-input-actions { display: flex; justify-content: flex-end; padding: 0 12px; }
 
 /* Per-row Claude indicator on the PR list. */
 /* Icon-only Claude badge — sized to match the other 16-ish px row badges
@@ -1167,7 +1167,7 @@ a.issue-comment-when:hover { text-decoration: underline; }
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11.5px;
 }
-.workflow-step-claude-body { font-size: 13px; line-height: 1.55; }
+.workflow-step-ai-body { font-size: 13px; line-height: 1.55; }
 .workflow-step-summary p { margin: 4px 0; font-size: 13px; }
 .workflow-step-summary code { background: var(--bg); padding: 1px 4px; border-radius: 3px; }
 .workflow-step-toast { margin: 0; font-size: 12px; padding: 6px 10px; border-radius: 4px; }

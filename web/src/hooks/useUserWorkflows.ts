@@ -17,9 +17,21 @@ function load(): UserWorkflow[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((w): w is UserWorkflow =>
-      !!w && typeof w.id === 'string' && typeof w.label === 'string' && Array.isArray(w.steps),
-    );
+    return parsed
+      .filter((w): w is UserWorkflow =>
+        !!w && typeof w.id === 'string' && typeof w.label === 'string' && Array.isArray(w.steps),
+      )
+      // Rename-time migration: pre-swap workflows persisted 'askClaude'
+      // as the step-action discriminator. Convert on load so existing
+      // user workflows keep working without a manual edit.
+      .map((w) => ({
+        ...w,
+        steps: w.steps.map((s) => {
+          const step = s as { action?: string };
+          if (step.action === 'askClaude') return { ...s, action: 'askAI' } as typeof s;
+          return s;
+        }),
+      }));
   } catch { return []; }
 }
 

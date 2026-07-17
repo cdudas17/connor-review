@@ -3,7 +3,7 @@ import type { TrackedPR } from '../types.js';
 import { StatusBadge } from './StatusBadge.js';
 import { GhStatusBadge } from './GhStatusBadge.js';
 import { CiBadge } from './CiBadge.js';
-import { ClaudeBadge } from './ClaudeBadge.js';
+import { AIBadge } from './AIBadge.js';
 import { ConflictBadge } from './ConflictBadge.js';
 import { LabelChips } from './LabelChips.js';
 import type { FilterMode } from './FilterToggle.js';
@@ -45,10 +45,10 @@ interface Props {
   };
   /** Per-PR Claude state aggregator (summary + threads). When provided, each row
    * renders a small badge indicating in-progress / saved-response / failed. */
-  claudeStateFor?: (id: { owner: string; repo: string; number: number }) => { kind: 'loading' | 'error' | 'success' } | null;
+  aiStateFor?: (id: { owner: string; repo: string; number: number }) => { kind: 'loading' | 'error' | 'success' } | null;
   /** Per-PR conflict-resolution state. When provided AND the PR has
    * `hasConflicts`, the ConflictBadge becomes a button driven by
-   * `onResolveConflicts`. Distinct from `claudeStateFor` to keep the
+   * `onResolveConflicts`. Distinct from `aiStateFor` to keep the
    * Claude badge clean of conflict-resolution activity. */
   conflictStateFor?: (id: { owner: string; repo: string; number: number }) => { kind: 'running' | 'failed' | 'success' } | null;
   /** Click handler for the conflict badge. Fire-and-forget; the hook
@@ -101,7 +101,7 @@ function CopyLinkButton({ owner, repo, number }: { owner: string; repo: string; 
   );
 }
 
-export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictStateFor, onResolveConflicts, ciFixStateFor, onOpenCiChecks, onToggleAutoMerge, showCopyLink, workflows, workflowStateFor, onRunWorkflow }: Props) {
+export function PRList({ prs, mode, onOpen, selection, aiStateFor, conflictStateFor, onResolveConflicts, ciFixStateFor, onOpenCiChecks, onToggleAutoMerge, showCopyLink, workflows, workflowStateFor, onRunWorkflow }: Props) {
   const filtered = mode === 'untouched-only' ? prs.filter((p) => p.status === 'untouched') : prs;
   if (filtered.length === 0) {
     return <p className="empty">No PRs to review.</p>;
@@ -157,7 +157,7 @@ export function PRList({ prs, mode, onOpen, selection, claudeStateFor, conflictS
               </span>
             </span>
             <span className="pr-badges">
-              <ClaudeBadge state={claudeStateFor?.({ owner: p.owner, repo: p.repo, number: p.number }) ?? null} />
+              <AIBadge state={aiStateFor?.({ owner: p.owner, repo: p.repo, number: p.number }) ?? null} />
               {/* Merge conflicts get the leading position in the left-of-CI
                   cluster — they block forward progress regardless of CI or
                   review state, so this is the first signal worth seeing. */}

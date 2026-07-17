@@ -767,14 +767,16 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       /** Prior turns when continuing a chat. Most-recent-first or oldest-first
        * doesn't matter — we render them in order. Each turn's `body` goes into
        * the prompt verbatim labeled by role. */
-      conversation?: Array<{ role: 'user' | 'claude'; body: string }>;
+      // 'claude' accepted as a legacy synonym for 'ai' from pre-rename
+      // conversation history persisted in the client's localStorage.
+      conversation?: Array<{ role: 'user' | 'ai' | 'claude'; body: string }>;
       /** Optional local checkout path. When valid (exists + has .git), `claude -p`
        * runs with that as its cwd so Claude can grep / read the actual repo
        * being reviewed. Without it, Claude runs from the server's cwd (the
        * connor-review repo) and can't see the target codebase. */
       repoPath?: string;
     };
-  }>('/api/pulls/:owner/:repo/:number/claude/ask', async (req, reply) => {
+  }>('/api/pulls/:owner/:repo/:number/ai/ask', async (req, reply) => {
     const params = parsePullParams(req.params);
     const draft = (req.body?.draft ?? '').trim();
     if (!draft) {
@@ -805,18 +807,20 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       ? `\nThe user is commenting on ${req.body.lineRange.path} ${req.body.lineRange.startLine != null && req.body.lineRange.startLine !== req.body.lineRange.endLine ? `lines ${req.body.lineRange.startLine}–${req.body.lineRange.endLine}` : `line ${req.body.lineRange.endLine}`} (${req.body.lineRange.side === 'LEFT' ? 'old/deleted side' : 'new/added side'}).\n`
       : '';
 
-    // Multi-turn chat: prior turns go into the prompt so Claude has context.
+    // Multi-turn chat: prior turns go into the prompt so the AI has context.
     // The user's latest draft is appended as the "latest message" block.
+    // We accept both 'ai' (new) and 'claude' (legacy) role tags so
+    // conversations persisted before the rename still label correctly.
     const priorTurns = (req.body.conversation ?? []).filter((t) => t && typeof t.body === 'string' && t.body.length > 0);
     const conversationBlock = priorTurns.length > 0
       ? '\nConversation so far:\n' + priorTurns.map((t) => {
-          const label = t.role === 'claude' ? 'Claude' : 'User';
+          const label = (t.role === 'ai' || t.role === 'claude') ? 'AI' : 'User';
           return `[${label}]:\n${t.body}\n`;
         }).join('\n')
       : '';
 
     const prompt = [
-      `You're helping the user review GitHub PR "${meta.title}" by @${meta.authorLogin ?? 'unknown'} on ${params.owner}/${params.repo}.`,
+      `You and the user are BOTH reviewers on GitHub PR "${meta.title}" by @${meta.authorLogin ?? 'unknown'} on ${params.owner}/${params.repo}. Investigate alongside them — you're a peer reviewer, not an advisor grading their questions.`,
       '',
       'Full unified diff:',
       '```diff',
@@ -827,7 +831,16 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       priorTurns.length > 0 ? "User's latest message:" : "User's draft comment:",
       '> ' + draft.replace(/\n/g, '\n> '),
       '',
-      'Respond as a thoughtful, concise code reviewer would — engage with the user\'s point, flag anything they may have missed, suggest follow-ups when useful. Do not pretend to be the PR author. When a prior conversation is present, build on it (do not repeat earlier explanations verbatim). Keep the response focused and well under 400 words unless the question genuinely demands more.',
+      'Answer as a co-reviewer doing the same investigation. Read the diff carefully; when you have repo access, grep and read relevant files to verify claims rather than speculating.',
+      '',
+      'HARD RULES:',
+      "- Do NOT open with meta-commentary about the user's question — no \"good question\", \"that's the right thing to ask\", \"yes, that's a fair concern\", \"I'd make it more specific\", or any variation. Skip validation; go straight to findings.",
+      "- Do NOT restate the user's question back to them.",
+      "- Do NOT pretend to be the PR author.",
+      '- When a prior conversation is present, build on it — do not repeat earlier explanations.',
+      '- Keep responses focused and under ~400 words unless the question genuinely demands more.',
+      '',
+      "Lead with the answer or the concrete finding. If the answer is \"I need to check X to know\", say so and then check it if you can.",
     ].join('\n');
 
     // Resolve cwd for claude: only honor the path if it's a real directory with
@@ -1004,7 +1017,7 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     },
   );
 
-  // Ask Claude to resolve the PR's merge conflicts locally and push the
+  // Ask AI to resolve the PR's merge conflicts locally and push the
   // resolution back to GitHub. Safety-first: every git operation runs in a
   // throwaway worktree, Claude is constrained to Read/Edit only, and three
   // independent checks gate the commit + push step. See route body for the
@@ -1323,7 +1336,7 @@ export async function registerPullsRoutes(app: FastifyInstance) {
     }
   });
 
-  // Ask Claude to fix the PR's failing CI builds locally and push the
+  // Ask AI to fix the PR's failing CI builds locally and push the
   // result. Mirrors the resolve-conflicts route's pattern: throwaway
   // worktree, safety-bounded prompt, --no-verify commit + push. Different
   // failure mode: instead of mechanical conflict resolution we let Claude

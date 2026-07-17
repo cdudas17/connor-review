@@ -58,7 +58,7 @@ const PR_GRAPHQL_RESPONSE = JSON.stringify({
 
 const DIFF = 'diff --git a/file.txt b/file.txt\nindex 0..1\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new\n';
 
-describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
+describe('POST /api/pulls/:o/:r/:n/ai/ask', () => {
   beforeEach(() => {
     mockedGh.mockReset();
     mockedCodex.mockReset();
@@ -68,7 +68,7 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
     const app = await buildServer();
     const res = await app.inject({
       method: 'POST',
-      url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+      url: '/api/pulls/Gusto/zenpayroll/1/ai/ask',
       payload: { draft: '   ' },
     });
     expect(res.statusCode).toBe(400);
@@ -85,7 +85,7 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
     const app = await buildServer();
     const res = await app.inject({
       method: 'POST',
-      url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+      url: '/api/pulls/Gusto/zenpayroll/1/ai/ask',
       payload: { draft: 'is this safe to merge?' },
     });
     expect(res.statusCode).toBe(200);
@@ -115,7 +115,7 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
     const app = await buildServer();
     const res = await app.inject({
       method: 'POST',
-      url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+      url: '/api/pulls/Gusto/zenpayroll/1/ai/ask',
       payload: {
         draft: 'why are we mutating here?',
         lineRange: { path: 'app/widget.rb', endLine: 42, startLine: 38, side: 'RIGHT' },
@@ -136,7 +136,7 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
     const app = await buildServer();
     const res = await app.inject({
       method: 'POST',
-      url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+      url: '/api/pulls/Gusto/zenpayroll/1/ai/ask',
       payload: { draft: 'thoughts?' },
     });
     expect(res.statusCode).toBe(200);
@@ -153,7 +153,7 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
     const app = await buildServer();
     const res = await app.inject({
       method: 'POST',
-      url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+      url: '/api/pulls/Gusto/zenpayroll/1/ai/ask',
       payload: {
         draft: 'follow up question',
         conversation: [
@@ -167,7 +167,7 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
     // The history block is present.
     expect(prompt).toContain('Conversation so far');
     expect(prompt).toContain('[User]:\nfirst ask');
-    expect(prompt).toContain('[Claude]:\nfirst reply');
+    expect(prompt).toContain('[AI]:\nfirst reply');
     // The latest message is labeled differently when history is present.
     expect(prompt).toContain("User's latest message");
     expect(prompt).toContain('> follow up question');
@@ -182,7 +182,7 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
     const app = await buildServer();
     await app.inject({
       method: 'POST',
-      url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+      url: '/api/pulls/Gusto/zenpayroll/1/ai/ask',
       payload: { draft: 'q' },
     });
     const prompt = mockedCodex.mock.calls[0][0] as string;
@@ -202,7 +202,7 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
       const app = await buildServer();
       const res = await app.inject({
         method: 'POST',
-        url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+        url: '/api/pulls/Gusto/zenpayroll/1/ai/ask',
         payload: { draft: 'q', repoPath: tmp },
       });
       expect(res.statusCode).toBe(200);
@@ -222,7 +222,7 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
     const app = await buildServer();
     const res = await app.inject({
       method: 'POST',
-      url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+      url: '/api/pulls/Gusto/zenpayroll/1/ai/ask',
       payload: { draft: 'q', repoPath: '/Users/nobody/no-such-path' },
     });
     expect(res.statusCode).toBe(200);
@@ -238,7 +238,7 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
     const app = await buildServer();
     const res = await app.inject({
       method: 'POST',
-      url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+      url: '/api/pulls/Gusto/zenpayroll/1/ai/ask',
       payload: { draft: 'hi' },
     });
     expect(res.statusCode).toBe(502);
@@ -253,7 +253,7 @@ describe('POST /api/pulls/:o/:r/:n/claude/ask', () => {
     const app = await buildServer();
     const res = await app.inject({
       method: 'POST',
-      url: '/api/pulls/Gusto/zenpayroll/1/claude/ask',
+      url: '/api/pulls/Gusto/zenpayroll/1/ai/ask',
       payload: { draft: 'hi' },
     });
     expect(res.statusCode).toBe(504);

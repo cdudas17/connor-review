@@ -12,7 +12,7 @@ import type { WorkflowCiMatch } from './workflowTypes.js';
  */
 
 export type UserWorkflowStep =
-  | { action: 'askClaude'; prompt: string; skipIfPrevFailed?: boolean }
+  | { action: 'askAI'; prompt: string; skipIfPrevFailed?: boolean }
   | { action: 'fixCi'; skipIfPrevFailed?: boolean }
   | { action: 'resolveConflicts'; skipIfPrevFailed?: boolean }
   /** Bulk-resolve threads. `authorLogin` restricts to threads started by

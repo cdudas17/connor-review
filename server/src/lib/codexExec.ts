@@ -6,7 +6,7 @@ import { join } from 'node:path';
 /**
  * Shells out to the user's local `codex` CLI in non-interactive `exec`
  * mode and returns the agent's final message. Sibling to `claudeExec`;
- * used by the "Ask Claude" review-chat surface, which the user asked
+ * used by the "Ask AI" review-chat surface, which the user asked
  * to run on Codex instead. Prompt is written via stdin (NOT argv) so
  * we don't trip argv-length limits with large diffs.
  *

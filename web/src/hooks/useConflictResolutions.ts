@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** Persistent per-PR state for the "ask Claude to resolve merge conflicts"
  * flow. Stored in its own localStorage bucket so that:
- *  1. ClaudeBadge (which reads from useClaudeResponses) is never affected by
+ *  1. AIBadge (which reads from useAIResponses) is never affected by
  *     conflict-resolution activity — per the user's explicit "don't count
  *     toward the Claude badge" rule.
  *  2. Failed attempts persist across drawer reopens / page reloads so the

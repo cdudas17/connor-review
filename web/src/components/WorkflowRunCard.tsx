@@ -18,10 +18,10 @@ function StepBody({ step }: { step: WorkflowStep }) {
   if (step.error) {
     return <pre className="workflow-step-error">{step.error}</pre>;
   }
-  if (step.action === 'askClaude') {
+  if (step.action === 'askAI') {
     const response = typeof step.output === 'string' ? step.output : '';
     return (
-      <div className="workflow-step-claude">
+      <div className="workflow-step-ai">
         {step.input && (
           <details className="workflow-step-prompt">
             <summary>prompt</summary>
@@ -29,8 +29,8 @@ function StepBody({ step }: { step: WorkflowStep }) {
           </details>
         )}
         {response
-          ? <div className="workflow-step-claude-body markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(response) }} />
-          : <p className="workflow-step-pending">Asking Claude…</p>}
+          ? <div className="workflow-step-ai-body markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(response) }} />
+          : <p className="workflow-step-pending">Asking…</p>}
       </div>
     );
   }

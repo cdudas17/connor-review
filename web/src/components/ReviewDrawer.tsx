@@ -15,9 +15,9 @@ import { useNextPRPrefetch } from '../hooks/useNextPRPrefetch.js';
 import { api } from '../lib/api.js';
 import { maybeAutoLabelOnReview } from '../lib/autoLabel.js';
 import { APP_CONFIG } from '../config.js';
-import type { ClaudeResponseState } from './ClaudeResponseCard.js';
-import type { ClaudeChat, LocalThreadAnchor } from '../hooks/useClaudeResponses.js';
-import { ClaudeChatPanel } from './ClaudeChatPanel.js';
+import type { AIResponseState } from './AIResponseCard.js';
+import type { AIChat, LocalThreadAnchor } from '../hooks/useAIResponses.js';
+import { AIChatPanel } from './AIChatPanel.js';
 import { ShaderLoader } from './ShaderLoader.js';
 import type { CiStatus, GhStatus, PRStatus, PullRequestMeta, ReviewEvent, StagedInlineComment, TrackedPR } from '../types.js';
 
@@ -94,24 +94,24 @@ interface Props {
   onSetStatus: (id: Identity, status: PRStatus) => void;
   onClose: () => void;
   /** Persistent Claude chat for this PR. Owned at App level. */
-  claudeChat: ClaudeChat | null;
+  aiChat: AIChat | null;
   /** Look up thread-reply Claude state by thread id. */
-  threadClaudeState: (threadId: string) => ClaudeResponseState | null;
+  threadAIState: (threadId: string) => AIResponseState | null;
   /** Append a user turn + fire Claude with the full chat history. Drawer
    * passes either the summary-textarea draft (first turn) or the chat panel's
    * own input (follow-ups). */
-  onAskClaudeChat: (userMessage: string) => void;
+  onAskAIChat: (userMessage: string) => void;
   /** Drop the whole chat for this PR. */
-  onClearClaudeChat: () => void;
+  onClearAIChat: () => void;
   /** Fire an ask against a thread reply. */
-  onAskThreadClaude: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
-  onDismissThreadClaude: (threadId: string) => void;
+  onAskThreadAI: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
+  onDismissThreadAI: (threadId: string) => void;
   /** Persisted inline Claude threads anchored on the diff for this PR. */
-  localClaudeThreads: Array<ClaudeChat & { anchor: LocalThreadAnchor; key: string }>;
+  localAIThreads: Array<AIChat & { anchor: LocalThreadAnchor; key: string }>;
   /** Start or continue a local Claude thread at the given line anchor. */
-  onAskInlineClaudeForLine: (anchor: LocalThreadAnchor, draft: string) => void;
+  onAskInlineAIForLine: (anchor: LocalThreadAnchor, draft: string) => void;
   /** Dismiss a local Claude thread (× on the card). */
-  onDismissLocalClaudeThread: (anchor: LocalThreadAnchor) => void;
+  onDismissLocalAIThread: (anchor: LocalThreadAnchor) => void;
   /** Current conflict-resolution entry for this PR (null when there's none). */
   conflictResolution: import('../hooks/useConflictResolutions.js').ConflictResolutionEntry | null;
   /** Fire / re-fire the resolve flow for the open PR. */
@@ -142,9 +142,9 @@ export function ReviewDrawer(props: Props) {
     current, prs, pendingReviewId, latestGhStatus, latestCiStatus, latestCiUrl, viewedPaths,
     onViewedChange, onPendingReviewChange, onMetaLoaded, onAdvance, onNavigatePrev, onNavigateNext,
     canNavigatePrev, canNavigateNext, onToast, onSetStatus, onClose,
-    claudeChat, threadClaudeState, onAskClaudeChat, onClearClaudeChat,
-    onAskThreadClaude, onDismissThreadClaude,
-    localClaudeThreads, onAskInlineClaudeForLine, onDismissLocalClaudeThread,
+    aiChat, threadAIState, onAskAIChat, onClearAIChat,
+    onAskThreadAI, onDismissThreadAI,
+    localAIThreads, onAskInlineAIForLine, onDismissLocalAIThread,
     conflictResolution, onResolveConflicts, onDismissConflictResolution,
     ciFix, onFixCi, onDismissCiFix,
     reloadNonce,
@@ -553,19 +553,19 @@ export function ReviewDrawer(props: Props) {
       )}
       {meta.source !== 'local' && <ReviewSummaryList reviews={meta.reviews ?? []} comments={meta.comments ?? []} />}
       {meta.source !== 'local' && (
-        <ClaudeChatPanel
-          chat={claudeChat}
-          onAsk={onAskClaudeChat}
-          onClear={onClearClaudeChat}
+        <AIChatPanel
+          chat={aiChat}
+          onAsk={onAskAIChat}
+          onClear={onClearAIChat}
         />
       )}
       {meta.source !== 'local' && commentsVisible && (
         <ConversationsList
           threads={meta.reviewThreads}
           onReply={reply}
-          claudeStateFor={threadClaudeState}
-          onAskClaude={onAskThreadClaude}
-          onDismissClaude={onDismissThreadClaude}
+          aiStateFor={threadAIState}
+          onAskAI={onAskThreadAI}
+          onDismissAI={onDismissThreadAI}
         />
       )}
       <DiffViewer
@@ -586,15 +586,15 @@ export function ReviewDrawer(props: Props) {
         onAddToReview={meta.source === 'local' ? noopAsync : addToReview}
         onReply={meta.source === 'local' ? noopReply : reply}
         commentsEnabled={meta.source !== 'local'}
-        // Inline composer Ask Claude: persisted local-only thread anchored to the line range.
-        onAskInlineClaude={meta.source === 'local' ? undefined : onAskInlineClaudeForLine}
-        localClaudeThreads={(meta.source === 'local' || !commentsVisible) ? [] : localClaudeThreads}
-        onAskLocalThread={meta.source === 'local' ? undefined : onAskInlineClaudeForLine}
-        onDismissLocalThread={meta.source === 'local' ? undefined : onDismissLocalClaudeThread}
-        // InlineThreadCard Ask Claude: persisted at App level. Drawer hands the threadId + draft to the parent.
-        threadClaudeStateFor={threadClaudeState}
-        onAskThreadClaude={onAskThreadClaude}
-        onDismissThreadClaude={onDismissThreadClaude}
+        // Inline composer Ask AI: persisted local-only thread anchored to the line range.
+        onAskInlineClaude={meta.source === 'local' ? undefined : onAskInlineAIForLine}
+        localAIThreads={(meta.source === 'local' || !commentsVisible) ? [] : localAIThreads}
+        onAskLocalThread={meta.source === 'local' ? undefined : onAskInlineAIForLine}
+        onDismissLocalThread={meta.source === 'local' ? undefined : onDismissLocalAIThread}
+        // InlineThreadCard Ask AI: persisted at App level. Drawer hands the threadId + draft to the parent.
+        threadAiStateFor={threadAIState}
+        onAskThreadAI={onAskThreadAI}
+        onDismissThreadAI={onDismissThreadAI}
       />
       {meta.source === 'local' ? (
         <LocalReviewFooter
@@ -642,15 +642,15 @@ export function ReviewDrawer(props: Props) {
           })()}
           ciFixRunning={ciFix?.kind === 'running'}
           failingCheckCount={(meta.ciContexts ?? []).filter((c) => c.isFailure).length}
-          onAskClaude={() => {
+          onAskAI={() => {
             // Drain the summary textarea into the chat as the next user turn,
             // then clear it so the box is free for an actual review summary.
             const draft = summary.trim();
             if (!draft) return;
-            onAskClaudeChat(draft);
+            onAskAIChat(draft);
             setSummary('');
           }}
-          claudeChatLoading={claudeChat?.turns.some((t) => t.loading) ?? false}
+          aiChatLoading={aiChat?.turns.some((t) => t.loading) ?? false}
         />
       )}
       {error && <ErrorToast message={error.message} onDismiss={() => { /* user can reload */ }} />}

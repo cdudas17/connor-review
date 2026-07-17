@@ -5,7 +5,7 @@ import type { UserWorkflow, UserWorkflowStep } from './userWorkflowTypes.js';
  * Convert a declarative `UserWorkflow` (from the in-app editor) into a
  * runnable `PrWorkflow`. The synthesised `run` is a tiny linear
  * interpreter: walks the steps in order, tracks whether the previous
- * step "failed" (action result `ok === false` or askClaude threw), and
+ * step "failed" (action result `ok === false` or askAI threw), and
  * honours each step's `skipIfPrevFailed` / `onlyIfPrevFailed` gate.
  */
 export function userWorkflowToPr(uw: UserWorkflow): PrWorkflow {
@@ -23,7 +23,7 @@ export function userWorkflowToPr(uw: UserWorkflow): PrWorkflow {
         try {
           prevFailed = await runStep(step, actions);
         } catch (e) {
-          // askClaude rejects on transport errors; treat as failed and
+          // askAI rejects on transport errors; treat as failed and
           // surface to the user via toast so the timeline isn't silently empty.
           actions.toast('error', `Step failed: ${(e as Error).message}`);
           prevFailed = true;
@@ -44,8 +44,8 @@ async function runStep(
   step: UserWorkflowStep,
   actions: Parameters<PrWorkflow['run']>[0]['actions'],
 ): Promise<boolean /* failed? */> {
-  if (step.action === 'askClaude') {
-    await actions.askClaude(step.prompt);
+  if (step.action === 'askAI') {
+    await actions.askAI(step.prompt);
     return false;
   }
   if (step.action === 'fixCi') {

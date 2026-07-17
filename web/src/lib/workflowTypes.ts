@@ -64,8 +64,8 @@ export type ResolveThreadsOutput =
 
 export interface WorkflowActions {
   /** Run an arbitrary Claude prompt with the PR diff as context. Returns
-   *  Claude's response string. Backed by POST /api/pulls/.../claude/ask. */
-  askClaude(prompt: string): Promise<string>;
+   *  Claude's response string. Backed by POST /api/pulls/.../ai/ask. */
+  askAI(prompt: string): Promise<string>;
   /** Spin up a worktree + run Fix CI. Result includes the rebase-when-
    *  unrelated path. Resolves with a result object — never throws on
    *  HTTP errors; failures land in `{ ok: false, code, message }`. */
@@ -93,11 +93,11 @@ export interface WorkflowContext {
 /** One step of a workflow run — what action fired, when, with what
  *  input + output. Stored on the run so the result card can replay the
  *  whole timeline (including across page reloads). */
-export type WorkflowStepAction = 'askClaude' | 'fixCi' | 'resolveConflicts' | 'resolveThreads' | 'updateBranch' | 'toast';
+export type WorkflowStepAction = 'askAI' | 'fixCi' | 'resolveConflicts' | 'resolveThreads' | 'updateBranch' | 'toast';
 
 export interface WorkflowStep {
   action: WorkflowStepAction;
-  /** Action-input summary (e.g. the prompt text for askClaude). */
+  /** Action-input summary (e.g. the prompt text for askAI). */
   input?: string;
   /** Action-output. Shape depends on the action — JSON-serialisable so
    *  the step survives a localStorage round-trip. */

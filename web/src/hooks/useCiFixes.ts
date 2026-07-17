@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** Persistent per-PR state for the "Fix failing CI builds" flow. Stored in
- * its own localStorage bucket so the ClaudeBadge never picks up this
+ * its own localStorage bucket so the AIBadge never picks up this
  * activity (mirrors useConflictResolutions's "don't count toward Claude
  * badge" promise). */
 

@@ -45,7 +45,7 @@ export function prToWorkflowPr(p: TrackedPR): WorkflowPr {
     ciCounts: p.ciCounts,
     mergeable: (p.hasConflicts ? 'CONFLICTING' : null),
     url: `https://github.com/${p.owner}/${p.repo}/pull/${p.number}`,
-    headRefName: '',  // TrackedPR doesn't carry refs; workflows that need them should askClaude with diff context
+    headRefName: '',  // TrackedPR doesn't carry refs; workflows that need them should askAI with diff context
     baseRefName: '',
   };
 }
@@ -61,11 +61,11 @@ export async function runWorkflow(
   deps: RunWorkflowDeps,
 ): Promise<void> {
   const actions: WorkflowActions = {
-    askClaude: async (prompt: string): Promise<string> => {
-      const idx = bus.appendStep({ action: 'askClaude', input: prompt, startedAt: Date.now() });
+    askAI: async (prompt: string): Promise<string> => {
+      const idx = bus.appendStep({ action: 'askAI', input: prompt, startedAt: Date.now() });
       try {
         const repoPath = deps.resolveRepoPath(pr.repo) ?? undefined;
-        const { response } = await api.askClaude(pr.owner, pr.repo, pr.number, { draft: prompt, repoPath });
+        const { response } = await api.askAI(pr.owner, pr.repo, pr.number, { draft: prompt, repoPath });
         bus.updateStep(idx, { output: response, finishedAt: Date.now() });
         return response;
       } catch (e) {

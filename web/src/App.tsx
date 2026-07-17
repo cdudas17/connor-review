@@ -29,7 +29,7 @@ import { PinIcon } from '@primer/octicons-react';
 import { ToastStack } from './components/ToastStack.js';
 import { useToasts } from './hooks/useToasts.js';
 import { useTrackedPRs } from './hooks/useTrackedPRs.js';
-import { useClaudeResponses } from './hooks/useClaudeResponses.js';
+import { useAIResponses } from './hooks/useAIResponses.js';
 import { useConflictResolutions } from './hooks/useConflictResolutions.js';
 import { useCiFixes } from './hooks/useCiFixes.js';
 import { useWorkflowRuns } from './hooks/useWorkflowRuns.js';
@@ -199,7 +199,7 @@ export function App() {
   // to localStorage). When an in-flight request resolves after the drawer's no
   // longer on that PR, the hook fires a toast.
   const currentPRKey = useMemo(() => (current ? prKey(current) : null), [current]);
-  const claudeResponses = useClaudeResponses({
+  const aiResponses = useAIResponses({
     onToast: addToast,
     currentPRKey,
     // Resolve a local checkout from `localRepos` so `claude -p` can grep the
@@ -208,8 +208,8 @@ export function App() {
     // owner='local' + repo=<shortName> (which is also a localRepos key).
     repoPathFor: (target) => APP_CONFIG.localRepos?.[target.repo],
   });
-  // Conflict-resolution state — distinct from claudeResponses so the
-  // ClaudeBadge never reads this activity (per the user's "don't count
+  // Conflict-resolution state — distinct from aiResponses so the
+  // AIBadge never reads this activity (per the user's "don't count
   // toward the Claude badge" rule).
   const conflictResolutions = useConflictResolutions();
   // Same idea for the "Fix failing CI" flow — its own localStorage bucket.
@@ -502,12 +502,12 @@ export function App() {
         const id = { owner: p.owner, repo: p.repo, number: p.number };
         removeFn(id);
         // Drop any Claude state tied to the deleted PR so we don't carry orphans.
-        claudeResponses.dismissAllForPR(id);
+        aiResponses.dismissAllForPR(id);
       }
     }
     setSelectedKeys(new Set());
     if (current && selectedKeys.has(prKey(current))) setCurrent(null);
-  }, [selectedKeys, activePRs, myPRs, mineAddedPRs, tab, current, claudeResponses]);
+  }, [selectedKeys, activePRs, myPRs, mineAddedPRs, tab, current, aiResponses]);
 
   /**
    * Optimistically add a batch of PRs to `target` (one of the tracked-PR hooks),
@@ -1334,7 +1334,7 @@ export function App() {
         prs={activePRs}
         mode={mode}
         onOpen={setCurrent}
-        claudeStateFor={claudeResponses.aggregateFor}
+        aiStateFor={aiResponses.aggregateFor}
         // ConflictBadge becomes interactive when a click handler is wired —
         // we always pass these so any conflicting PR can be resolved from
         // the row, regardless of tab.
@@ -1462,15 +1462,15 @@ export function App() {
             onToast={addToast}
             onSetStatus={activeSetStatus}
             onClose={() => setCurrent(null)}
-            claudeChat={claudeResponses.chatFor(current)}
-            threadClaudeState={(threadId) => claudeResponses.threadFor(current, threadId)}
-            onAskClaudeChat={(userMessage) => claudeResponses.askInChat(current, userMessage)}
-            onClearClaudeChat={() => claudeResponses.dismissChat(current)}
-            onAskThreadClaude={(threadId, draft, lineRange) => claudeResponses.askThread(current, threadId, draft, lineRange)}
-            onDismissThreadClaude={(threadId) => claudeResponses.dismissThread(current, threadId)}
-            localClaudeThreads={claudeResponses.localThreadsForPR(current)}
-            onAskInlineClaudeForLine={(anchor, draft) => claudeResponses.askInLocalThread(current, anchor, draft)}
-            onDismissLocalClaudeThread={(anchor) => claudeResponses.dismissLocalThread(current, anchor)}
+            aiChat={aiResponses.chatFor(current)}
+            threadAIState={(threadId) => aiResponses.threadFor(current, threadId)}
+            onAskAIChat={(userMessage) => aiResponses.askInChat(current, userMessage)}
+            onClearAIChat={() => aiResponses.dismissChat(current)}
+            onAskThreadAI={(threadId, draft, lineRange) => aiResponses.askThread(current, threadId, draft, lineRange)}
+            onDismissThreadAI={(threadId) => aiResponses.dismissThread(current, threadId)}
+            localAIThreads={aiResponses.localThreadsForPR(current)}
+            onAskInlineAIForLine={(anchor, draft) => aiResponses.askInLocalThread(current, anchor, draft)}
+            onDismissLocalAIThread={(anchor) => aiResponses.dismissLocalThread(current, anchor)}
             conflictResolution={conflictResolutions.stateFor(current)}
             onResolveConflicts={() => resolveConflicts(current)}
             onDismissConflictResolution={() => conflictResolutions.dismiss(current)}

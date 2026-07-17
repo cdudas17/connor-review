@@ -58,7 +58,7 @@ export const APP_CONFIG: Partial<AppConfig> = {
 
   // Tag-driven Claude workflows on the My PRs tab. Each entry surfaces as a
   // pill button on matching PR rows; clicking runs the workflow. The `run`
-  // function is just an async TS function — chain as many askClaude /
+  // function is just an async TS function — chain as many askAI /
   // fixCi / resolveConflicts / updateBranch / toast calls as needed; each
   // step's input + output streams into a result card in the drawer.
   //
@@ -69,11 +69,11 @@ export const APP_CONFIG: Partial<AppConfig> = {
     // {
     //   id: 'loaders-check',
     //   label: 'Check loaders',
-    //   description: "Ask Claude if this PR breaks any GraphQL loaders.",
+    //   description: "Ask AI if this PR breaks any GraphQL loaders.",
     //   tag: 'ID->UUID',
     //   matchCi: 'success',
     //   run: async ({ actions }) => {
-    //     await actions.askClaude(
+    //     await actions.askAI(
     //       "Make sure this won't adversely affect any loaders. We've seen 2 incidents " +
     //       "where we forgot to swap some stuff in loaders."
     //     );

@@ -3,17 +3,17 @@ import type { ReviewThread } from '../types.js';
 import { DiffHunkSnippet } from './DiffHunkSnippet.js';
 import { EmojiTextarea } from './EmojiTextarea.js';
 import { Avatar } from './Avatar.js';
-import { ClaudeResponseCard, type ClaudeResponseState } from './ClaudeResponseCard.js';
+import { AIResponseCard, type AIResponseState } from './AIResponseCard.js';
 
 interface Props {
   threads: ReviewThread[];
   onReply: (threadId: string, body: string) => Promise<void>;
   /** Per-thread Claude state lookup. State is owned at App level and persisted across drawer close. */
-  claudeStateFor?: (threadId: string) => ClaudeResponseState | null;
-  /** Ask Claude for a specific thread. Fires the App-level handler that may toast on late arrival. */
-  onAskClaude?: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
+  aiStateFor?: (threadId: string) => AIResponseState | null;
+  /** Ask AI for a specific thread. Fires the App-level handler that may toast on late arrival. */
+  onAskAI?: (threadId: string, draft: string, lineRange: { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }) => void;
   /** Dismiss the per-thread Claude card. */
-  onDismissClaude?: (threadId: string) => void;
+  onDismissAI?: (threadId: string) => void;
 }
 
 function formatTimeAgo(iso: string): string {
@@ -33,20 +33,20 @@ function formatTimeAgo(iso: string): string {
 interface CardProps {
   thread: ReviewThread;
   onReply: (threadId: string, body: string) => Promise<void>;
-  claudeState: ClaudeResponseState | null;
-  onAskClaude?: Props['onAskClaude'];
-  onDismissClaude?: Props['onDismissClaude'];
+  aiState: AIResponseState | null;
+  onAskAI?: Props['onAskAI'];
+  onDismissAI?: Props['onDismissAI'];
 }
 
-function ConversationCard({ thread, onReply, claudeState, onAskClaude, onDismissClaude }: CardProps) {
+function ConversationCard({ thread, onReply, aiState, onAskAI, onDismissAI }: CardProps) {
   const [open, setOpen] = useState(true);
   const [reply, setReply] = useState('');
   const [replying, setReplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const askClaude = () => {
-    if (!onAskClaude || reply.trim() === '') return;
-    onAskClaude(thread.id, reply.trim(), {
+  const askAI = () => {
+    if (!onAskAI || reply.trim() === '') return;
+    onAskAI(thread.id, reply.trim(), {
       path: thread.path,
       endLine: thread.line ?? 0,
       startLine: thread.startLine ?? undefined,
@@ -104,23 +104,23 @@ function ConversationCard({ thread, onReply, claudeState, onAskClaude, onDismiss
               disabled={replying}
             />
             {error && <p className="conversation-reply-error">{error}</p>}
-            <ClaudeResponseCard
-              state={claudeState}
-              onDismiss={onDismissClaude ? () => onDismissClaude(thread.id) : undefined}
+            <AIResponseCard
+              state={aiState}
+              onDismiss={onDismissAI ? () => onDismissAI(thread.id) : undefined}
             />
             <div className="conversation-reply-actions">
               <button type="button" className="btn-primary" disabled={replying || reply.trim() === ''} onClick={submit}>
                 {replying ? 'Replying…' : 'Reply'}
               </button>
-              {onAskClaude && (
+              {onAskAI && (
                 <button
                   type="button"
-                  className="btn-ask-claude"
-                  disabled={reply.trim() === '' || claudeState?.loading}
-                  onClick={askClaude}
+                  className="btn-ask-ai"
+                  disabled={reply.trim() === '' || aiState?.loading}
+                  onClick={askAI}
                   title="Send your draft reply + this thread's line range to your local `claude` CLI"
                 >
-                  {claudeState?.loading ? 'Asking…' : 'Ask Claude'}
+                  {aiState?.loading ? 'Asking…' : 'Ask AI'}
                 </button>
               )}
             </div>
@@ -131,7 +131,7 @@ function ConversationCard({ thread, onReply, claudeState, onAskClaude, onDismiss
   );
 }
 
-export function ConversationsList({ threads, onReply, claudeStateFor, onAskClaude, onDismissClaude }: Props) {
+export function ConversationsList({ threads, onReply, aiStateFor, onAskAI, onDismissAI }: Props) {
   // Collapsed by default — the diff is usually what the user actually
   // wants to see first; conversations are background context.
   const [sectionOpen, setSectionOpen] = useState(false);
@@ -184,9 +184,9 @@ export function ConversationsList({ threads, onReply, claudeStateFor, onAskClaud
               key={t.id}
               thread={t}
               onReply={onReply}
-              claudeState={claudeStateFor?.(t.id) ?? null}
-              onAskClaude={onAskClaude}
-              onDismissClaude={onDismissClaude}
+              aiState={aiStateFor?.(t.id) ?? null}
+              onAskAI={onAskAI}
+              onDismissAI={onDismissAI}
             />
           ))}
         </div>

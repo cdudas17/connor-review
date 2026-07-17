@@ -1,37 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiCallError } from '../lib/api.js';
-import type { ClaudeResponseState } from '../components/ClaudeResponseCard.js';
+import type { AIResponseState } from '../components/AIResponseCard.js';
 
 interface PRTarget { owner: string; repo: string; number: number; }
 interface LineRange { path: string; startLine?: number; endLine: number; side: 'LEFT' | 'RIGHT' }
 
-export interface ClaudeChatTurn {
-  role: 'user' | 'claude';
+export interface AIChatTurn {
+  role: 'user' | 'ai';
   body: string;
   ts: number;
-  /** True only on the latest claude turn while in-flight; cleared on settle. Never persisted. */
+  /** True only on the latest AI turn while in-flight; cleared on settle. Never persisted. */
   loading?: boolean;
-  /** Set on a claude turn that failed. */
+  /** Set on an AI turn that failed. */
   error?: string;
-  /** Set on a claude turn whose prompt had a truncated diff. Display-only. */
+  /** Set on an AI turn whose prompt had a truncated diff. Display-only. */
   truncatedDiff?: boolean;
 }
 
-export interface ClaudeChat {
-  turns: ClaudeChatTurn[];
+export interface AIChat {
+  turns: AIChatTurn[];
   /** Epoch ms when this chat was last updated. Drives sweep + LRU. */
   savedAt: number;
 }
 
 /** Persisted-chat storage. Replaces the old per-PR summary card store. */
-const CHAT_STORAGE_KEY = 'connor-review.claudeChat.v1';
+const CHAT_STORAGE_KEY = 'connor-review.aiChat.v1';
 /** Legacy summary card store (single response per PR). Read once at boot and
  * migrated into the new chat shape (single claude turn), then ignored. */
 const LEGACY_SUMMARY_STORAGE_KEY = 'connor-review.claudeSummary.v1';
 const THREAD_STORAGE_KEY = 'connor-review.claudeThread.v1';
 /** Per-PR-per-diff-anchor local Claude threads. Keyed by
  * `${prKey}::${path}|${startLine ?? line}-${line}|${side}`. Each is a full
- * ClaudeChat — multi-turn, persisted, never sent to GitHub. */
+ * AIChat — multi-turn, persisted, never sent to GitHub. */
 const LOCAL_THREAD_STORAGE_KEY = 'connor-review.claudeLocalThread.v1';
 
 /** Drop persisted responses older than this on hook mount. */
@@ -68,12 +68,32 @@ function loadJson<T>(key: string, fallback: T): T {
   }
 }
 
-function loadChats(): Record<string, ClaudeChat> {
-  const direct = loadJson<Record<string, ClaudeChat>>(CHAT_STORAGE_KEY, {});
-  if (Object.keys(direct).length > 0) return direct;
+/** Convert any legacy `role: 'claude'` on persisted turns into `'ai'`.
+ *  The rename is client-only — no storage-key bump, so old chats in
+ *  localStorage still deserialize; we just relabel roles on read. */
+function migrateChatRoles(chat: AIChat): AIChat {
+  let mutated = false;
+  const turns = chat.turns.map((t) => {
+    // Older writes used 'claude' as the assistant-role tag.
+    if ((t as { role: string }).role === 'claude') {
+      mutated = true;
+      return { ...t, role: 'ai' as const };
+    }
+    return t;
+  });
+  return mutated ? { ...chat, turns } : chat;
+}
+
+function loadChats(): Record<string, AIChat> {
+  const direct = loadJson<Record<string, AIChat>>(CHAT_STORAGE_KEY, {});
+  if (Object.keys(direct).length > 0) {
+    const migrated: Record<string, AIChat> = {};
+    for (const [k, v] of Object.entries(direct)) migrated[k] = migrateChatRoles(v);
+    return migrated;
+  }
   // Migrate any legacy single-card entries on first run.
-  const legacy = loadJson<Record<string, ClaudeResponseState & { savedAt?: number }>>(LEGACY_SUMMARY_STORAGE_KEY, {});
-  const migrated: Record<string, ClaudeChat> = {};
+  const legacy = loadJson<Record<string, AIResponseState & { savedAt?: number }>>(LEGACY_SUMMARY_STORAGE_KEY, {});
+  const migrated: Record<string, AIChat> = {};
   for (const [key, v] of Object.entries(legacy)) {
     if (v.loading) continue;
     if (!v.body && !v.error) continue;
@@ -84,18 +104,18 @@ function loadChats(): Record<string, ClaudeChat> {
         // The legacy single-card stored only Claude's response — we don't have
         // the user's original prompt. Render as a Claude turn with a marker so
         // the user knows what it is.
-        { role: 'claude', body: v.body ?? '', ts, truncatedDiff: v.truncatedDiff, error: v.error },
+        { role: 'ai', body: v.body ?? '', ts, truncatedDiff: v.truncatedDiff, error: v.error },
       ],
     };
   }
   return migrated;
 }
 
-function persistChats(store: Record<string, ClaudeChat>) {
+function persistChats(store: Record<string, AIChat>) {
   try {
     // Drop transient `loading` flags from any claude turn before persisting —
     // a loading request that's lost on reload would otherwise stay stuck.
-    const stable: Record<string, ClaudeChat> = {};
+    const stable: Record<string, AIChat> = {};
     for (const [k, v] of Object.entries(store)) {
       stable[k] = {
         savedAt: v.savedAt,
@@ -106,13 +126,13 @@ function persistChats(store: Record<string, ClaudeChat>) {
   } catch { /* quota — ignore */ }
 }
 
-function loadStore(key: string): Record<string, ClaudeResponseState> {
-  return loadJson<Record<string, ClaudeResponseState>>(key, {});
+function loadStore(key: string): Record<string, AIResponseState> {
+  return loadJson<Record<string, AIResponseState>>(key, {});
 }
 
-function persistStore(key: string, store: Record<string, ClaudeResponseState>) {
+function persistStore(key: string, store: Record<string, AIResponseState>) {
   try {
-    const stable: Record<string, ClaudeResponseState> = {};
+    const stable: Record<string, AIResponseState> = {};
     for (const [k, v] of Object.entries(store)) {
       if (v.loading) continue;
       stable[k] = v;
@@ -142,7 +162,7 @@ interface Options {
   repoPathFor?: (target: PRTarget) => string | undefined;
 }
 
-/** Centralised Claude state for the drawer's "Ask Claude" surfaces.
+/** Centralised Claude state for the drawer's "Ask AI" surfaces.
  *
  * - **Chat panel** (one per PR): a multi-turn conversation. Replaces what used
  *   to be the single summary response card. Persisted across drawer close, PR
@@ -152,17 +172,21 @@ interface Options {
  *
  * In-flight requests survive drawer close. When a response lands and the drawer
  * is no longer on that PR, we toast so the user knows to reopen. */
-export function useClaudeResponses(opts: Options) {
+export function useAIResponses(opts: Options) {
   const { onToast, currentPRKey, repoPathFor } = opts;
   // Stable ref so the ask callbacks (wrapped in useCallback([])) always read
   // the latest resolver without invalidating their identity.
   const repoPathForRef = useRef<typeof repoPathFor>(repoPathFor);
   useEffect(() => { repoPathForRef.current = repoPathFor; }, [repoPathFor]);
-  const [chats, setChats] = useState<Record<string, ClaudeChat>>(() => sweepStore(loadChats(), Date.now()));
-  const [threads, setThreads] = useState<Record<string, ClaudeResponseState>>(() => sweepStore(loadStore(THREAD_STORAGE_KEY), Date.now()));
-  const [localThreads, setLocalThreads] = useState<Record<string, ClaudeChat & { anchor: LocalThreadAnchor }>>(
-    () => sweepStore(loadJson<Record<string, ClaudeChat & { anchor: LocalThreadAnchor }>>(LOCAL_THREAD_STORAGE_KEY, {}), Date.now()),
-  );
+  const [chats, setChats] = useState<Record<string, AIChat>>(() => sweepStore(loadChats(), Date.now()));
+  const [threads, setThreads] = useState<Record<string, AIResponseState>>(() => sweepStore(loadStore(THREAD_STORAGE_KEY), Date.now()));
+  const [localThreads, setLocalThreads] = useState<Record<string, AIChat & { anchor: LocalThreadAnchor }>>(() => {
+    const raw = loadJson<Record<string, AIChat & { anchor: LocalThreadAnchor }>>(LOCAL_THREAD_STORAGE_KEY, {});
+    // Same role-rename migration as loadChats.
+    const migrated: Record<string, AIChat & { anchor: LocalThreadAnchor }> = {};
+    for (const [k, v] of Object.entries(raw)) migrated[k] = { ...migrateChatRoles(v), anchor: v.anchor };
+    return sweepStore(migrated, Date.now());
+  });
 
   const tokensRef = useRef<Map<string, number>>(new Map());
   const currentPRKeyRef = useRef<string | null>(currentPRKey);
@@ -170,10 +194,10 @@ export function useClaudeResponses(opts: Options) {
 
   // Ref-mirror of chats so the synchronous part of askInChat can read the
   // latest turns without going through a state-updater (React 18 batches the
-  // updater, which means it runs AFTER `api.askClaude` is called otherwise).
-  const chatsRef = useRef<Record<string, ClaudeChat>>(chats);
+  // updater, which means it runs AFTER `api.askAI` is called otherwise).
+  const chatsRef = useRef<Record<string, AIChat>>(chats);
   useEffect(() => { chatsRef.current = chats; }, [chats]);
-  const localThreadsRef = useRef<Record<string, ClaudeChat & { anchor: LocalThreadAnchor }>>(localThreads);
+  const localThreadsRef = useRef<Record<string, AIChat & { anchor: LocalThreadAnchor }>>(localThreads);
   useEffect(() => { localThreadsRef.current = localThreads; }, [localThreads]);
 
   useEffect(() => { persistChats(chats); }, [chats]);
@@ -182,7 +206,7 @@ export function useClaudeResponses(opts: Options) {
     // Same loading-strip pattern as persistChats — drop transient flags so a
     // page reload mid-ask doesn't leave a thread stuck "asking".
     try {
-      const stable: Record<string, ClaudeChat & { anchor: LocalThreadAnchor }> = {};
+      const stable: Record<string, AIChat & { anchor: LocalThreadAnchor }> = {};
       for (const [k, v] of Object.entries(localThreads)) {
         stable[k] = { ...v, turns: v.turns.map((t) => (t.loading ? { ...t, loading: false } : t)) };
       }
@@ -201,9 +225,9 @@ export function useClaudeResponses(opts: Options) {
     tokensRef.current.set(`chat::${key}`, token);
 
     // Read existing turns from the ref synchronously — state-updater runs
-    // later under React 18 batching, which would race with api.askClaude below.
+    // later under React 18 batching, which would race with api.askAI below.
     const existing = chatsRef.current[key];
-    const priorTurns: ClaudeChatTurn[] = existing?.turns.filter((t) => !t.loading) ?? [];
+    const priorTurns: AIChatTurn[] = existing?.turns.filter((t) => !t.loading) ?? [];
     const now = Date.now();
     setChats((c) => {
       const cur = c[key];
@@ -215,13 +239,13 @@ export function useClaudeResponses(opts: Options) {
           turns: [
             ...baseTurns,
             { role: 'user', body: trimmed, ts: now },
-            { role: 'claude', body: '', ts: now, loading: true },
+            { role: 'ai', body: '', ts: now, loading: true },
           ],
         },
       };
     });
 
-    api.askClaude(target.owner, target.repo, target.number, {
+    api.askAI(target.owner, target.repo, target.number, {
       draft: trimmed,
       conversation: priorTurns.map((t) => ({ role: t.role, body: t.body })),
       repoPath: repoPathForRef.current?.(target),
@@ -233,7 +257,7 @@ export function useClaudeResponses(opts: Options) {
           if (!cur) return c;
           // Replace the trailing loading claude turn with the resolved one.
           const turns = cur.turns.map((t, i) =>
-            i === cur.turns.length - 1 && t.role === 'claude' && t.loading
+            i === cur.turns.length - 1 && t.role === 'ai' && t.loading
               ? { ...t, loading: false, body: res.response, truncatedDiff: res.truncatedDiff, ts: Date.now() }
               : t);
           return { ...c, [key]: { savedAt: Date.now(), turns } };
@@ -249,7 +273,7 @@ export function useClaudeResponses(opts: Options) {
           const cur = c[key];
           if (!cur) return c;
           const turns = cur.turns.map((t, i) =>
-            i === cur.turns.length - 1 && t.role === 'claude' && t.loading
+            i === cur.turns.length - 1 && t.role === 'ai' && t.loading
               ? { ...t, loading: false, error: msg, ts: Date.now() }
               : t);
           return { ...c, [key]: { savedAt: Date.now(), turns } };
@@ -278,7 +302,7 @@ export function useClaudeResponses(opts: Options) {
     tokensRef.current.set(`local::${key}`, token);
 
     const existing = localThreadsRef.current[key];
-    const priorTurns: ClaudeChatTurn[] = existing?.turns.filter((t) => !t.loading) ?? [];
+    const priorTurns: AIChatTurn[] = existing?.turns.filter((t) => !t.loading) ?? [];
     const now = Date.now();
     setLocalThreads((c) => {
       const cur = c[key];
@@ -291,14 +315,14 @@ export function useClaudeResponses(opts: Options) {
           turns: [
             ...baseTurns,
             { role: 'user', body: trimmed, ts: now },
-            { role: 'claude', body: '', ts: now, loading: true },
+            { role: 'ai', body: '', ts: now, loading: true },
           ],
         },
       };
     });
 
     const prRef = prKey(target);
-    api.askClaude(target.owner, target.repo, target.number, {
+    api.askAI(target.owner, target.repo, target.number, {
       draft: trimmed,
       conversation: priorTurns.map((t) => ({ role: t.role, body: t.body })),
       lineRange: { path: anchor.path, endLine: anchor.line, startLine: anchor.startLine, side: anchor.side },
@@ -310,7 +334,7 @@ export function useClaudeResponses(opts: Options) {
           const cur = c[key];
           if (!cur) return c;
           const turns = cur.turns.map((t, i) =>
-            i === cur.turns.length - 1 && t.role === 'claude' && t.loading
+            i === cur.turns.length - 1 && t.role === 'ai' && t.loading
               ? { ...t, loading: false, body: res.response, truncatedDiff: res.truncatedDiff, ts: Date.now() }
               : t);
           return { ...c, [key]: { ...cur, savedAt: Date.now(), turns } };
@@ -326,7 +350,7 @@ export function useClaudeResponses(opts: Options) {
           const cur = c[key];
           if (!cur) return c;
           const turns = cur.turns.map((t, i) =>
-            i === cur.turns.length - 1 && t.role === 'claude' && t.loading
+            i === cur.turns.length - 1 && t.role === 'ai' && t.loading
               ? { ...t, loading: false, error: msg, ts: Date.now() }
               : t);
           return { ...c, [key]: { ...cur, savedAt: Date.now(), turns } };
@@ -345,9 +369,9 @@ export function useClaudeResponses(opts: Options) {
 
   /** Lookup helper for the diff: returns every local thread on this PR so the
    * renderer can anchor them at their (path, line, side). */
-  const localThreadsForPR = useCallback((target: PRTarget): Array<ClaudeChat & { anchor: LocalThreadAnchor; key: string }> => {
+  const localThreadsForPR = useCallback((target: PRTarget): Array<AIChat & { anchor: LocalThreadAnchor; key: string }> => {
     const prefix = `${prKey(target)}::`;
-    const out: Array<ClaudeChat & { anchor: LocalThreadAnchor; key: string }> = [];
+    const out: Array<AIChat & { anchor: LocalThreadAnchor; key: string }> = [];
     for (const [k, v] of Object.entries(localThreads)) {
       if (k.startsWith(prefix)) out.push({ ...v, key: k });
     }
@@ -361,7 +385,7 @@ export function useClaudeResponses(opts: Options) {
     tokensRef.current.set(`thread::${key}`, token);
     setThreads((s) => ({ ...s, [key]: { loading: true } }));
     const prRef = prKey(target);
-    api.askClaude(target.owner, target.repo, target.number, {
+    api.askAI(target.owner, target.repo, target.number, {
       draft,
       lineRange,
       repoPath: repoPathForRef.current?.(target),
@@ -396,7 +420,7 @@ export function useClaudeResponses(opts: Options) {
     tokensRef.current.set(`chat::${sKey}`, (tokensRef.current.get(`chat::${sKey}`) ?? 0) + 1);
     setChats((c) => { const next = { ...c }; delete next[sKey]; return next; });
     setThreads((s) => {
-      const next: Record<string, ClaudeResponseState> = {};
+      const next: Record<string, AIResponseState> = {};
       for (const [k, v] of Object.entries(s)) {
         if (k.startsWith(tPrefix)) {
           tokensRef.current.set(`thread::${k}`, (tokensRef.current.get(`thread::${k}`) ?? 0) + 1);
@@ -407,7 +431,7 @@ export function useClaudeResponses(opts: Options) {
       return next;
     });
     setLocalThreads((l) => {
-      const next: Record<string, ClaudeChat & { anchor: LocalThreadAnchor }> = {};
+      const next: Record<string, AIChat & { anchor: LocalThreadAnchor }> = {};
       for (const [k, v] of Object.entries(l)) {
         if (k.startsWith(tPrefix)) {
           tokensRef.current.set(`local::${k}`, (tokensRef.current.get(`local::${k}`) ?? 0) + 1);
@@ -419,8 +443,8 @@ export function useClaudeResponses(opts: Options) {
     });
   }, []);
 
-  const chatFor = useCallback((target: PRTarget): ClaudeChat | null => chats[prKey(target)] ?? null, [chats]);
-  const threadFor = useCallback((target: PRTarget, threadId: string): ClaudeResponseState | null => threads[threadKey(target, threadId)] ?? null, [threads]);
+  const chatFor = useCallback((target: PRTarget): AIChat | null => chats[prKey(target)] ?? null, [chats]);
+  const threadFor = useCallback((target: PRTarget, threadId: string): AIResponseState | null => threads[threadKey(target, threadId)] ?? null, [threads]);
 
   /** Aggregate state for the PR-list row badge. Inspects chat turns + every
    * thread card + every inline local-thread for the PR. Priority:
@@ -437,7 +461,7 @@ export function useClaudeResponses(opts: Options) {
       for (const t of chat.turns) {
         if (t.loading) anyLoading = true;
         if (t.error) anyError = true;
-        if (t.role === 'claude' && t.body && !t.error) anyBody = true;
+        if (t.role === 'ai' && t.body && !t.error) anyBody = true;
       }
     }
     const threadPrefix = `${prefix}::`;
@@ -454,7 +478,7 @@ export function useClaudeResponses(opts: Options) {
       for (const t of v.turns) {
         if (t.loading) anyLoading = true;
         if (t.error) anyError = true;
-        if (t.role === 'claude' && t.body && !t.error) anyBody = true;
+        if (t.role === 'ai' && t.body && !t.error) anyBody = true;
       }
     }
     if (!anyEntry) return null;

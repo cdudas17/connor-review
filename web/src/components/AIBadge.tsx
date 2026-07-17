@@ -10,7 +10,7 @@ interface Props {
  *
  * Tooltip explains the state. Open the drawer to see the actual response.
  */
-export function ClaudeBadge({ state }: Props) {
+export function AIBadge({ state }: Props) {
   if (!state) return null;
   if (state.kind === 'loading') {
     return (
