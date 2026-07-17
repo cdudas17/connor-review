@@ -716,7 +716,11 @@ a.issue-comment-when:hover { text-decoration: underline; }
  * colors back to their original hue so blues stay blue-ish. Standard
  * trick for skinning third-party embeds; text stays legible and event
  * chips keep their color families. */
-.calendar-embed { width: 100%; height: calc(100vh - 240px); min-height: 480px; border: 0; border-radius: 8px; background: #1a1a1a; filter: invert(0.92) hue-rotate(180deg); color-scheme: light; }
+/* Pre-filter background is pure white so the invert filter produces
+ * ~#141414 during the pre-content load — matches --bg (#0d1117) closely
+ * enough that there's no bright flash before Google's own HTML paints.
+ * A dark wrapper background here would render LIGHT after the filter. */
+.calendar-embed { width: 100%; height: calc(100vh - 240px); min-height: 480px; border: 0; border-radius: 8px; background: #ffffff; filter: invert(0.92) hue-rotate(180deg); color-scheme: light; }
 
 /* Timeline view — replaces the per-event list with a horizontal busy-block
  * bar per day. Far more useful at a glance when every event is title-less
