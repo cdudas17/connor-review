@@ -7,6 +7,16 @@ interface Props {
   /** Kept for forward-compat — fires only for events that actually have a
    * title. Title-less busy blocks are visual-only (no drawer to open). */
   onOpen: (event: CalendarEvent) => void;
+  /** Hide this event from future agenda + FAB output. Titled events hide
+   *  every occurrence with that title (so recurring "holds" collapse to
+   *  one click); untitled blocks hide the single occurrence only. See
+   *  `lib/agendaHide.ts`. */
+  onHide?: (event: CalendarEvent) => void;
+  /** How many events are currently hidden (post-filter count already
+   *  applied to `events`). Drives the "Show hidden" footer when > 0. */
+  hiddenCount?: number;
+  /** Wipe the hide list — used by the footer's "Show N hidden" button. */
+  onShowAllHidden?: () => void;
 }
 
 // Fixed window for the timeline view. Events fully outside this range are
@@ -50,7 +60,7 @@ function hoursIntoDay(iso: string, dayStart: Date): number {
   return (t - dayStart.getTime()) / 3_600_000 - DAY_START_HOUR;
 }
 
-export function CalendarAgenda({ events, onOpen }: Props) {
+export function CalendarAgenda({ events, onOpen, onHide, hiddenCount = 0, onShowAllHidden }: Props) {
   // Tick once a minute so the "now" line advances without a hard refresh.
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -142,7 +152,20 @@ export function CalendarAgenda({ events, onOpen }: Props) {
                     onClick={hasTitle ? () => onOpen(e) : undefined}
                     role={hasTitle ? 'button' : undefined}
                     tabIndex={hasTitle ? 0 : -1}
-                  />
+                  >
+                    {onHide && (
+                      // Hide-from-agenda affordance. Sits inside the block so
+                      // it's discoverable via hover regardless of title. Stop
+                      // propagation so clicking × doesn't also open the drawer.
+                      <button
+                        type="button"
+                        className="calendar-block-hide"
+                        aria-label={hasTitle ? `Hide "${e.title}" from agenda` : 'Hide this block from agenda'}
+                        title={hasTitle ? `Hide "${e.title}" from agenda` : 'Hide this block from agenda'}
+                        onClick={(ev) => { ev.stopPropagation(); onHide(e); }}
+                      >×</button>
+                    )}
+                  </div>
                 );
               })}
               {/* "Now" line on today */}
@@ -167,6 +190,15 @@ export function CalendarAgenda({ events, onOpen }: Props) {
           </section>
         );
       })}
+      {hiddenCount > 0 && onShowAllHidden && (
+        // Undo bar — the only way back to hidden events. Nukes the whole
+        // hide list; per-event restore isn't worth the UI right now since
+        // hidden holds are usually recurring and clearing all is fine.
+        <p className="calendar-hidden-footer">
+          <span className="calendar-hidden-footer-count">{hiddenCount} event{hiddenCount === 1 ? '' : 's'} hidden</span>
+          <button type="button" className="link-button" onClick={onShowAllHidden}>Show all hidden</button>
+        </p>
+      )}
     </div>
   );
 }

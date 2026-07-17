@@ -17,6 +17,8 @@ import { CalendarAgenda } from './components/CalendarAgenda.js';
 import { EventDrawer } from './components/EventDrawer.js';
 import { NextMeetingFab } from './components/NextMeetingFab.js';
 import { useCalendarEvents } from './hooks/useCalendarEvents.js';
+import { useHiddenAgendaEvents } from './hooks/useHiddenAgendaEvents.js';
+import { filterVisible, hideKeyOf } from './lib/agendaHide.js';
 import type { CalendarEvent } from './types.js';
 import { OncallStateFilter, type OncallState } from './components/OncallStateFilter.js';
 import { NotesFab } from './components/NotesFab.js';
@@ -144,6 +146,14 @@ export function App() {
   });
   useEffect(() => { if (tab === 'issues') setIssuesTabEverSeen(true); }, [tab]);
   const calendar = useCalendarEvents();
+  const hiddenAgenda = useHiddenAgendaEvents();
+  // Everything downstream of Calendar (agenda timeline, next-meeting FAB)
+  // sees only non-hidden events; hidden ones are still in `calendar.events`
+  // so the "N hidden — restore" affordance can still enumerate them.
+  const visibleEvents = useMemo(
+    () => filterVisible(calendar.events, hiddenAgenda.hidden),
+    [calendar.events, hiddenAgenda.hidden],
+  );
   const [currentEvent, setCurrentEvent] = useState<CalendarEvent | null>(null);
   // Locked to 'all' — the toggle UI was removed. Existing PRList +
   // advance plumbing still reads `mode`; useState keeps the type wide
@@ -1337,7 +1347,13 @@ export function App() {
                     {calendar.error && (
                       <ErrorToast message={calendar.error} onDismiss={() => { /* error clears on next successful fetch */ }} />
                     )}
-                    <CalendarAgenda events={calendar.events} onOpen={setCurrentEvent} />
+                    <CalendarAgenda
+                      events={visibleEvents}
+                      hiddenCount={calendar.events.length - visibleEvents.length}
+                      onHide={(event) => hiddenAgenda.hide(hideKeyOf(event))}
+                      onShowAllHidden={hiddenAgenda.clear}
+                      onOpen={setCurrentEvent}
+                    />
                   </>
                 )}
                 {calendar.auth.kind === 'unknown' && (
@@ -1592,7 +1608,7 @@ export function App() {
       })()}
       <NotesFab />
       <NextMeetingFab
-        events={calendar.events}
+        events={visibleEvents}
         hasCalendar={calendar.auth.kind === 'ready'}
         onOpen={() => setTab('calendar')}
       />

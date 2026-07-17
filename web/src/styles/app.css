@@ -741,6 +741,19 @@ a.issue-comment-when:hover { text-decoration: underline; }
 .calendar-block { position: absolute; top: 2px; bottom: 2px; background: rgba(99, 102, 241, 0.55); border: 1px solid rgba(99, 102, 241, 0.85); border-radius: 3px; min-width: 4px; }
 .calendar-block-titled { cursor: pointer; }
 .calendar-block-titled:hover { background: rgba(99, 102, 241, 0.75); }
+/* Hide-from-agenda × on each block. Hidden by default; fades in on
+ * hover/focus. Absolute-positioned top-right so it doesn't grow the
+ * block and it's discoverable regardless of block width (min-width on
+ * the parent keeps a 4px block reachable). */
+.calendar-block-hide { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; padding: 0; border-radius: 50%; border: 1px solid var(--border); background: var(--bg); color: var(--muted); cursor: pointer; font: inherit; font-size: 11px; line-height: 1; display: none; align-items: center; justify-content: center; z-index: 2; }
+.calendar-block:hover .calendar-block-hide,
+.calendar-block:focus-within .calendar-block-hide { display: inline-flex; }
+.calendar-block-hide:hover { color: var(--fg); background: var(--bg-subtle); border-color: var(--muted); }
+/* Footer strip under the timeline — shows when there are hidden
+ * events, offers a one-click restore. Deliberately understated so it
+ * doesn't compete with the calendar body. */
+.calendar-hidden-footer { display: flex; align-items: center; gap: 10px; margin-top: 12px; color: var(--muted); font-size: 0.85rem; }
+.calendar-hidden-footer-count { color: var(--muted); }
 .calendar-now-marker { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #f85149; box-shadow: 0 0 6px rgba(248, 81, 73, 0.55); pointer-events: none; }
 .calendar-day-extras { display: flex; gap: 4px; flex-wrap: wrap; justify-self: end; }
 .calendar-day-extra { font-size: 10px; color: var(--muted); padding: 1px 6px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
