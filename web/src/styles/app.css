@@ -709,8 +709,14 @@ a.issue-comment-when:hover { text-decoration: underline; }
 .calendar-view-toggle button:hover:not(.calendar-view-toggle-on) { background: var(--bg-subtle); color: var(--fg); }
 .calendar-view-toggle-on { background: var(--accent); color: #fff; }
 /* Embed mode iframe — fills the tab body. Height matches the visible
- * agenda scroll region so switching between views doesn't jump. */
-.calendar-embed { width: 100%; height: calc(100vh - 240px); min-height: 480px; border: 0; border-radius: 8px; background: var(--bg-subtle); }
+ * agenda scroll region so switching between views doesn't jump.
+ *
+ * Google Calendar's embed doesn't ship a dark theme, so we invert +
+ * hue-rotate at the iframe level: hue-rotate(180deg) puts the inverted
+ * colors back to their original hue so blues stay blue-ish. Standard
+ * trick for skinning third-party embeds; text stays legible and event
+ * chips keep their color families. */
+.calendar-embed { width: 100%; height: calc(100vh - 240px); min-height: 480px; border: 0; border-radius: 8px; background: #1a1a1a; filter: invert(0.92) hue-rotate(180deg); color-scheme: light; }
 
 /* Timeline view — replaces the per-event list with a horizontal busy-block
  * bar per day. Far more useful at a glance when every event is title-less
