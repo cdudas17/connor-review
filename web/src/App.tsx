@@ -1386,6 +1386,7 @@ export function App() {
         conflictStateFor={(t) => conflictResolutions.stateFor(t)}
         onResolveConflicts={(t) => resolveConflicts({ ...t })}
         ciFixStateFor={(t) => ciFixes.stateFor(t)}
+        rebasingFor={(t) => rebasesRunning.has(`${t.owner}/${t.repo}#${t.number}`)}
         onOpenCiChecks={(t) => setCiChecksTarget(t)}
         // Only on the My PRs tab — those are PRs the viewer can typically merge.
         // Fire-and-forget toggle: optimistically flip the row, toast on failure.

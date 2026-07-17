@@ -5,6 +5,7 @@ import { GhStatusBadge } from './GhStatusBadge.js';
 import { CiBadge } from './CiBadge.js';
 import { AIBadge } from './AIBadge.js';
 import { ConflictBadge } from './ConflictBadge.js';
+import { RebaseBadge } from './RebaseBadge.js';
 import { LabelChips } from './LabelChips.js';
 import type { FilterMode } from './FilterToggle.js';
 import { GitMergeIcon, GitMergeQueueIcon, CopyIcon, CheckIcon } from '@primer/octicons-react';
@@ -57,6 +58,9 @@ interface Props {
   /** Per-PR fix-CI state. When 'running', the CiBadge replaces its icon
    * with a spinner so the row signals an in-flight fix attempt. */
   ciFixStateFor?: (id: { owner: string; repo: string; number: number }) => { kind: 'running' | 'failed' | 'success' | 'no-failures' | 'no-changes' } | null;
+  /** Whether a rebase is currently running for this PR. When true, a
+   *  Rebasing badge renders in the row's status cluster. */
+  rebasingFor?: (id: { owner: string; repo: string; number: number }) => boolean;
   /** When set, clicking the CI badge on a row opens the per-check
    * breakdown drawer for that PR. */
   onOpenCiChecks?: (id: { owner: string; repo: string; number: number }) => void;
@@ -101,7 +105,7 @@ function CopyLinkButton({ owner, repo, number }: { owner: string; repo: string; 
   );
 }
 
-export function PRList({ prs, mode, onOpen, selection, aiStateFor, conflictStateFor, onResolveConflicts, ciFixStateFor, onOpenCiChecks, onToggleAutoMerge, showCopyLink, workflows, workflowStateFor, onRunWorkflow }: Props) {
+export function PRList({ prs, mode, onOpen, selection, aiStateFor, conflictStateFor, onResolveConflicts, ciFixStateFor, rebasingFor, onOpenCiChecks, onToggleAutoMerge, showCopyLink, workflows, workflowStateFor, onRunWorkflow }: Props) {
   const filtered = mode === 'untouched-only' ? prs.filter((p) => p.status === 'untouched') : prs;
   if (filtered.length === 0) {
     return <p className="empty">No PRs to review.</p>;
@@ -168,6 +172,11 @@ export function PRList({ prs, mode, onOpen, selection, aiStateFor, conflictState
                   : 'idle'}
                 onClick={onResolveConflicts ? () => onResolveConflicts({ owner: p.owner, repo: p.repo, number: p.number }) : undefined}
               />
+              {/* Rebase indicator — session-only, appears only while the
+                  drawer-fired rebase is in flight for this PR. Renders
+                  next to Conflicts because both live on the branch-state
+                  axis. */}
+              <RebaseBadge running={rebasingFor?.({ owner: p.owner, repo: p.repo, number: p.number }) ?? false} />
               {/* Draft + Closed + Approved are the GhStatus values we surface
                   left-of-CI — Draft gates reviewability, Closed flags the PR
                   is dead, and Approved is high-signal "ready to merge". Other

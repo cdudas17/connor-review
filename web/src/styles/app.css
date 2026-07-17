@@ -250,6 +250,13 @@ body { margin: 0; color: var(--fg); background: var(--bg); }
 .claude-badge-success { color: #d97757; }
 .claude-badge-error { color: var(--err, #cf6679); }
 .claude-badge-spinner { width: 9px; height: 9px; border-width: 1.5px; margin: 0; }
+/* Rebase in-flight indicator — renders in the branch-state cluster next
+ * to ConflictBadge. Uses the same blue as the .btn-rebase footer button
+ * for visual consistency between "I clicked rebase" and "the row shows
+ * that rebase". */
+.rebase-badge { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; border: 1px solid #58a6ff; color: #58a6ff; background: rgba(88, 166, 255, 0.1); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.rebase-badge-spinner { width: 9px; height: 9px; border-width: 1.5px; margin: 0; border-color: rgba(88, 166, 255, 0.35); border-top-color: #58a6ff; }
+.rebase-badge-label { line-height: 1; }
 
 /* :shortcode: emoji autocomplete dropdown */
 .emoji-textarea { position: relative; }
