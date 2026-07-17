@@ -1281,15 +1281,16 @@ export function App() {
         </section>
       )}
 
-      {tab === 'calendar' && (() => {
-        // When calendarIframeUrl is configured, the tab gains an Agenda ↔ Embed
-        // toggle. In Embed mode the tab body is a Google Calendar iframe —
-        // useful when gcalcli is fighting you. useCalendarEvents keeps
-        // running either way so NextMeetingFab still has data.
+      {(() => {
+        // The calendar tab renders ALWAYS (just hidden with display:none when
+        // it's not the active tab) so the iframe's DOM node — and its loaded
+        // Google Calendar session — survives tab switches. Reloading the
+        // whole embed every time the user bounces to My PRs and back is
+        // slow enough to feel broken.
         const iframeUrl = APP_CONFIG.calendarIframeUrl?.trim();
         const showIframeMode = !!iframeUrl && calendarView === 'iframe';
         return (
-          <section className="calendar-tab">
+          <section className="calendar-tab" style={tab === 'calendar' ? undefined : { display: 'none' }}>
             {iframeUrl && (
               <div className="calendar-view-toggle" role="tablist" aria-label="Calendar view">
                 <button
