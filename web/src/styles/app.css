@@ -700,6 +700,17 @@ a.issue-comment-when:hover { text-decoration: underline; }
 .calendar-connect-btn { padding: 8px 18px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; font: inherit; font-weight: 500; }
 .calendar-connect-btn:hover { filter: brightness(1.08); }
 .calendar-actions-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.9rem; color: var(--muted); }
+/* Agenda ↔ Embed segmented toggle — rendered only when calendarIframeUrl
+ * is configured. Same visual weight as .oncall-external-links pills so it
+ * blends into the tab header. */
+.calendar-view-toggle { display: inline-flex; gap: 0; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.calendar-view-toggle button { padding: 4px 12px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: 0.85rem; }
+.calendar-view-toggle button + button { border-left: 1px solid var(--border); }
+.calendar-view-toggle button:hover:not(.calendar-view-toggle-on) { background: var(--bg-subtle); color: var(--fg); }
+.calendar-view-toggle-on { background: var(--accent); color: #fff; }
+/* Embed mode iframe — fills the tab body. Height matches the visible
+ * agenda scroll region so switching between views doesn't jump. */
+.calendar-embed { width: 100%; height: calc(100vh - 240px); min-height: 480px; border: 0; border-radius: 8px; background: var(--bg-subtle); }
 
 /* Timeline view — replaces the per-event list with a horizontal busy-block
  * bar per day. Far more useful at a glance when every event is title-less

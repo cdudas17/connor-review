@@ -278,6 +278,18 @@ export function App() {
   useEffect(() => {
     try { localStorage.setItem('connor-review.teamGreenCiOnly.v1', teamGreenCiOnly ? '1' : '0'); } catch { /* ignore */ }
   }, [teamGreenCiOnly]);
+
+  // Calendar tab view choice — only meaningful when APP_CONFIG.calendarIframeUrl
+  // is set. 'agenda' keeps the gcalcli-driven list; 'iframe' drops the tab body
+  // into a Google Calendar embed. useCalendarEvents keeps running in both
+  // modes so NextMeetingFab always has data.
+  const [calendarView, setCalendarView] = useState<'agenda' | 'iframe'>(() => {
+    try { return localStorage.getItem('connor-review.calendarView.v1') === 'iframe' ? 'iframe' : 'agenda'; }
+    catch { return 'agenda'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('connor-review.calendarView.v1', calendarView); } catch { /* ignore */ }
+  }, [calendarView]);
   // Oncall tab state-filter (Draft vs Ready for review). Defaults to Draft only — that's
   // what the on-call person actually needs to triage.
   const [oncallStates, setOncallStates] = useState<Set<OncallState>>(() => new Set<OncallState>(['draft']));
@@ -1269,48 +1281,90 @@ export function App() {
         </section>
       )}
 
-      {tab === 'calendar' && (
-        <section className="calendar-tab">
-          {calendar.auth.kind === 'needs-setup' && (
-            <div className="calendar-connect">
-              <p>Calendar isn't set up yet.</p>
-              <p className="calendar-connect-note">{calendar.auth.message}</p>
-              <p className="calendar-connect-note" style={{ marginTop: 12 }}>
-                Run those commands in your shell, then click below.
-              </p>
-              <button type="button" className="calendar-connect-btn" onClick={() => void calendar.recheck()}>
-                I've installed it — recheck
-              </button>
-            </div>
-          )}
-          {calendar.auth.kind === 'ready' && (
-            <>
-              <p className="calendar-actions-row">
-                <span className="tab-context-freshness">
-                  {calendar.lastFetchedAt && (
-                    <>auto-refreshes every 5 min · last updated {new Date(calendar.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</>
-                  )}
-                  {calendar.loading && <span className="loading-spinner" aria-label="Refreshing" />}
-                </span>
+      {tab === 'calendar' && (() => {
+        // When calendarIframeUrl is configured, the tab gains an Agenda ↔ Embed
+        // toggle. In Embed mode the tab body is a Google Calendar iframe —
+        // useful when gcalcli is fighting you. useCalendarEvents keeps
+        // running either way so NextMeetingFab still has data.
+        const iframeUrl = APP_CONFIG.calendarIframeUrl?.trim();
+        const showIframeMode = !!iframeUrl && calendarView === 'iframe';
+        return (
+          <section className="calendar-tab">
+            {iframeUrl && (
+              <div className="calendar-view-toggle" role="tablist" aria-label="Calendar view">
                 <button
                   type="button"
-                  className="link-button"
-                  onClick={() => void calendar.refresh()}
-                  disabled={calendar.loading}
-                  style={{ marginLeft: 'auto' }}
-                >Refresh</button>
-              </p>
-              {calendar.error && (
-                <ErrorToast message={calendar.error} onDismiss={() => { /* error clears on next successful fetch */ }} />
-              )}
-              <CalendarAgenda events={calendar.events} onOpen={setCurrentEvent} />
-            </>
-          )}
-          {calendar.auth.kind === 'unknown' && (
-            <p className="empty"><span className="loading-spinner" aria-hidden="true" /> Checking calendar connection…</p>
-          )}
-        </section>
-      )}
+                  role="tab"
+                  aria-selected={calendarView === 'agenda'}
+                  className={calendarView === 'agenda' ? 'calendar-view-toggle-on' : ''}
+                  onClick={() => setCalendarView('agenda')}
+                >Agenda</button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={calendarView === 'iframe'}
+                  className={calendarView === 'iframe' ? 'calendar-view-toggle-on' : ''}
+                  onClick={() => setCalendarView('iframe')}
+                >Embed</button>
+              </div>
+            )}
+            {showIframeMode ? (
+              // Iframe mode bypasses the gcalcli needs-setup / unknown panels
+              // entirely — the embed doesn't depend on the local CLI. The
+              // hook keeps polling in the background so NextMeetingFab has
+              // events; when that fails, its FAB just goes idle, but this
+              // tab is still functional.
+              <iframe
+                className="calendar-embed"
+                src={iframeUrl}
+                title="Google Calendar"
+                loading="lazy"
+              />
+            ) : (
+              <>
+                {calendar.auth.kind === 'needs-setup' && (
+                  <div className="calendar-connect">
+                    <p>Calendar isn't set up yet.</p>
+                    <p className="calendar-connect-note">{calendar.auth.message}</p>
+                    <p className="calendar-connect-note" style={{ marginTop: 12 }}>
+                      Run those commands in your shell, then click below.
+                    </p>
+                    <button type="button" className="calendar-connect-btn" onClick={() => void calendar.recheck()}>
+                      I've installed it — recheck
+                    </button>
+                  </div>
+                )}
+                {calendar.auth.kind === 'ready' && (
+                  <>
+                    <p className="calendar-actions-row">
+                      <span className="tab-context-freshness">
+                        {calendar.lastFetchedAt && (
+                          <>auto-refreshes every 5 min · last updated {new Date(calendar.lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</>
+                        )}
+                        {calendar.loading && <span className="loading-spinner" aria-label="Refreshing" />}
+                      </span>
+                      <button
+                        type="button"
+                        className="link-button"
+                        onClick={() => void calendar.refresh()}
+                        disabled={calendar.loading}
+                        style={{ marginLeft: 'auto' }}
+                      >Refresh</button>
+                    </p>
+                    {calendar.error && (
+                      <ErrorToast message={calendar.error} onDismiss={() => { /* error clears on next successful fetch */ }} />
+                    )}
+                    <CalendarAgenda events={calendar.events} onOpen={setCurrentEvent} />
+                  </>
+                )}
+                {calendar.auth.kind === 'unknown' && (
+                  <p className="empty"><span className="loading-spinner" aria-hidden="true" /> Checking calendar connection…</p>
+                )}
+              </>
+            )}
+          </section>
+        );
+      })()}
 
       <EventDrawer current={currentEvent} onClose={() => setCurrentEvent(null)} />
 

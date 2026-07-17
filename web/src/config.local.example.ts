@@ -34,6 +34,23 @@ export const APP_CONFIG: Partial<AppConfig> = {
   // `/trunk cancel` to undo) instead of calling the GitHub mutation.
   trunkMergeRepos: [], // e.g. ['web']
 
+  // Optional Google Calendar iframe embed URL. When set, the Calendar tab
+  // gains an Agenda / Embed toggle — Embed mode drops the gcalcli-driven
+  // agenda in favour of an iframe pointed at this URL. Useful when your
+  // org's gcalcli OAuth is unreliable (Gusto IT restricts cross-account
+  // calendar sharing, tokens expire, etc.) and it's easier to just log in
+  // to google.com in the same browser.
+  //
+  // How to get the URL: open Google Calendar → Settings → Integrate
+  // calendar → "Public URL to this calendar" or "Embed code" (copy the
+  // `src` attribute out of the generated <iframe>). You can tack on
+  // `&mode=WEEK` / `&mode=AGENDA` / etc. to change the default view.
+  // Shared and work calendars appear as long as the browser session is
+  // signed into a Google account that has access.
+  //
+  // Leave empty to hide the toggle entirely (tab keeps its current UI).
+  calendarIframeUrl: '',
+
   // Local git checkouts that should power the "Local" tab. Short name → absolute
   // path. Each path must be a directory with a `.git` subdir. Diff is always
   // against the checkout's local `main`. Leave empty / omit to hide the tab.

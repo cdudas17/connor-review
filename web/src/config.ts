@@ -68,6 +68,15 @@ export interface AppConfig {
    * and `config.local.example.ts` for usage.
    */
   prWorkflows: PrWorkflow[];
+  /** Optional Google Calendar embed URL. When set, the Calendar tab
+   *  gains an Agenda ↔ Embed toggle; in Embed mode the tab renders
+   *  this URL inside an iframe instead of the gcalcli-driven agenda
+   *  view. Pull the URL from Google Calendar → Settings → Integrate
+   *  calendar → Embed code (the `src` attribute of the generated
+   *  <iframe>). Shared/work calendars show up when the browser
+   *  session is signed into a Google account that has access.
+   *  Empty = no toggle, tab behaves exactly as before. */
+  calendarIframeUrl: string;
 }
 
 const DEFAULTS: AppConfig = {
@@ -83,6 +92,7 @@ const DEFAULTS: AppConfig = {
   myIssuesOwner: '',
   trunkMergeRepos: [],
   prWorkflows: [],
+  calendarIframeUrl: '',
 };
 
 // Vite's import.meta.glob lets us optionally pull in config.local.ts if it
