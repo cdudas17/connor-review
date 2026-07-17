@@ -720,7 +720,7 @@ a.issue-comment-when:hover { text-decoration: underline; }
  * ~#141414 during the pre-content load — matches --bg (#0d1117) closely
  * enough that there's no bright flash before Google's own HTML paints.
  * A dark wrapper background here would render LIGHT after the filter. */
-.calendar-embed { width: 100%; height: calc(100vh - 240px); min-height: 480px; border: 0; border-radius: 8px; background: #ffffff; filter: invert(0.92) hue-rotate(180deg); color-scheme: light; }
+.calendar-embed { width: 100%; height: calc(100vh - 160px); min-height: 720px; border: 0; border-radius: 8px; background: #ffffff; filter: invert(0.92) hue-rotate(180deg); color-scheme: light; }
 
 /* Timeline view — replaces the per-event list with a horizontal busy-block
  * bar per day. Far more useful at a glance when every event is title-less
