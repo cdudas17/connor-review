@@ -59,8 +59,6 @@ function sweep(store: Record<string, WorkflowRun>, now: number): Record<string, 
 
 export function useWorkflowRuns() {
   const [store, setStore] = useState<Record<string, WorkflowRun>>(() => sweep(loadStore(), Date.now()));
-  const storeRef = useRef(store);
-  useEffect(() => { storeRef.current = store; }, [store]);
   useEffect(() => { saveStore(store); }, [store]);
 
   const inFlightRef = useRef<Set<string>>(new Set());
@@ -136,21 +134,28 @@ export function useWorkflowRuns() {
     });
   }, []);
 
+  // Read from the reactive `store` state (not storeRef) so consumers see
+  // fresh values on the SAME render after a setStore call. Depending on
+  // the ref meant the drawer's WorkflowRunCard was one render behind on
+  // dismiss — the card would still see the dismissed run and keep
+  // rendering it as "running". Deps: [store] rebuilds the callback
+  // whenever the store changes, which is exactly what triggers React to
+  // pipe fresh data through to the drawer.
   const stateFor = useCallback((workflowId: string, t: PRTarget): WorkflowRun | null => {
-    return storeRef.current[entryKey(workflowId, t)] ?? null;
-  }, []);
+    return store[entryKey(workflowId, t)] ?? null;
+  }, [store]);
 
   /** Latest run (any workflow) for a given PR — used by the drawer card
    *  which only shows ONE run at a time per PR. */
   const latestForPR = useCallback((t: PRTarget): WorkflowRun | null => {
     const prefix = `::${prKeyOf(t)}`;
     let best: WorkflowRun | null = null;
-    for (const [k, v] of Object.entries(storeRef.current)) {
+    for (const [k, v] of Object.entries(store)) {
       if (!k.endsWith(prefix)) continue;
       if (!best || (v.lastFiredAt ?? 0) > (best.lastFiredAt ?? 0)) best = v;
     }
     return best;
-  }, []);
+  }, [store]);
 
   return { start, appendStep, updateStep, finish, dismiss, stateFor, latestForPR, store };
 }
