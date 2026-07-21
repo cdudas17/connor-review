@@ -833,8 +833,8 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       '',
       'Answer as a co-reviewer doing the same investigation. Read the diff carefully; when you have repo access, grep and read relevant files to verify claims rather than speculating.',
       '',
-      'TOOLS AVAILABLE (read-only sandbox — use them freely to verify):',
-      '- `gh` — GitHub CLI, already authenticated. `gh api ...` for GraphQL/REST, `gh pr view`, `gh pr checks`, `gh issue view`, etc.',
+      'TOOLS AVAILABLE (workspace-write sandbox with network — use them freely to verify):',
+      '- `gh` — GitHub CLI, already authenticated. `gh api ...` for GraphQL/REST, `gh pr view`, `gh pr checks`, `gh issue view`, `gh pr view <n> --json comments,reviews,reviewThreads`, etc. Reach for `gh` when the question is about PR conversation, review threads, other-bot comments (Fresh Eyes, Trunk), CI status, etc.',
       '- `bktide` — Buildkite CLI, already authenticated. Use when the question touches CI / builds / failing tests / logs:',
       '    `bktide build <org/pipeline/number>`     details for a single build',
       '    `bktide logs  <build> <step-id>`        log output for a specific step',
@@ -842,9 +842,11 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       '    `bktide builds --pipeline <slug>`       recent builds',
       '    `bktide snapshot <build>`               download build data locally',
       '  Build refs accept `org/pipeline/number`, the full URL, or `org/pipeline#number`.',
-      '- Standard read-only shell (`rg`, `cat`, `git log`, `git diff`, etc.) inside the checkout.',
+      '- Standard read shell (`rg`, `cat`, `git log`, `git diff`, etc.) inside the checkout.',
       '',
-      'When the user asks about CI / build failures / red checks, DO NOT speculate — pull the actual build via `bktide` and read the failure. The PR diff often lists check names + URLs that convert directly to bktide refs.',
+      'When the user asks about CI / build failures / red checks, DO NOT speculate — pull the actual build via `bktide` and read the failure. When the user asks about PR conversation, review threads, or another bot\'s comments (Fresh Eyes, Trunk, gusto-builds-1, etc.), DO NOT speculate — pull them via `gh api graphql` or `gh pr view --json comments,reviews,reviewThreads` and cite the actual bodies. The PR diff often lists check names + URLs that convert directly to bktide refs.',
+      '',
+      'IMPORTANT — read-only reviewer contract: the sandbox technically allows writes to the workspace, but you are still a read-only reviewer. Do NOT edit, create, or delete any files. Do NOT make any git-mutating commands (no `git commit`, `git push`, `git rebase`, `git checkout <branch>`, `git reset`, `git restore`). Read + gh + bktide only.',
       '',
       'HARD RULES:',
       "- Do NOT open with meta-commentary about the user's question — no \"good question\", \"that's the right thing to ask\", \"yes, that's a fair concern\", \"I'd make it more specific\", or any variation. Skip validation; go straight to findings.",
@@ -871,9 +873,13 @@ export async function registerPullsRoutes(app: FastifyInstance) {
 
     try {
       // Ask-Claude review-chat backend swapped to Codex (per user
-      // preference). read-only sandbox — this endpoint reviews the
-      // implementation and returns prose; it never edits files.
-      const response = await codexExec(prompt, { cwd: claudeCwd, sandbox: 'read-only' });
+      // preference). workspace-write sandbox + network is the only
+      // Codex config that lets `gh` / `bktide` reach the internet —
+      // read-only mode blocks network at the seatbelt level, which
+      // caused "error connecting to api.github.com" on any prompt
+      // that tried to pull PR conversation or CI data. The prompt
+      // itself is the read-only contract now.
+      const response = await codexExec(prompt, { cwd: claudeCwd, sandbox: 'workspace-write', network: true });
       return { response: response.trim(), truncatedDiff: truncated };
     } catch (e) {
       if (e instanceof CodexCliError) {

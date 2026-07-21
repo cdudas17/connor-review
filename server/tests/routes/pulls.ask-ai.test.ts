@@ -101,9 +101,12 @@ describe('POST /api/pulls/:o/:r/:n/ai/ask', () => {
     expect(prompt).toContain('> is this safe to merge?');
     // No line range was passed → no per-line block.
     expect(prompt).not.toContain('commenting on');
-    // Read-only sandbox — this endpoint reviews, it doesn't write.
-    const opts = mockedCodex.mock.calls[0][1] as { sandbox?: string };
-    expect(opts?.sandbox).toBe('read-only');
+    // workspace-write sandbox with network is the only combo that lets
+    // Codex reach `gh` / `bktide`. The read-only reviewer contract is
+    // enforced in the prompt, not the sandbox.
+    const opts = mockedCodex.mock.calls[0][1] as { sandbox?: string; network?: boolean };
+    expect(opts?.sandbox).toBe('workspace-write');
+    expect(opts?.network).toBe(true);
     await app.close();
   });
 

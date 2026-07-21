@@ -37,15 +37,26 @@ export interface CodexExecOptions {
   timeoutMs?: number;
   /** Working directory the agent should treat as its workspace root. */
   cwd?: string;
-  /** Sandbox mode — defaults to read-only for review-chat safety. */
+  /** Sandbox mode — defaults to workspace-write so `gh` / `bktide` /
+   *  network-touching shell tools work. Codex's `read-only` mode
+   *  blocks network at the seatbelt level on macOS, which broke the
+   *  review-chat flow (couldn't fetch PR threads, CI logs, etc.).
+   *  workspace-write still restricts writes to the working dir; the
+   *  prompt itself frames the AI as read-only review. */
   sandbox?: 'read-only' | 'workspace-write' | 'danger-full-access';
   /** Model override (e.g. 'gpt-5.6-terra'). Omitted → uses config default. */
   model?: string;
+  /** Allow the sandbox to reach the network. Only meaningful when
+   *  sandbox is 'workspace-write' (Codex's read-only mode always
+   *  blocks network, no config override). Default true for
+   *  workspace-write so gh / bktide just work. */
+  network?: boolean;
 }
 
 export function codexExec(prompt: string, opts: CodexExecOptions = {}): Promise<string> {
   const timeoutMs = opts.timeoutMs ?? 300_000;
-  const sandbox = opts.sandbox ?? 'read-only';
+  const sandbox = opts.sandbox ?? 'workspace-write';
+  const network = opts.network ?? true;
   // Codex writes the final assistant message to this file. Cleaner than
   // parsing the stdout banner ("OpenAI Codex vX", "session id: …",
   // "tokens used", …).
@@ -57,6 +68,12 @@ export function codexExec(prompt: string, opts: CodexExecOptions = {}): Promise<
     '--skip-git-repo-check',
     '-o', outFile,
   ];
+  // Enable network only when it makes sense — workspace-write is the
+  // sandbox that supports the `sandbox_workspace_write.network_access`
+  // config override. Codex silently ignores the flag under read-only.
+  if (network && sandbox === 'workspace-write') {
+    args.push('-c', 'sandbox_workspace_write.network_access=true');
+  }
   if (opts.cwd) args.push('-C', opts.cwd);
   if (opts.model) args.push('-m', opts.model);
   // Read prompt from stdin (`-` sentinel) so we don't hit argv limits
