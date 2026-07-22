@@ -637,12 +637,14 @@ button.ci-badge { cursor: pointer; }
  * and widens the panel to make room for the sidebar. */
 .notes-panel-multi { width: 660px; flex-direction: row; padding: 0; gap: 0; overflow: hidden; }
 .notes-projects { flex: 0 0 180px; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--bg-subtle); padding: 12px 8px; min-width: 0; }
-.notes-projects-list { list-style: none; padding: 0; margin: 0 0 8px 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; min-height: 0; }
+.notes-projects-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; min-height: 0; }
+/* + New project sits as the last <li> so it hugs the project list.
+ * A little top-margin gives visual separation without a divider. */
+.notes-project-new-item { margin-top: 4px; }
 .notes-project-btn { display: block; width: 100%; padding: 6px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; font: inherit; font-size: 0.85rem; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .notes-project-btn:hover { background: var(--bg); border-color: var(--border); }
 .notes-project-btn-active { background: var(--bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .notes-project-name { display: block; overflow: hidden; text-overflow: ellipsis; }
-.notes-projects-footer { padding-top: 6px; border-top: 1px solid var(--border); }
 .notes-project-new { width: 100%; padding: 6px 10px; border: 1px dashed var(--border); border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: 0.8rem; text-align: left; }
 .notes-project-new:hover { color: var(--fg); border-color: var(--muted); }
 .notes-project-new-form input { width: 100%; padding: 6px 10px; border: 1px solid var(--accent); border-radius: 6px; background: var(--bg); color: inherit; font: inherit; font-size: 0.85rem; }

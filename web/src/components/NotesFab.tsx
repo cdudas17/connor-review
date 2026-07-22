@@ -158,32 +158,36 @@ export function NotesFab() {
                   </button>
                 </li>
               ))}
+              {/* "+ New project" lives as the last list item so it hugs the
+                  bottom of the project list without a divider strip
+                  between them. Empty state (only misc + this button) still
+                  reads cleanly because it sits immediately under misc. */}
+              <li className="notes-project-new-item">
+                {creating ? (
+                  <form
+                    className="notes-project-new-form"
+                    onSubmit={(e) => { e.preventDefault(); void submitCreate(); }}
+                  >
+                    <input
+                      type="text"
+                      autoFocus
+                      value={draftName}
+                      onChange={(e) => setDraftName(e.target.value)}
+                      onBlur={submitCreate}
+                      placeholder="Project name"
+                      maxLength={48}
+                      aria-label="New project name"
+                    />
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    className="notes-project-new"
+                    onClick={() => { setCreating(true); setDraftName(''); }}
+                  >+ New project</button>
+                )}
+              </li>
             </ul>
-            <div className="notes-projects-footer">
-              {creating ? (
-                <form
-                  className="notes-project-new-form"
-                  onSubmit={(e) => { e.preventDefault(); void submitCreate(); }}
-                >
-                  <input
-                    type="text"
-                    autoFocus
-                    value={draftName}
-                    onChange={(e) => setDraftName(e.target.value)}
-                    onBlur={submitCreate}
-                    placeholder="Project name"
-                    maxLength={48}
-                    aria-label="New project name"
-                  />
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  className="notes-project-new"
-                  onClick={() => { setCreating(true); setDraftName(''); }}
-                >+ New project</button>
-              )}
-            </div>
           </nav>
           <div className="notes-panel-main">
             <header className="notes-panel-header">
