@@ -14,6 +14,10 @@ interface Props {
   /** Move to the next PR in the list without changing status. */
   onNextPR: () => void;
   canSubmit: boolean;
+  /** Show the Approve button. Defaults to canSubmit but the drawer
+   *  overrides this to false on PRs the viewer authored — GitHub
+   *  disallows self-approval so the button is dead-weight noise. */
+  canApprove?: boolean;
   canReviewed: boolean;
   canPrev: boolean;
   canNextPR: boolean;
@@ -104,7 +108,7 @@ export function LocalReviewFooter({
 
 export function ReviewFooter({
   summary, onSummaryChange, onSubmit, onReviewed, onPrev, onNextPR,
-  canSubmit, canReviewed, canPrev, canNextPR, finishLabel, onMarkReady,
+  canSubmit, canApprove, canReviewed, canPrev, canNextPR, finishLabel, onMarkReady,
   onAskAI, aiChatLoading, onToggleAutoMerge, autoMergeEnabled, mergeQueueQueued,
   commentsVisible, onToggleComments,
   onFixCi, ciFixRunning, failingCheckCount,
@@ -125,7 +129,9 @@ export function ReviewFooter({
         onChange={(e) => onSummaryChange(e.target.value)}
       />
       <div className="review-footer-actions">
-        <button type="button" className="btn-primary" disabled={!canSubmit} onClick={() => onSubmit('APPROVE')}>Approve</button>
+        {canApprove !== false && (
+          <button type="button" className="btn-primary" disabled={!canSubmit} onClick={() => onSubmit('APPROVE')}>Approve</button>
+        )}
         <button type="button" disabled={!canSubmit} onClick={() => onSubmit('COMMENT')}>Comment</button>
         {onAskAI && (
           <button

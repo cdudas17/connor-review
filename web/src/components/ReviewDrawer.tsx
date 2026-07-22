@@ -445,6 +445,12 @@ export function ReviewDrawer(props: Props) {
   }
 
   const canSubmit = meta.state === 'OPEN';
+  // GitHub disallows self-approval; hide the Approve button on PRs
+  // the viewer authored. myPRsAuthor is the source of truth for
+  // "who is the viewer" everywhere else in this app. Kept independent
+  // of canSubmit so a merged/closed self-PR still hides Approve
+  // rather than showing a disabled button.
+  const canApprove = !APP_CONFIG.myPRsAuthor || meta.authorLogin !== APP_CONFIG.myPRsAuthor;
   const canNext = true;
 
   const submitReview = (event: ReviewEvent) => {
@@ -622,6 +628,7 @@ export function ReviewDrawer(props: Props) {
           onPrev={onNavigatePrev}
           onNextPR={onNavigateNext}
           canSubmit={canSubmit}
+          canApprove={canApprove}
           canReviewed={canNext}
           canPrev={canNavigatePrev && canNext}
           canNextPR={canNavigateNext && canNext}
