@@ -204,15 +204,26 @@ export function NotesFab() {
                 </button>
               </div>
             </header>
-            <NotesEditor
-              // Force a fresh editor mount per project so contenteditable
-              // doesn't try to reconcile HTML across two completely
-              // different bodies (which drops selection, mangles undo).
-              key={notes.selected}
-              initialHtml={notes.currentBody}
-              onChange={notes.setBody}
-              placeholder="Jot anything down — auto-saved. Select text + paste a URL to linkify."
-            />
+            {notes.currentLoading ? (
+              // First per-project fetch is in flight — render a small
+              // spinner in the editor slot instead of an empty
+              // contenteditable, so the user doesn't briefly think
+              // they lost the project's contents.
+              <div className="notes-panel-loading" role="status" aria-live="polite">
+                <span className="loading-spinner" aria-hidden="true" />
+                <span>Loading {currentProject?.name ?? 'notes'}…</span>
+              </div>
+            ) : (
+              <NotesEditor
+                // Force a fresh editor mount per project so contenteditable
+                // doesn't try to reconcile HTML across two completely
+                // different bodies (which drops selection, mangles undo).
+                key={notes.selected}
+                initialHtml={notes.currentBody}
+                onChange={notes.setBody}
+                placeholder="Jot anything down — auto-saved. Select text + paste a URL to linkify."
+              />
+            )}
             <p className="notes-panel-hint">
               {notes.status === 'loading' && 'Loading notes…'}
               {notes.status === 'saving' && 'Saving…'}

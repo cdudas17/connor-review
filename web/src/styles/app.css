@@ -652,6 +652,9 @@ button.ci-badge { cursor: pointer; }
 .notes-panel-multi .notes-panel-header { margin-bottom: 8px; }
 .notes-panel-delete { color: var(--err, #cf6679) !important; border-color: var(--err, #cf6679) !important; }
 .notes-panel-delete:hover:not(:disabled) { background: rgba(207, 102, 121, 0.12) !important; }
+/* Per-project first-load spinner. Sits inside the editor slot so the
+ * panel doesn't collapse to zero height while the fetch is in flight. */
+.notes-panel-loading { flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-size: 0.9rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); }
 .notes-panel-hint { color: var(--muted); font-size: 0.75rem; margin: 6px 0 0; text-align: right; }
 
 /* Floating issues FAB + panel. Same shape/affordances as NotesFab; the FAB

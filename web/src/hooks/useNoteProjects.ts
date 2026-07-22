@@ -62,6 +62,10 @@ export function useNoteProjects() {
 
   // Initial project list fetch. If offline, seed a misc entry with the
   // legacy cache body so notes don't disappear from view during outages.
+  // Follow-up: eagerly fetch every project's body in parallel so
+  // switching between projects is instant (no "did I lose these?"
+  // moment waiting on a fetch when the panel opens for the first
+  // time).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -77,6 +81,20 @@ export function useNoteProjects() {
           setSelected(MISC_SLUG);
         }
         setStatus('saved');
+        // Eager pre-fetch every project's body in parallel — the
+        // second useEffect below would otherwise wait until the user
+        // clicked into a project. Failures per-slug are swallowed;
+        // the per-project fetch will retry when the user selects it.
+        await Promise.all(list.map(async (p) => {
+          try {
+            const r = await fetch(`/api/notes/projects/${p.slug}`);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const data = (await r.json()) as { notes: string };
+            if (cancelled) return;
+            setBodies((cur) => (cur[p.slug] !== undefined ? cur : { ...cur, [p.slug]: data.notes ?? '' }));
+            hydratedRef.current.add(p.slug);
+          } catch { /* per-slug prefetch is best-effort */ }
+        }));
       } catch {
         if (cancelled) return;
         // Offline path: keep misc alone in the sidebar and pre-seed its
@@ -203,6 +221,12 @@ export function useNoteProjects() {
   }, []);
 
   const currentBody = bodies[selected] ?? '';
+  // Distinct from `status`: true only when the CURRENT project's body
+  // hasn't landed in the cache yet. Drives the "actually loading" UI
+  // separately from the panel-wide save/offline status line — so a
+  // routine "Saving…" during typing doesn't hide the editor, but the
+  // very first per-project fetch does.
+  const currentLoading = bodies[selected] === undefined;
   const canDelete = selected !== MISC_SLUG;
   const canRename = selected !== MISC_SLUG;
 
@@ -211,6 +235,7 @@ export function useNoteProjects() {
     selected,
     setSelected,
     currentBody,
+    currentLoading,
     setBody: (html: string) => setBody(selected, html),
     createProject,
     removeProject,
