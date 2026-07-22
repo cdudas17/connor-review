@@ -78,7 +78,7 @@ export function WorkflowsManager({ open, onClose, workflows, onUpsert, onRemove 
                   <li key={w.id} className="workflows-manager-item">
                     <div className="workflows-manager-item-body">
                       <strong>{w.label || '(no label)'}</strong>
-                      <span className="workflows-manager-item-tag">[{w.tag || '?'}]{w.matchCi && w.matchCi !== 'any' ? ` · ${w.matchCi}` : ''}</span>
+                      <span className="workflows-manager-item-tag">{w.tag ? `[${w.tag}]` : 'every PR'}{w.matchCi && w.matchCi !== 'any' ? ` · ${w.matchCi}` : ''}</span>
                       {w.description && <p className="workflows-manager-item-desc">{w.description}</p>}
                       <p className="workflows-manager-item-steps">{w.steps.length} step{w.steps.length === 1 ? '' : 's'}</p>
                     </div>
@@ -118,7 +118,7 @@ function WorkflowEditor({ initial, existingIds, onSave, onCancel }: {
 
   const errors: string[] = [];
   if (!label.trim()) errors.push('Label is required.');
-  if (!tag.trim()) errors.push('Tag is required.');
+  // Tag is optional now — blank means "apply to every PR".
   if (steps.length === 0) errors.push('At least one step is required.');
   steps.forEach((s, i) => {
     if (s.action === 'askAI' && !s.prompt.trim()) errors.push(`Step ${i + 1}: prompt is required.`);
@@ -155,8 +155,8 @@ function WorkflowEditor({ initial, existingIds, onSave, onCancel }: {
         <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional — shown in the button tooltip" />
       </label>
       <label className="workflow-editor-field">
-        <span>Tag *</span>
-        <input type="text" value={tag} onChange={(e) => setTag(e.target.value)} placeholder="ID->UUID (no brackets)" />
+        <span>Tag</span>
+        <input type="text" value={tag} onChange={(e) => setTag(e.target.value)} placeholder="ID->UUID (no brackets) — blank = every PR" />
       </label>
       <label className="workflow-editor-field">
         <span>CI match</span>

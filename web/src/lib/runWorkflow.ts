@@ -20,10 +20,17 @@ export interface RunWorkflowDeps {
 }
 
 /** Whether a workflow's filter matches a PR. Pure — call from the UI to
- *  decide whether to render the button on a row. */
+ *  decide whether to render the button on a row.
+ *
+ *  Empty `tag` means "apply to every PR" — the CI filter still applies
+ *  if set, so an all-PRs workflow can still be scoped to e.g. only
+ *  green PRs. */
 export function workflowMatches(workflow: PrWorkflow, pr: { title: string; ciStatus: PullRequestMeta['ciStatus'] }): boolean {
-  const tags = extractTags(pr.title);
-  if (!tags.includes(workflow.tag)) return false;
+  const tag = workflow.tag?.trim();
+  if (tag) {
+    const tags = extractTags(pr.title);
+    if (!tags.includes(tag)) return false;
+  }
   const match = workflow.matchCi ?? 'any';
   if (match === 'any') return true;
   if (match === 'failing') return pr.ciStatus === 'FAILURE' || pr.ciStatus === 'ERROR';

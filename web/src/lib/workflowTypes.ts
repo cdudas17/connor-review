@@ -23,7 +23,9 @@ export interface PrWorkflow {
   /** Optional longer description used as the button's hover tooltip. */
   description?: string;
   /** Bracket-tag (case-sensitive, no `[`/`]`) that gates the workflow.
-   *  Workflow is only offered on rows whose title contains this tag. */
+   *  When set, the workflow is only offered on rows whose title contains
+   *  this tag. Leave empty ('') to apply the workflow to every PR on
+   *  the My PRs tab (still subject to `matchCi` if set). */
   tag: string;
   /** Optional CI-status filter — workflow is hidden on rows that don't
    *  match. Default `'any'`. */
