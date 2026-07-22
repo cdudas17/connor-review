@@ -140,7 +140,7 @@ export const api = {
        *  this as its cwd so it can grep the actual codebase. */
       repoPath?: string;
     },
-  ): Promise<{ response: string; truncatedDiff?: boolean }> {
+  ): Promise<{ response: string; truncatedDiff?: boolean; tokensUsed?: number }> {
     return call(`/api/pulls/${owner}/${repo}/${number}/ai/ask`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

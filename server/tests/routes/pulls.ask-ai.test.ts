@@ -80,7 +80,7 @@ describe('POST /api/pulls/:o/:r/:n/ai/ask', () => {
     // gh calls: meta GraphQL, then `gh pr diff` for the diff.
     mockedGh.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
     mockedGh.mockResolvedValueOnce(DIFF);
-    mockedCodex.mockResolvedValueOnce('Looks fine. One concern: ...\n');
+    mockedCodex.mockResolvedValueOnce({ response: 'Looks fine. One concern: ...\n', tokensUsed: 1234 });
 
     const app = await buildServer();
     const res = await app.inject({
@@ -89,7 +89,7 @@ describe('POST /api/pulls/:o/:r/:n/ai/ask', () => {
       payload: { draft: 'is this safe to merge?' },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ response: 'Looks fine. One concern: ...', truncatedDiff: false });
+    expect(res.json()).toEqual({ response: 'Looks fine. One concern: ...', truncatedDiff: false, tokensUsed: 1234 });
 
     // Inspect the prompt actually sent to codexExec.
     const prompt = mockedCodex.mock.calls[0][0] as string;
@@ -113,7 +113,7 @@ describe('POST /api/pulls/:o/:r/:n/ai/ask', () => {
   it('includes a line range block when the inline composer asks', async () => {
     mockedGh.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
     mockedGh.mockResolvedValueOnce(DIFF);
-    mockedCodex.mockResolvedValueOnce('Thoughts...\n');
+    mockedCodex.mockResolvedValueOnce({ response: 'Thoughts...\n', tokensUsed: 1234 });
 
     const app = await buildServer();
     const res = await app.inject({
@@ -135,7 +135,7 @@ describe('POST /api/pulls/:o/:r/:n/ai/ask', () => {
   it('truncates huge diffs and signals truncatedDiff=true', async () => {
     mockedGh.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
     mockedGh.mockResolvedValueOnce('x'.repeat(200_000)); // > 150k cap
-    mockedCodex.mockResolvedValueOnce('ok\n');
+    mockedCodex.mockResolvedValueOnce({ response: 'ok\n', tokensUsed: 1234 });
     const app = await buildServer();
     const res = await app.inject({
       method: 'POST',
@@ -152,7 +152,7 @@ describe('POST /api/pulls/:o/:r/:n/ai/ask', () => {
   it('includes the prior conversation in the prompt when one is supplied', async () => {
     mockedGh.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
     mockedGh.mockResolvedValueOnce(DIFF);
-    mockedCodex.mockResolvedValueOnce('continuing...\n');
+    mockedCodex.mockResolvedValueOnce({ response: 'continuing...\n', tokensUsed: 1234 });
     const app = await buildServer();
     const res = await app.inject({
       method: 'POST',
@@ -181,7 +181,7 @@ describe('POST /api/pulls/:o/:r/:n/ai/ask', () => {
   it('does NOT add a conversation block when none is supplied (first-turn path unchanged)', async () => {
     mockedGh.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
     mockedGh.mockResolvedValueOnce(DIFF);
-    mockedCodex.mockResolvedValueOnce('ok\n');
+    mockedCodex.mockResolvedValueOnce({ response: 'ok\n', tokensUsed: 1234 });
     const app = await buildServer();
     await app.inject({
       method: 'POST',
@@ -201,7 +201,7 @@ describe('POST /api/pulls/:o/:r/:n/ai/ask', () => {
       await fs.mkdir(join(tmp, '.git'));
       mockedGh.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
       mockedGh.mockResolvedValueOnce(DIFF);
-      mockedCodex.mockResolvedValueOnce('ok\n');
+      mockedCodex.mockResolvedValueOnce({ response: 'ok\n', tokensUsed: 1234 });
       const app = await buildServer();
       const res = await app.inject({
         method: 'POST',
@@ -221,7 +221,7 @@ describe('POST /api/pulls/:o/:r/:n/ai/ask', () => {
     // Path doesn't exist on disk → validation fails, no cwd passed.
     mockedGh.mockResolvedValueOnce(PR_GRAPHQL_RESPONSE);
     mockedGh.mockResolvedValueOnce(DIFF);
-    mockedCodex.mockResolvedValueOnce('ok\n');
+    mockedCodex.mockResolvedValueOnce({ response: 'ok\n', tokensUsed: 1234 });
     const app = await buildServer();
     const res = await app.inject({
       method: 'POST',

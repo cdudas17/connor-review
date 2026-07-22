@@ -72,8 +72,8 @@ export async function runWorkflow(
       const idx = bus.appendStep({ action: 'askAI', input: prompt, startedAt: Date.now() });
       try {
         const repoPath = deps.resolveRepoPath(pr.repo) ?? undefined;
-        const { response } = await api.askAI(pr.owner, pr.repo, pr.number, { draft: prompt, repoPath });
-        bus.updateStep(idx, { output: response, finishedAt: Date.now() });
+        const { response, tokensUsed } = await api.askAI(pr.owner, pr.repo, pr.number, { draft: prompt, repoPath });
+        bus.updateStep(idx, { output: response, finishedAt: Date.now(), tokensUsed });
         return response;
       } catch (e) {
         const message = e instanceof ApiCallError ? e.message : (e as Error).message;

@@ -107,6 +107,10 @@ export interface WorkflowStep {
   startedAt: number;
   finishedAt?: number;
   error?: string;
+  /** Tokens the model reported for this step. Populated for askAI
+   *  from Codex's stderr summary; undefined for non-LLM actions
+   *  (fixCi/resolveConflicts/etc.). */
+  tokensUsed?: number;
 }
 
 export type WorkflowRunKind = 'running' | 'success' | 'failed';

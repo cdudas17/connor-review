@@ -879,8 +879,8 @@ export async function registerPullsRoutes(app: FastifyInstance) {
       // caused "error connecting to api.github.com" on any prompt
       // that tried to pull PR conversation or CI data. The prompt
       // itself is the read-only contract now.
-      const response = await codexExec(prompt, { cwd: claudeCwd, sandbox: 'workspace-write', network: true });
-      return { response: response.trim(), truncatedDiff: truncated };
+      const { response, tokensUsed } = await codexExec(prompt, { cwd: claudeCwd, sandbox: 'workspace-write', network: true });
+      return { response: response.trim(), truncatedDiff: truncated, tokensUsed };
     } catch (e) {
       if (e instanceof CodexCliError) {
         const status = e.code === 'CODEX_NOT_INSTALLED' ? 502 : e.code === 'TIMEOUT' ? 504 : 500;

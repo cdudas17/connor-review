@@ -1222,6 +1222,8 @@ a.issue-comment-when:hover { text-decoration: underline; }
 }
 .workflow-step-action { color: var(--fg); }
 .workflow-step-duration { color: var(--muted); font-weight: 400; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.workflow-step-tokens { color: var(--muted); font-weight: 400; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.workflow-step-tokens::before { content: '·'; margin: 0 6px 0 4px; color: var(--muted); }
 .workflow-step-spinner { width: 10px; height: 10px; border-width: 1.5px; margin: 0; }
 .workflow-step-body { font-size: 13px; }
 .workflow-step-error {

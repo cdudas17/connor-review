@@ -53,7 +53,28 @@ export interface CodexExecOptions {
   network?: boolean;
 }
 
-export function codexExec(prompt: string, opts: CodexExecOptions = {}): Promise<string> {
+export interface CodexExecResult {
+  /** The agent's final message — same string codexExec used to return. */
+  response: string;
+  /** Total tokens the model reported using for this call. Parsed from
+   *  the "tokens used\n<n>" line Codex prints on stderr. undefined when
+   *  the parser couldn't find a count (older Codex builds, custom
+   *  formatters, model failures that skipped the summary). */
+  tokensUsed?: number;
+}
+
+/** Scrape the "tokens used\n<comma-formatted-int>" summary Codex writes
+ *  to stderr at the end of each exec. Regex is loose on purpose — the
+ *  layout is `tokens used`, then a line with the number, sometimes with
+ *  thousands separators; occasionally it's inline. */
+function parseTokensUsed(stderr: string): number | undefined {
+  const m = stderr.match(/tokens used[^\d]*([\d,]+)/i);
+  if (!m) return undefined;
+  const n = parseInt(m[1].replace(/,/g, ''), 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+export function codexExec(prompt: string, opts: CodexExecOptions = {}): Promise<CodexExecResult> {
   const timeoutMs = opts.timeoutMs ?? 300_000;
   const sandbox = opts.sandbox ?? 'workspace-write';
   const network = opts.network ?? true;
@@ -104,7 +125,7 @@ export function codexExec(prompt: string, opts: CodexExecOptions = {}): Promise<
         return;
       }
       rmSync(dir, { recursive: true, force: true });
-      resolve(last);
+      resolve({ response: last, tokensUsed: parseTokensUsed(stderrStr) });
     });
     child.stdin?.end(prompt);
   });

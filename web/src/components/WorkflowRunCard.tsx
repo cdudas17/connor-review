@@ -14,6 +14,15 @@ function fmtDuration(ms: number | undefined): string {
   return `${(ms / 60_000).toFixed(1)}m`;
 }
 
+/** "8,432" tokens rendered as "8.4k tok"; below 1k stays exact.
+ *  Distinct from fmtDuration so nobody reads "1.7m" as 1.7M tokens. */
+function fmtTokens(n: number | undefined): string {
+  if (n == null || !Number.isFinite(n)) return '';
+  if (n < 1000) return `${n} tok`;
+  if (n < 1_000_000) return `${(n / 1000).toFixed(1)}k tok`;
+  return `${(n / 1_000_000).toFixed(2)}M tok`;
+}
+
 function StepBody({ step }: { step: WorkflowStep }) {
   if (step.error) {
     return <pre className="workflow-step-error">{step.error}</pre>;
@@ -118,6 +127,9 @@ export function WorkflowRunCard({ workflowLabel, run, onDismiss }: Props) {
               <span className="workflow-step-action">{step.action}</span>
               {step.finishedAt && step.startedAt && (
                 <span className="workflow-step-duration">{fmtDuration(step.finishedAt - step.startedAt)}</span>
+              )}
+              {step.tokensUsed != null && (
+                <span className="workflow-step-tokens" title="Model tokens consumed for this step">{fmtTokens(step.tokensUsed)}</span>
               )}
               {!step.finishedAt && <span className="loading-spinner workflow-step-spinner" aria-hidden="true" />}
             </div>
