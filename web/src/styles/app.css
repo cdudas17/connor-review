@@ -647,7 +647,7 @@ button.ci-badge { cursor: pointer; }
 .notes-project-name { display: block; overflow: hidden; text-overflow: ellipsis; }
 .notes-project-new { width: 100%; padding: 6px 10px; border: 1px dashed var(--border); border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: 0.8rem; text-align: left; }
 .notes-project-new:hover { color: var(--fg); border-color: var(--muted); }
-.notes-project-new-form input { width: 100%; padding: 6px 10px; border: 1px solid var(--accent); border-radius: 6px; background: var(--bg); color: inherit; font: inherit; font-size: 0.85rem; }
+.notes-project-new-form input { width: 100%; padding: 6px 10px; border: 1px solid var(--accent); border-radius: 6px; background: var(--bg); color: inherit; font: inherit; font-size: 0.85rem; box-sizing: border-box; }
 .notes-panel-main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 12px; }
 .notes-panel-multi .notes-panel-header { margin-bottom: 8px; }
 .notes-panel-delete { color: var(--err, #cf6679) !important; border-color: var(--err, #cf6679) !important; }
