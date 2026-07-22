@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNotes } from '../hooks/useNotes.js';
+import { useNoteProjects } from '../hooks/useNoteProjects.js';
 import { useFabPosition } from '../hooks/useFabPosition.js';
 import { NotesEditor } from './NotesEditor.js';
 
@@ -21,24 +21,24 @@ function CloseIcon({ size = 16 }: { size?: number }) {
 
 const FAB_SIZE = 44;
 const DRAG_THRESHOLD_PX = 4;
-const PANEL_W = 440;
+// Panel got wider now that there's a projects sidebar on the left.
+const PANEL_W = 660;
 const PANEL_GAP = 12;
 
 /**
- * Floating draggable notes pencil + slide-in panel. Defaults to bottom-left.
- * Click to toggle the panel; press-and-drag to reposition the button anywhere
- * on screen. Position is persisted to localStorage and clamped to the viewport.
+ * Floating draggable notes pencil + slide-in projects panel. Left rail
+ * lists projects (with 'misc' pinned first and non-deletable); right
+ * side is the active project's editor. Body cache is per-project so
+ * switching between projects is instant.
  */
 export function NotesFab() {
-  const { notes, setNotes, clear, status } = useNotes();
+  const notes = useNoteProjects();
   const { pos, setPos } = useFabPosition();
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [draftName, setDraftName] = useState('');
   const [isDragging, setIsDragging] = useState(false);
-  const dragRef = useRef<{
-    startX: number; startY: number;
-    originX: number; originY: number;
-    moved: boolean;
-  } | null>(null);
+  const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number; moved: boolean } | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -46,15 +46,14 @@ export function NotesFab() {
         e.preventDefault();
         setOpen((o) => !o);
       } else if (e.key === 'Escape' && open) {
+        if (creating) { setCreating(false); setDraftName(''); return; }
         setOpen(false);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
+  }, [open, creating]);
 
-  // Window-level move/up listeners while a drag is in flight — the drag must
-  // survive the pointer leaving the FAB.
   useEffect(() => {
     if (!isDragging) return;
     const onMove = (e: MouseEvent) => {
@@ -67,10 +66,7 @@ export function NotesFab() {
     const onUp = () => {
       const d = dragRef.current;
       setIsDragging(false);
-      if (d && !d.moved) {
-        // Treat as a click — toggle the panel.
-        setOpen((o) => !o);
-      }
+      if (d && !d.moved) setOpen((o) => !o);
       dragRef.current = null;
     };
     window.addEventListener('mousemove', onMove);
@@ -82,20 +78,41 @@ export function NotesFab() {
   }, [isDragging, setPos]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (e.button !== 0) return; // primary button only
+    if (e.button !== 0) return;
     e.preventDefault();
-    dragRef.current = {
-      startX: e.clientX, startY: e.clientY,
-      originX: pos.x, originY: pos.y,
-      moved: false,
-    };
+    dragRef.current = { startX: e.clientX, startY: e.clientY, originX: pos.x, originY: pos.y, moved: false };
     setIsDragging(true);
   };
 
-  // Position the panel relative to the FAB. Anchor by *bottom* when placing above
-  // so the PANEL_GAP is enforced regardless of the panel's actual rendered height
-  // (which can be less than PANEL_H when max-height clips it). Anchor by top when
-  // placing below.
+  const submitCreate = async () => {
+    const name = draftName.trim();
+    if (!name) { setCreating(false); return; }
+    const created = await notes.createProject(name);
+    if (created) {
+      setCreating(false);
+      setDraftName('');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!notes.canDelete) return;
+    const current = notes.projects.find((p) => p.slug === notes.selected);
+    if (!current) return;
+    if (!confirm(`Delete project "${current.name}" and everything in it?`)) return;
+    await notes.removeProject(current.slug);
+  };
+
+  const handleRename = async () => {
+    if (!notes.canRename) return;
+    const current = notes.projects.find((p) => p.slug === notes.selected);
+    if (!current) return;
+    const next = window.prompt('Rename project', current.name);
+    if (next == null) return;
+    await notes.renameProject(current.slug, next);
+  };
+
+  // Position the panel relative to the FAB (same logic as before,
+  // adjusted for the new width).
   const w = typeof window === 'undefined' ? 1024 : window.innerWidth;
   const h = typeof window === 'undefined' ? 768 : window.innerHeight;
   const placeAbove = pos.y > h / 2;
@@ -105,6 +122,8 @@ export function NotesFab() {
   const panelStyle: React.CSSProperties = placeAbove
     ? { left: panelLeft, bottom: h - pos.y + PANEL_GAP, right: 'auto', top: 'auto' }
     : { left: panelLeft, top: pos.y + FAB_SIZE + PANEL_GAP, right: 'auto', bottom: 'auto' };
+
+  const currentProject = notes.projects.find((p) => p.slug === notes.selected);
 
   return (
     <>
@@ -120,33 +139,85 @@ export function NotesFab() {
       </button>
       {open && (
         <aside
-          className="notes-panel"
+          className="notes-panel notes-panel-multi"
           role="dialog"
           aria-label="Notes"
           style={panelStyle}
         >
-          <header className="notes-panel-header">
-            <h3>Notes</h3>
-            <div className="notes-panel-actions">
-              <button type="button" onClick={clear} disabled={!notes} title="Clear notes">Clear</button>
-              <button type="button" className="notes-panel-close" onClick={() => setOpen(false)} aria-label="Close notes">
-                <CloseIcon />
-              </button>
+          <nav className="notes-projects" aria-label="Note projects">
+            <ul className="notes-projects-list">
+              {notes.projects.map((p) => (
+                <li key={p.slug}>
+                  <button
+                    type="button"
+                    className={`notes-project-btn${p.slug === notes.selected ? ' notes-project-btn-active' : ''}`}
+                    onClick={() => notes.setSelected(p.slug)}
+                    title={p.slug === 'misc' ? 'Default catch-all — cannot be renamed or deleted' : p.name}
+                  >
+                    <span className="notes-project-name">{p.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="notes-projects-footer">
+              {creating ? (
+                <form
+                  className="notes-project-new-form"
+                  onSubmit={(e) => { e.preventDefault(); void submitCreate(); }}
+                >
+                  <input
+                    type="text"
+                    autoFocus
+                    value={draftName}
+                    onChange={(e) => setDraftName(e.target.value)}
+                    onBlur={submitCreate}
+                    placeholder="Project name"
+                    maxLength={48}
+                    aria-label="New project name"
+                  />
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  className="notes-project-new"
+                  onClick={() => { setCreating(true); setDraftName(''); }}
+                >+ New project</button>
+              )}
             </div>
-          </header>
-          <NotesEditor
-            initialHtml={notes}
-            onChange={setNotes}
-            placeholder="Jot anything down — auto-saved. Select text + paste a URL to linkify."
-          />
-          <p className="notes-panel-hint">
-            {status === 'loading' && 'Loading notes…'}
-            {status === 'saving' && 'Saving…'}
-            {status === 'saved' && 'Saved'}
-            {status === 'offline' && 'Server offline — using browser cache'}
-            {status === 'error' && 'Save failed — will retry on next change'}
-            {' · ⌘⇧N to toggle · drag the pencil to move'}
-          </p>
+          </nav>
+          <div className="notes-panel-main">
+            <header className="notes-panel-header">
+              <h3>{currentProject?.name ?? 'Notes'}</h3>
+              <div className="notes-panel-actions">
+                {notes.canRename && (
+                  <button type="button" onClick={handleRename} title="Rename this project">Rename</button>
+                )}
+                {notes.canDelete && (
+                  <button type="button" onClick={handleDelete} title="Delete this project" className="notes-panel-delete">Delete</button>
+                )}
+                <button type="button" className="notes-panel-close" onClick={() => setOpen(false)} aria-label="Close notes">
+                  <CloseIcon />
+                </button>
+              </div>
+            </header>
+            <NotesEditor
+              // Force a fresh editor mount per project so contenteditable
+              // doesn't try to reconcile HTML across two completely
+              // different bodies (which drops selection, mangles undo).
+              key={notes.selected}
+              initialHtml={notes.currentBody}
+              onChange={notes.setBody}
+              placeholder="Jot anything down — auto-saved. Select text + paste a URL to linkify."
+            />
+            <p className="notes-panel-hint">
+              {notes.status === 'loading' && 'Loading notes…'}
+              {notes.status === 'saving' && 'Saving…'}
+              {notes.status === 'saved' && 'Saved'}
+              {notes.status === 'offline' && 'Server offline — using browser cache'}
+              {notes.status === 'error' && 'Save failed — will retry on next change'}
+              {' · ⌘⇧N to toggle · drag the pencil to move'}
+            </p>
+          </div>
         </aside>
       )}
     </>

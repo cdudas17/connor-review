@@ -631,6 +631,25 @@ button.ci-badge { cursor: pointer; }
 .notes-editor a { color: var(--accent); cursor: pointer; }
 .notes-editor a:hover { text-decoration: underline; }
 .notes-editor:empty::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
+/* Multi-project panel: two-column layout (project rail | editor). The
+ * base .notes-panel above is column-flex so the single-body version
+ * still renders correctly; .notes-panel-multi upgrades it to row-flex
+ * and widens the panel to make room for the sidebar. */
+.notes-panel-multi { width: 660px; flex-direction: row; padding: 0; gap: 0; overflow: hidden; }
+.notes-projects { flex: 0 0 180px; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--bg-subtle); padding: 12px 8px; min-width: 0; }
+.notes-projects-list { list-style: none; padding: 0; margin: 0 0 8px 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; min-height: 0; }
+.notes-project-btn { display: block; width: 100%; padding: 6px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; font: inherit; font-size: 0.85rem; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notes-project-btn:hover { background: var(--bg); border-color: var(--border); }
+.notes-project-btn-active { background: var(--bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.notes-project-name { display: block; overflow: hidden; text-overflow: ellipsis; }
+.notes-projects-footer { padding-top: 6px; border-top: 1px solid var(--border); }
+.notes-project-new { width: 100%; padding: 6px 10px; border: 1px dashed var(--border); border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: 0.8rem; text-align: left; }
+.notes-project-new:hover { color: var(--fg); border-color: var(--muted); }
+.notes-project-new-form input { width: 100%; padding: 6px 10px; border: 1px solid var(--accent); border-radius: 6px; background: var(--bg); color: inherit; font: inherit; font-size: 0.85rem; }
+.notes-panel-main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 12px; }
+.notes-panel-multi .notes-panel-header { margin-bottom: 8px; }
+.notes-panel-delete { color: var(--err, #cf6679) !important; border-color: var(--err, #cf6679) !important; }
+.notes-panel-delete:hover:not(:disabled) { background: rgba(207, 102, 121, 0.12) !important; }
 .notes-panel-hint { color: var(--muted); font-size: 0.75rem; margin: 6px 0 0; text-align: right; }
 
 /* Floating issues FAB + panel. Same shape/affordances as NotesFab; the FAB
