@@ -15,6 +15,12 @@ import { renderNotesToHtml } from '../lib/renderNotes.js';
 
 const SAVE_DEBOUNCE_MS = 500;
 const SELECTION_KEY = 'connor-review.notesSelectedProject.v1';
+/** localStorage key for the user's preferred project ordering — a JSON
+ *  array of slugs (misc excluded, since it's always first). Slugs the
+ *  server has but the array doesn't get appended in server order at
+ *  render time, so new projects show up at the bottom without stomping
+ *  a preexisting reorder. */
+const ORDER_KEY = 'connor-review.notesProjectOrder.v1';
 const MISC_SLUG = 'misc';
 
 export type ProjectSyncStatus = 'idle' | 'loading' | 'saving' | 'saved' | 'offline' | 'error';
@@ -38,8 +44,44 @@ function loadLegacyCache(): string {
   } catch { return ''; }
 }
 
+function loadOrder(): string[] {
+  try {
+    const raw = localStorage.getItem(ORDER_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((v): v is string => typeof v === 'string' && v !== MISC_SLUG);
+  } catch { return []; }
+}
+
+function saveOrder(order: string[]): void {
+  try { localStorage.setItem(ORDER_KEY, JSON.stringify(order.filter((s) => s !== MISC_SLUG))); }
+  catch { /* quota — ignore */ }
+}
+
+/** Apply the user's reorder on top of the server-returned list. Misc
+ *  is always first; then slugs in `order` (dropping any that no longer
+ *  exist server-side); then any brand-new server slugs the order array
+ *  hasn't seen yet, in the server's order (typically most-recently-
+ *  updated first). */
+function applyOrder(serverProjects: NoteProject[], order: string[]): NoteProject[] {
+  const bySlug = new Map(serverProjects.map((p) => [p.slug, p]));
+  const out: NoteProject[] = [];
+  const misc = bySlug.get(MISC_SLUG);
+  if (misc) { out.push(misc); bySlug.delete(MISC_SLUG); }
+  for (const slug of order) {
+    const p = bySlug.get(slug);
+    if (p) { out.push(p); bySlug.delete(slug); }
+  }
+  // Anything left over — new since we last saved order — lands at the bottom.
+  for (const p of bySlug.values()) out.push(p);
+  return out;
+}
+
 export function useNoteProjects() {
   const [projects, setProjects] = useState<NoteProject[]>([{ slug: MISC_SLUG, name: 'Misc' }]);
+  const [order, setOrder] = useState<string[]>(() => loadOrder());
+  useEffect(() => { saveOrder(order); }, [order]);
   const [selected, setSelected] = useState<string>(() => {
     try { return localStorage.getItem(SELECTION_KEY) || MISC_SLUG; }
     catch { return MISC_SLUG; }
@@ -220,6 +262,34 @@ export function useNoteProjects() {
     }
   }, []);
 
+  /** Move `fromSlug` to sit immediately BEFORE `beforeSlug`. Both must be
+   *  non-misc (misc is pinned first). No-ops if either slug is misc or
+   *  unknown, or if fromSlug is already in that position. */
+  const reorderProject = useCallback((fromSlug: string, beforeSlug: string | null) => {
+    if (fromSlug === MISC_SLUG) return;
+    if (beforeSlug === MISC_SLUG) return;
+    setOrder((cur) => {
+      // Build the current effective order (excluding misc) so we can
+      // rewrite it deterministically, then trim to only the slugs
+      // that server still knows about.
+      const knownNonMisc = projects.filter((p) => p.slug !== MISC_SLUG).map((p) => p.slug);
+      const seen = new Set<string>();
+      const merged: string[] = [];
+      const pushIfKnown = (s: string) => {
+        if (!seen.has(s) && knownNonMisc.includes(s)) { seen.add(s); merged.push(s); }
+      };
+      for (const s of cur) pushIfKnown(s);
+      for (const s of knownNonMisc) pushIfKnown(s);
+      // Drop the mover from its current position.
+      const without = merged.filter((s) => s !== fromSlug);
+      if (beforeSlug == null) return [...without, fromSlug];
+      const insertAt = without.indexOf(beforeSlug);
+      if (insertAt === -1) return [...without, fromSlug];
+      return [...without.slice(0, insertAt), fromSlug, ...without.slice(insertAt)];
+    });
+  }, [projects]);
+
+  const orderedProjects = applyOrder(projects, order);
   const currentBody = bodies[selected] ?? '';
   // Distinct from `status`: true only when the CURRENT project's body
   // hasn't landed in the cache yet. Drives the "actually loading" UI
@@ -231,7 +301,7 @@ export function useNoteProjects() {
   const canRename = selected !== MISC_SLUG;
 
   return {
-    projects,
+    projects: orderedProjects,
     selected,
     setSelected,
     currentBody,
@@ -240,6 +310,7 @@ export function useNoteProjects() {
     createProject,
     removeProject,
     renameProject,
+    reorderProject,
     status,
     canDelete,
     canRename,

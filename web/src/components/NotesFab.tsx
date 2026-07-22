@@ -39,6 +39,11 @@ export function NotesFab() {
   const [draftName, setDraftName] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number; moved: boolean } | null>(null);
+  // Reorder-drag state, distinct from the FAB drag above. Tracks the
+  // slug currently being dragged in the project list + the drop-target
+  // slug so we can draw an insertion-point indicator.
+  const [dragProject, setDragProject] = useState<string | null>(null);
+  const [dropBefore, setDropBefore] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -145,19 +150,76 @@ export function NotesFab() {
           style={panelStyle}
         >
           <nav className="notes-projects" aria-label="Note projects">
-            <ul className="notes-projects-list">
-              {notes.projects.map((p) => (
-                <li key={p.slug}>
-                  <button
-                    type="button"
-                    className={`notes-project-btn${p.slug === notes.selected ? ' notes-project-btn-active' : ''}`}
-                    onClick={() => notes.setSelected(p.slug)}
-                    title={p.slug === 'misc' ? 'Default catch-all — cannot be renamed or deleted' : p.name}
+            <ul
+              className="notes-projects-list"
+              // Drops that fall through to the container (past the last
+              // project, on the "+ New" row, etc.) mean "append to end".
+              // Individual <li> handlers call e.preventDefault() so the
+              // event won't bubble here when they take the drop.
+              onDragOver={dragProject ? (e) => e.preventDefault() : undefined}
+              onDrop={dragProject ? (e) => {
+                e.preventDefault();
+                const from = e.dataTransfer.getData('text/plain') || dragProject;
+                if (from && from !== 'misc') notes.reorderProject(from, null);
+                setDragProject(null);
+                setDropBefore(null);
+              } : undefined}
+            >
+              {notes.projects.map((p) => {
+                const isMisc = p.slug === 'misc';
+                const dragging = dragProject === p.slug;
+                const dropTarget = dropBefore === p.slug;
+                return (
+                  <li
+                    key={p.slug}
+                    className={`notes-project-item${dragging ? ' notes-project-item-dragging' : ''}${dropTarget ? ' notes-project-item-drop-before' : ''}`}
+                    // Only non-misc projects are reorderable. Misc is pinned
+                    // to position 0 by the hook anyway; making it undraggable
+                    // avoids confusing "why doesn't this work" moments.
+                    draggable={!isMisc}
+                    onDragStart={isMisc ? undefined : (e) => {
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', p.slug);
+                      setDragProject(p.slug);
+                    }}
+                    onDragEnter={isMisc || !dragProject ? undefined : (e) => {
+                      e.preventDefault();
+                      if (dragProject !== p.slug) setDropBefore(p.slug);
+                    }}
+                    onDragOver={isMisc || !dragProject ? undefined : (e) => {
+                      // Necessary to make the <li> a valid drop target.
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                    }}
+                    onDragLeave={() => {
+                      // Only clear when leaving this specific target; a
+                      // rapid drag over multiple items still shows the
+                      // right indicator because the next onDragEnter
+                      // sets it again.
+                      if (dropBefore === p.slug) setDropBefore(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const from = e.dataTransfer.getData('text/plain') || dragProject;
+                      if (from && !isMisc && from !== p.slug) {
+                        notes.reorderProject(from, p.slug);
+                      }
+                      setDragProject(null);
+                      setDropBefore(null);
+                    }}
+                    onDragEnd={() => { setDragProject(null); setDropBefore(null); }}
                   >
-                    <span className="notes-project-name">{p.name}</span>
-                  </button>
-                </li>
-              ))}
+                    <button
+                      type="button"
+                      className={`notes-project-btn${p.slug === notes.selected ? ' notes-project-btn-active' : ''}`}
+                      onClick={() => notes.setSelected(p.slug)}
+                      title={isMisc ? 'Default catch-all — cannot be reordered, renamed, or deleted' : `${p.name} · drag to reorder`}
+                    >
+                      <span className="notes-project-name">{p.name}</span>
+                    </button>
+                  </li>
+                );
+              })}
               {/* "+ New project" lives as the last list item so it hugs the
                   bottom of the project list without a divider strip
                   between them. Empty state (only misc + this button) still

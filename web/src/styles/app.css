@@ -641,7 +641,14 @@ button.ci-badge { cursor: pointer; }
 /* + New project sits as the last <li> so it hugs the project list.
  * A little top-margin gives visual separation without a divider. */
 .notes-project-new-item { margin-top: 4px; }
+.notes-project-item { position: relative; }
+/* Drag-in-progress: the source item dims + moves to a "grabbed" state
+ * so it's clear WHICH one is being moved. The 2px accent line drawn
+ * above the drop target shows where the release will land. */
+.notes-project-item-dragging > .notes-project-btn { opacity: 0.45; cursor: grabbing; }
+.notes-project-item-drop-before::before { content: ''; position: absolute; left: 4px; right: 4px; top: -2px; height: 2px; background: var(--accent); border-radius: 2px; }
 .notes-project-btn { display: block; width: 100%; padding: 6px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; font: inherit; font-size: 0.85rem; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notes-project-item[draggable="true"] > .notes-project-btn { cursor: grab; }
 .notes-project-btn:hover { background: var(--bg); border-color: var(--border); }
 .notes-project-btn-active { background: var(--bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .notes-project-name { display: block; overflow: hidden; text-overflow: ellipsis; }
