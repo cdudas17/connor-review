@@ -517,15 +517,29 @@ exactly what was in play.
 
 ## 6. Quality-of-life polish
 
-### 6.1 Draggable Notes pencil (file-backed scratchpad)
+### 6.1 Draggable Notes pencil (multi-project scratchpad)
 **What it does.** Always-on-screen FAB (defaults bottom-left, draggable)
-opens a 440×620 panel with a free-form note-taking textarea. Persists to
-`~/.connor-review/notes.html` (file-backed, so it survives browser
-profile resets).
+opens a 660×620 panel with two columns: a projects sidebar on the left
+(rename / delete / drag-to-reorder, with a non-deletable `misc` pinned
+at position 0) and a `contenteditable` editor on the right. Each
+project persists to its own file at
+`~/.connor-review/notes/<slug>.html`, with the pretty display name
+stored inline as an HTML comment on line 1 (`<!--name:...-->`) so
+there's no sidecar metadata file. Every project's body is
+eager-fetched in parallel on panel open so switching between projects
+is instant; the very first per-project fetch shows a spinner in the
+editor slot so an unloaded body doesn't look like lost content.
+Order is client-only (localStorage) — reordering doesn't touch the
+files on disk.
 
-**Files.** `web/src/components/NotesFab.tsx` +
-`web/src/components/NotesPanel.tsx`,
-`server/src/routes/notes.ts` (GET/PUT against the file).
+**Files.** `web/src/components/NotesFab.tsx`,
+`web/src/components/NotesEditor.tsx`,
+`web/src/hooks/useNoteProjects.ts`,
+`server/src/routes/notes.ts` (GET /projects, GET/PUT/PATCH/DELETE
+/projects/:slug, POST /projects, plus legacy /api/notes GET/PUT that
+routes through the misc project). Legacy single-file installs are
+auto-migrated on first request — old `~/.connor-review/notes.html`
+is copied into `notes/misc.html`.
 
 ### 6.2 "My open issues" floating widget
 **What it does.** Separate draggable FAB + panel that lazy-fetches
@@ -739,13 +753,28 @@ packages. The copies stay tiny (~80 LOC each) and can diverge later.
 `web/src/hooks/useCiFixes.ts` / `useConflictResolutions.ts` (per-PR
 in-flight state with stale auto-flip).
 
-### 10.2 File-backed Notes scratchpad
-**What it does.** A textarea-backed scratchpad that survives browser
-profile resets. Server endpoint reads/writes a single file at
-`~/.connor-review/notes.html`.
+### 10.2 File-backed per-project Notes scratchpad
+**What it does.** A `contenteditable` scratchpad that survives browser
+profile resets. Storage is one HTML file per project under
+`~/.connor-review/notes/<slug>.html`; a non-deletable `misc` project
+is the default. Server endpoints:
 
-**Files.** `web/src/components/NotesPanel.tsx`,
-`server/src/routes/notes.ts`.
+- `GET /api/notes/projects` — list projects (misc pinned first).
+- `GET|PUT /api/notes/projects/:slug` — read / debounced-save a body.
+- `POST /api/notes/projects` — create (slug generated server-side,
+  auto-suffixed on collision; `misc` is protected).
+- `PATCH /api/notes/projects/:slug` — rename (misc protected).
+- `DELETE /api/notes/projects/:slug` — remove (misc protected).
+- `GET|PUT /api/notes` — legacy single-file endpoints, now aliases
+  for the misc project.
+
+Names live inline as an HTML comment on the file's first line so no
+sidecar metadata file is needed. Client caches every project body
+in memory after eager-fetching them on panel open, so switching is
+instant; per-project debounced saves flush independently.
+
+**Files.** `web/src/hooks/useNoteProjects.ts`,
+`web/src/components/NotesFab.tsx`, `server/src/routes/notes.ts`.
 
 ### 10.3 SQLite (better-sqlite3) for the telemetry service
 **What it does.** WAL-mode SQLite at
