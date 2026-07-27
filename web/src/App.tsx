@@ -1546,6 +1546,11 @@ export function App() {
         onClose={() => setCiChecksTarget(null)}
         onFixCi={ciChecksTarget ? () => fixCi(ciChecksTarget) : undefined}
         ciFixRunning={ciChecksTarget ? ciFixes.stateFor(ciChecksTarget)?.kind === 'running' : false}
+        // "Ask AI about these N failures" seeds the PR's persistent chat.
+        // The PR-drawer AIChatPanel is what actually renders the conversation —
+        // this drawer just kicks off the ask and expects the user to reopen
+        // the PR drawer to read the answer. Wired only when a PR is targeted.
+        onAskAI={ciChecksTarget ? (prompt) => aiResponses.askInChat(ciChecksTarget, prompt) : undefined}
       />
 
       {current && (() => {

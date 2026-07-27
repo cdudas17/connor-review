@@ -889,6 +889,32 @@ a.issue-comment-when:hover { text-decoration: underline; }
 .ci-checks-buildkite-annotation-body details,
 .ci-checks-buildkite-annotation-body li,
 .ci-checks-buildkite-annotation-body p { margin: 0 0 8px; }
+
+/* Structured rspec-failure list — the "Option A" layout ported from the
+ * design preview. Each failure gets its own card with a breadcrumb
+ * description, click-to-copy path, and an expected/actual diff block
+ * with a copy button in its top-right corner. */
+.rs-list { display: flex; flex-direction: column; gap: 10px; }
+.rs-group-actions { display: flex; gap: 10px; align-items: center; }
+.rs-group-ai { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 6px; background: transparent; color: var(--accent); font: inherit; font-size: 12px; cursor: pointer; }
+.rs-group-ai:hover { background: rgba(88, 166, 255, 0.12); }
+.rs-group-actions a { color: var(--muted); text-decoration: none; margin-left: auto; font-size: 12px; }
+.rs-group-actions a:hover { color: var(--fg); }
+.rs-failure { padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-subtle); display: flex; flex-direction: column; gap: 6px; }
+.rs-desc { color: var(--muted); font-size: 13px; line-height: 1.4; }
+/* Path IS the copy affordance — click it and it copies itself. Cursor
+ * hints at that; :active flashes green while held. */
+.rs-path { align-self: flex-start; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left; }
+.rs-path:hover { text-decoration: underline; }
+.rs-path:active { color: var(--ok, #3fb950); text-decoration: none; }
+.rs-diff { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; white-space: pre; overflow-x: auto; position: relative; }
+.rs-copy { position: absolute; top: 6px; right: 6px; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-subtle); color: var(--muted); cursor: pointer; }
+.rs-copy:hover { color: var(--fg); background: var(--bg-elev, var(--bg-subtle)); border-color: var(--muted); }
+.rs-copy:active { color: var(--ok, #3fb950); border-color: var(--ok, #3fb950); }
+.rs-copy svg { width: 12px; height: 12px; display: block; }
+.rs-unparsed { margin-top: 4px; }
+.rs-unparsed > summary { color: var(--muted); font-size: 12px; cursor: pointer; padding: 4px 0; }
+.rs-unparsed .ci-checks-buildkite-annotation { margin-top: 8px; }
 .ci-checks-buildkite-annotation-body ul, .ci-checks-buildkite-annotation-body ol { padding-left: 18px; margin: 4px 0; }
 .ci-checks-buildkite-annotation-body details > summary { cursor: pointer; padding: 2px 0; }
 .ci-checks-buildkite-annotation-body pre,

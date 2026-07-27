@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, ApiCallError } from '../lib/api.js';
+import { RspecFailureList } from './RspecFailureList.js';
 
 function CloseIcon({ size = 16 }: { size?: number }) {
   return (
@@ -57,6 +58,11 @@ interface Props {
   /** Set to true to render the button in its disabled / running state
    * (used while a fix-CI run is already in flight for this PR). */
   ciFixRunning?: boolean;
+  /** Fire an ask into the PR's AI chat panel with a prefilled prompt.
+   *  Wired to `aiResponses.askInChat(current, prompt)` at the App level;
+   *  passed as a prop so the drilldown component doesn't need to know
+   *  about the PR-drawer chat plumbing. */
+  onAskAI?: (prompt: string) => void;
 }
 
 /** Click-target for the CI badge. Opens a right-side drawer listing every
@@ -77,7 +83,7 @@ type BkState =
   | { kind: 'ok'; detail: BkDetail }
   | { kind: 'error'; code: string; message: string };
 
-export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixCi, ciFixRunning }: Props) {
+export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixCi, ciFixRunning, onAskAI }: Props) {
   const [contexts, setContexts] = useState<CiContext[] | null>(seedContexts ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -231,29 +237,15 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
                               )}
                             </div>
                           )}
-                          {bk!.kind === 'ok' && (() => {
-                            const detail = bk!.detail;
-                            if (detail.annotations.length === 0) {
-                              return (
-                                <p className="ci-checks-buildkite-empty">
-                                  No annotations found on this build. The job probably didn't post a
-                                  failure summary — open it on Buildkite for the raw log.
-                                </p>
-                              );
-                            }
-                            return (
-                              <div className="ci-checks-buildkite-annotations">
-                                {detail.annotations.map((a) => (
-                                  <div key={a.id} className={`ci-checks-buildkite-annotation ci-checks-buildkite-annotation-${a.style}`}>
-                                    {a.context && a.context !== 'default' && (
-                                      <div className="ci-checks-buildkite-annotation-context">{a.context}</div>
-                                    )}
-                                    <div className="ci-checks-buildkite-annotation-body" dangerouslySetInnerHTML={{ __html: a.body_html }} />
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })()}
+                          {bk!.kind === 'ok' && (
+                            <RspecFailureList
+                              jobName={c.name}
+                              jobWebUrl={c.url ?? undefined}
+                              buildWebUrl={bk!.detail.buildWebUrl}
+                              annotations={bk!.detail.annotations}
+                              onAskAI={onAskAI}
+                            />
+                          )}
                         </div>
                       )}
                     </span>
