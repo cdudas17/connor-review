@@ -341,6 +341,25 @@ export const api = {
   /** Drill into a failing Buildkite CI check: fetches the build's annotations
    * (where rspec / jest / similar agents post failure summaries) so the CI
    * drawer can render per-test failure details inline. */
+  /** Fetch the tail of a Buildkite job's log by job web URL (or a
+   *  build URL + separate jobId). Used by the CI drilldown when a
+   *  failed job posted no error annotation — the failure detail lives
+   *  in the log itself. Server truncates to a sane tail unless
+   *  `full: true` is passed. */
+  getBuildkiteJobLog(url: string, opts?: { full?: boolean; jobId?: string }): Promise<{
+    jobId: string;
+    buildWebUrl: string;
+    totalLines: number;
+    returnedLines: number;
+    truncated: boolean;
+    text: string;
+  }> {
+    const qs = new URLSearchParams({ url });
+    if (opts?.full) qs.set('full', '1');
+    if (opts?.jobId) qs.set('jobId', opts.jobId);
+    return call(`/api/buildkite/log?${qs.toString()}`);
+  },
+
   getBuildkiteFailures(url: string): Promise<{
     org: string;
     pipeline: string;

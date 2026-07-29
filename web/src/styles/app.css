@@ -915,6 +915,11 @@ a.issue-comment-when:hover { text-decoration: underline; }
 .rs-unparsed { margin-top: 4px; }
 .rs-unparsed > summary { color: var(--muted); font-size: 12px; cursor: pointer; padding: 4px 0; }
 .rs-unparsed .ci-checks-buildkite-annotation { margin-top: 8px; }
+/* Log-tail fallback (for jobs that post no error annotation — rubocop,
+ * graphql-score-ratchet, pact, etc.). Bounded height with scroll so a
+ * long tail doesn't hijack the entire drawer. */
+.rs-log-tail { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; line-height: 1.5; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin: 0; max-height: 480px; overflow: auto; white-space: pre; color: var(--fg); }
+.rs-log-truncated { display: block; margin-top: 12px; color: var(--muted); font-style: italic; }
 .ci-checks-buildkite-annotation-body ul, .ci-checks-buildkite-annotation-body ol { padding-left: 18px; margin: 4px 0; }
 .ci-checks-buildkite-annotation-body details > summary { cursor: pointer; padding: 2px 0; }
 .ci-checks-buildkite-annotation-body pre,

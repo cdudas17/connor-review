@@ -147,4 +147,81 @@ export async function registerBuildkiteRoutes(app: FastifyInstance) {
       });
     }
   });
+
+  /**
+   * Fetch a job's raw log. Companion to `/failures` for the failure-mode
+   * where the job posts no annotation — its failure output lives only in
+   * the log (rubocop, graphql_score_ratchet, pact-can-i-merge, etc.).
+   *
+   * `url` should be the job's web URL (e.g. https://.../builds/N#<uuid>)
+   * OR a build URL with the `?jobId=<uuid>` query param. Response tail is
+   * capped at MAX_TAIL_LINES unless the caller passes `?full=1`.
+   *
+   * Buildkite embeds a proprietary line-timing prefix (`_bk;t=<ms>`) on
+   * every log line so its live log renderer can animate them. We strip
+   * that before returning so the tail reads as normal text.
+   */
+  const MAX_TAIL_LINES = 300;
+  app.get<{ Querystring: { url?: string; jobId?: string; full?: string } }>('/api/buildkite/log', async (req, reply) => {
+    const url = req.query.url;
+    if (!url) {
+      return reply.code(400).send({ code: 'MISSING_URL', message: 'url query param is required' });
+    }
+    const parsed = parseBuildkiteUrl(url);
+    if (!parsed) {
+      return reply.code(400).send({ code: 'INVALID_URL', message: 'Could not parse a Buildkite build/job URL.' });
+    }
+    const jobId = (req.query.jobId ?? parsed.jobId ?? '').trim();
+    if (!jobId) {
+      return reply.code(400).send({
+        code: 'MISSING_JOB',
+        message: 'A job UUID is required — pass it as the URL fragment (#<uuid>) or via ?jobId=<uuid>.',
+      });
+    }
+    const token = (process.env.BUILDKITE_API_TOKEN ?? '').trim();
+    if (!token) {
+      return reply.code(503).send({
+        code: 'NO_TOKEN',
+        message: 'BUILDKITE_API_TOKEN is not set. Add `read_build_logs` scope and export it in your shell, then restart the server.',
+      });
+    }
+    const full = req.query.full === '1';
+    const logUrl = `https://api.buildkite.com/v2/organizations/${encodeURIComponent(parsed.org)}/pipelines/${encodeURIComponent(parsed.pipeline)}/builds/${encodeURIComponent(parsed.build)}/jobs/${encodeURIComponent(jobId)}/log.txt`;
+    try {
+      const res = await fetch(logUrl, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        const body = (await res.text()).slice(0, 500);
+        const isScope = res.status === 403 && /scope/i.test(body);
+        return reply.code(res.status === 401 ? 401 : res.status === 403 ? 403 : 502).send({
+          code: isScope ? 'MISSING_SCOPE' : res.status === 401 ? 'AUTH_FAILED' : 'BUILDKITE_API_ERROR',
+          message: isScope
+            ? "Your BUILDKITE_API_TOKEN doesn't have the `read_build_logs` scope. Edit the token at https://buildkite.com/user/api-access-tokens, enable that scope, export the new value, and restart the server."
+            : `Buildkite log API returned ${res.status}: ${body}`,
+          status: res.status,
+        });
+      }
+      const raw = await res.text();
+      // Strip Buildkite's per-line `_bk;t=<ms>` timing prefix and terminal
+      // colour codes so the tail reads like plain text.
+      const cleaned = raw
+        .replace(/_bk;t=\d+/g, '')
+        // eslint-disable-next-line no-control-regex
+        .replace(/\x1b\[[0-9;]*m/g, '');
+      const allLines = cleaned.split('\n');
+      const lines = full ? allLines : allLines.slice(Math.max(0, allLines.length - MAX_TAIL_LINES));
+      return {
+        jobId,
+        buildWebUrl: `https://buildkite.com/${parsed.org}/${parsed.pipeline}/builds/${parsed.build}`,
+        totalLines: allLines.length,
+        returnedLines: lines.length,
+        truncated: !full && lines.length < allLines.length,
+        text: lines.join('\n'),
+      };
+    } catch (e) {
+      return reply.code(502).send({
+        code: 'FETCH_FAILED',
+        message: `Failed to reach Buildkite log API: ${(e as Error).message}`,
+      });
+    }
+  });
 }

@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { api, ApiCallError } from '../lib/api.js';
 import { parseRspecAnnotation, type RspecFailure } from '../lib/parseRspecAnnotation.js';
 
 interface Annotation {
@@ -59,6 +60,93 @@ function CopyIcon({ text, label }: { text: string; label: string }) {
   );
 }
 
+/** Called when the drilldown has no parseable annotations. Offers a
+ *  one-click log-tail fetch (lazy — logs can be large, no need to
+ *  spend the API call unless the user asks for it) and, once loaded,
+ *  an "Ask AI about this log" button that seeds the PR chat with a
+ *  prompt built from the log tail. */
+function LogTailFallback({ jobName, jobWebUrl, onAskAI }: {
+  jobName: string;
+  jobWebUrl: string;
+  onAskAI?: (prompt: string) => void;
+}) {
+  const [state, setState] = useState<
+    | { kind: 'idle' }
+    | { kind: 'loading' }
+    | { kind: 'ok'; text: string; truncated: boolean; totalLines: number }
+    | { kind: 'error'; code: string; message: string }
+  >({ kind: 'idle' });
+
+  const load = () => {
+    setState({ kind: 'loading' });
+    api.getBuildkiteJobLog(jobWebUrl)
+      .then((r) => setState({ kind: 'ok', text: r.text, truncated: r.truncated, totalLines: r.totalLines }))
+      .catch((e) => {
+        const err = e as ApiCallError & { code?: string };
+        setState({ kind: 'error', code: err.code ?? 'UNKNOWN', message: err.message ?? 'Log fetch failed' });
+      });
+  };
+
+  if (state.kind === 'idle') {
+    return (
+      <div className="rs-list">
+        <p className="ci-checks-buildkite-empty" style={{ marginBottom: 0 }}>
+          No parsed failure summary on this job — the failure output is only in the raw log.
+        </p>
+        <div className="rs-group-actions">
+          <button type="button" className="rs-group-ai" onClick={load}>Fetch log tail</button>
+          <a href={jobWebUrl} target="_blank" rel="noopener noreferrer">Open on Buildkite ↗</a>
+        </div>
+      </div>
+    );
+  }
+  if (state.kind === 'loading') {
+    return <p className="ci-checks-buildkite-loading"><span className="loading-spinner" aria-hidden="true" /> Fetching log tail…</p>;
+  }
+  if (state.kind === 'error') {
+    return (
+      <div className="ci-checks-buildkite-error">
+        <strong>Couldn't fetch log.</strong>
+        <p>{state.message}</p>
+        {state.code === 'MISSING_SCOPE' && (
+          <p className="ci-checks-buildkite-hint">
+            Add the <code>read_build_logs</code> scope to your Buildkite token at{' '}
+            <a href="https://buildkite.com/user/api-access-tokens" target="_blank" rel="noopener noreferrer">buildkite.com/user/api-access-tokens</a>,
+            re-export it in your shell, and restart the server.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const prompt = [
+    `A CI job failed on this PR: ${jobName}. There's no rspec-style failure summary; the failing output is in the raw log tail below (last ~300 lines, prefix noise stripped).`,
+    'Job: ' + jobWebUrl,
+    'Read the tail, identify the actual failure, and tell me what to change. If the tail is truncated, note it and ask before requesting more.',
+    '',
+    '```',
+    state.text.slice(-20_000), // keep prompt under a manageable size
+    '```',
+  ].join('\n');
+
+  return (
+    <div className="rs-list">
+      <div className="rs-group-actions">
+        {onAskAI && (
+          <button type="button" className="rs-group-ai" onClick={() => onAskAI(prompt)}>
+            Ask AI about this log
+          </button>
+        )}
+        <a href={jobWebUrl} target="_blank" rel="noopener noreferrer">Open on Buildkite ↗</a>
+      </div>
+      <pre className="rs-log-tail">{state.text}
+{state.truncated && <span className="rs-log-truncated">
+… truncated (last 300 of {state.totalLines} lines)
+</span>}</pre>
+    </div>
+  );
+}
+
 /** Renders a failing Buildkite job's annotation content in the "Option A"
  *  shape from the design preview: batch Ask-AI at the top, then one
  *  card per parsed failure with clickable-to-copy path + copy-icon on
@@ -80,11 +168,11 @@ export function RspecFailureList({ jobName, jobWebUrl, buildWebUrl, annotations,
   }, [annotations]);
 
   if (parsed.length === 0 && unparsed.length === 0) {
+    // Fall back to fetching the tail of the failing job's log — the
+    // failure output for graphql-score-ratchet, pact-can-i-merge,
+    // rubocop, etc. only exists in the log, not in an annotation.
     return (
-      <p className="ci-checks-buildkite-empty">
-        No parsed failure details on this build. The job probably didn't post a
-        summary — <a href={jobWebUrl ?? buildWebUrl} target="_blank" rel="noopener noreferrer">open on Buildkite ↗</a> for the raw log.
-      </p>
+      <LogTailFallback jobName={jobName} jobWebUrl={jobWebUrl ?? buildWebUrl} onAskAI={onAskAI} />
     );
   }
 
