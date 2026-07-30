@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, ApiCallError } from '../lib/api.js';
 import { parseRspecAnnotation, type RspecFailure } from '../lib/parseRspecAnnotation.js';
 
@@ -70,36 +70,27 @@ function LogTailFallback({ jobName, jobWebUrl, onAskAI }: {
   jobWebUrl: string;
   onAskAI?: (prompt: string) => void;
 }) {
+  // Auto-fetch on mount. This component only renders after the user
+  // has clicked into a failing check, so we're not blowing API quota
+  // on every drawer open — just the click that actually wants the log.
   const [state, setState] = useState<
-    | { kind: 'idle' }
     | { kind: 'loading' }
     | { kind: 'ok'; text: string; truncated: boolean; totalLines: number }
     | { kind: 'error'; code: string; message: string }
-  >({ kind: 'idle' });
+  >({ kind: 'loading' });
 
-  const load = () => {
-    setState({ kind: 'loading' });
+  useEffect(() => {
+    let cancelled = false;
     api.getBuildkiteJobLog(jobWebUrl)
-      .then((r) => setState({ kind: 'ok', text: r.text, truncated: r.truncated, totalLines: r.totalLines }))
+      .then((r) => { if (!cancelled) setState({ kind: 'ok', text: r.text, truncated: r.truncated, totalLines: r.totalLines }); })
       .catch((e) => {
+        if (cancelled) return;
         const err = e as ApiCallError & { code?: string };
         setState({ kind: 'error', code: err.code ?? 'UNKNOWN', message: err.message ?? 'Log fetch failed' });
       });
-  };
+    return () => { cancelled = true; };
+  }, [jobWebUrl]);
 
-  if (state.kind === 'idle') {
-    return (
-      <div className="rs-list">
-        <p className="ci-checks-buildkite-empty" style={{ marginBottom: 0 }}>
-          No parsed failure summary on this job — the failure output is only in the raw log.
-        </p>
-        <div className="rs-group-actions">
-          <button type="button" className="rs-group-ai" onClick={load}>Fetch log tail</button>
-          <a href={jobWebUrl} target="_blank" rel="noopener noreferrer">Open on Buildkite ↗</a>
-        </div>
-      </div>
-    );
-  }
   if (state.kind === 'loading') {
     return <p className="ci-checks-buildkite-loading"><span className="loading-spinner" aria-hidden="true" /> Fetching log tail…</p>;
   }
