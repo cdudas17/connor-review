@@ -12,7 +12,12 @@ import type { WorkflowCiMatch } from './workflowTypes.js';
  */
 
 export type UserWorkflowStep =
-  | { action: 'askAI'; prompt: string; skipIfPrevFailed?: boolean }
+  /** askAI step. `prompt` is used as-is when set; when `skillSlug` is set
+   *  the runner loads the skill body from ~/.connor-review/skills/<slug>.md
+   *  and uses that as the prompt (falling back to `prompt` if the skill
+   *  can't be resolved). This lets a shared prompt live in one file and
+   *  be referenced from many workflows without paste-and-drift. */
+  | { action: 'askAI'; prompt: string; skillSlug?: string; skipIfPrevFailed?: boolean }
   | { action: 'fixCi'; skipIfPrevFailed?: boolean }
   | { action: 'resolveConflicts'; skipIfPrevFailed?: boolean }
   /** Bulk-resolve threads. `authorLogin` restricts to threads started by

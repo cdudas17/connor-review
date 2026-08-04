@@ -9,6 +9,11 @@ interface Props {
   workflows: UserWorkflow[];
   onUpsert: (workflow: UserWorkflow) => void;
   onRemove: (id: string) => void;
+  /** Reusable prompt templates, offered as a picker on each askAI step. */
+  skills?: Array<{ slug: string; name: string }>;
+  /** Fired when the user clicks "Manage skills" — parent opens the
+   *  Skills drawer. Optional; the picker still works without it. */
+  onOpenSkills?: () => void;
 }
 
 type ActionKind = UserWorkflowStep['action'];
@@ -41,7 +46,7 @@ function blankWorkflow(): UserWorkflow {
  *  `onRemove` callbacks the parent passes. Code-authored workflows in
  *  `config.local.ts` aren't surfaced here — they continue to work in
  *  parallel; this drawer only manages the localStorage-backed ones. */
-export function WorkflowsManager({ open, onClose, workflows, onUpsert, onRemove }: Props) {
+export function WorkflowsManager({ open, onClose, workflows, onUpsert, onRemove, skills = [], onOpenSkills }: Props) {
   const [editing, setEditing] = useState<UserWorkflow | null>(null);
 
   useEffect(() => {
@@ -65,6 +70,8 @@ export function WorkflowsManager({ open, onClose, workflows, onUpsert, onRemove 
           <WorkflowEditor
             initial={editing}
             existingIds={workflows.map((w) => w.id).filter((id) => id !== editing.id)}
+            skills={skills}
+            onOpenSkills={onOpenSkills}
             onSave={(w) => { onUpsert(w); setEditing(null); }}
             onCancel={() => setEditing(null)}
           />
@@ -104,9 +111,11 @@ export function WorkflowsManager({ open, onClose, workflows, onUpsert, onRemove 
   );
 }
 
-function WorkflowEditor({ initial, existingIds, onSave, onCancel }: {
+function WorkflowEditor({ initial, existingIds, skills, onOpenSkills, onSave, onCancel }: {
   initial: UserWorkflow;
   existingIds: string[];
+  skills: Array<{ slug: string; name: string }>;
+  onOpenSkills?: () => void;
   onSave: (w: UserWorkflow) => void;
   onCancel: () => void;
 }) {
@@ -121,7 +130,9 @@ function WorkflowEditor({ initial, existingIds, onSave, onCancel }: {
   // Tag is optional now — blank means "apply to every PR".
   if (steps.length === 0) errors.push('At least one step is required.');
   steps.forEach((s, i) => {
-    if (s.action === 'askAI' && !s.prompt.trim()) errors.push(`Step ${i + 1}: prompt is required.`);
+    if (s.action === 'askAI' && !s.prompt.trim() && !s.skillSlug) {
+      errors.push(`Step ${i + 1}: prompt or skill is required.`);
+    }
     if (s.action === 'toast' && !s.message.trim()) errors.push(`Step ${i + 1}: message is required.`);
   });
   const submit = () => {
@@ -187,12 +198,43 @@ function WorkflowEditor({ initial, existingIds, onSave, onCancel }: {
               <button type="button" className="workflow-editor-step-remove" onClick={() => setSteps((s) => s.filter((_, idx) => idx !== i))} aria-label="Remove step">×</button>
             </div>
             {step.action === 'askAI' && (
-              <textarea
-                value={step.prompt}
-                onChange={(e) => updateStep(i, { prompt: e.target.value })}
-                placeholder="The prompt sent to Claude (with the PR diff as context)."
-                rows={4}
-              />
+              <>
+                <div className="workflow-editor-skill-row">
+                  <label>
+                    Skill
+                    <select
+                      value={step.skillSlug ?? ''}
+                      onChange={(e) => updateStep(i, { skillSlug: e.target.value || undefined })}
+                    >
+                      <option value="">— Inline prompt (below) —</option>
+                      {skills.map((s) => (
+                        <option key={s.slug} value={s.slug}>{s.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {onOpenSkills && (
+                    <button
+                      type="button"
+                      className="workflow-editor-manage-skills"
+                      onClick={onOpenSkills}
+                    >Manage skills</button>
+                  )}
+                </div>
+                {!step.skillSlug && (
+                  <textarea
+                    value={step.prompt}
+                    onChange={(e) => updateStep(i, { prompt: e.target.value })}
+                    placeholder="The prompt sent to the AI (with the PR diff as context). Pick a skill above to reuse a saved prompt instead."
+                    rows={4}
+                  />
+                )}
+                {step.skillSlug && (
+                  <p className="workflow-editor-skill-note">
+                    Prompt loaded from the <strong>{skills.find((s) => s.slug === step.skillSlug)?.name ?? step.skillSlug}</strong> skill at run time.
+                    Edit the prompt via <button type="button" className="link-button" onClick={onOpenSkills}>Manage skills</button>.
+                  </p>
+                )}
+              </>
             )}
             {step.action === 'resolveThreads' && (
               <input

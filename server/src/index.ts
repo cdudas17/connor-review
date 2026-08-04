@@ -8,6 +8,7 @@ import cors from '@fastify/cors';
 import { registerPullsRoutes } from './routes/pulls.js';
 import { registerTeamRoutes } from './routes/team.js';
 import { registerNotesRoutes } from './routes/notes.js';
+import { registerSkillsRoutes } from './routes/skills.js';
 import { registerLocalRoutes } from './routes/local.js';
 import { registerIssuesRoutes } from './routes/issues.js';
 import { registerBuildkiteRoutes } from './routes/buildkite.js';
@@ -20,6 +21,7 @@ export async function buildServer() {
   await registerPullsRoutes(app);
   await registerTeamRoutes(app);
   await registerNotesRoutes(app);
+  await registerSkillsRoutes(app);
   await registerLocalRoutes(app);
   await registerIssuesRoutes(app);
   await registerBuildkiteRoutes(app);
