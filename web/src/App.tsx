@@ -36,11 +36,9 @@ import { useConflictResolutions } from './hooks/useConflictResolutions.js';
 import { useCiFixes } from './hooks/useCiFixes.js';
 import { useWorkflowRuns } from './hooks/useWorkflowRuns.js';
 import { useUserWorkflows } from './hooks/useUserWorkflows.js';
-import { useSkills } from './hooks/useSkills.js';
 import { runWorkflow, prToWorkflowPr } from './lib/runWorkflow.js';
 import { userWorkflowToPr } from './lib/userWorkflowToPr.js';
 import { WorkflowsManager } from './components/WorkflowsManager.js';
-import { SkillsManager } from './components/SkillsManager.js';
 import type { PrWorkflow } from './lib/workflowTypes.js';
 import { MentionsProvider } from './contexts/MentionsContext.js';
 import { useTeamPRs } from './hooks/useTeamPRs.js';
@@ -232,9 +230,7 @@ export function App() {
   const [rebasesRunning, setRebasesRunning] = useState<Set<string>>(new Set());
   const workflowRuns = useWorkflowRuns();
   const userWorkflows = useUserWorkflows();
-  const skills = useSkills();
   const [workflowsManagerOpen, setWorkflowsManagerOpen] = useState(false);
-  const [skillsManagerOpen, setSkillsManagerOpen] = useState(false);
   const [addPrModalOpen, setAddPrModalOpen] = useState(false);
   // Escape closes the Add PR modal — matches the rest of the app's modal
   // pattern (drawer, workflows manager, event drawer).
@@ -249,13 +245,8 @@ export function App() {
    *  localStorage. Merged here so PRList renders both as pills and so
    *  workflowLabelOf in the drawer can resolve either. */
   const mergedWorkflows = useMemo(
-    () => [
-      ...APP_CONFIG.prWorkflows,
-      ...userWorkflows.workflows.map((uw) => userWorkflowToPr(uw, { resolveSkillBody: skills.bodyFor })),
-    ],
-    // skills.bodyFor identity changes when a skill body is fetched/edited,
-    // so this memo naturally rebuilds workflows when skills change.
-    [userWorkflows.workflows, skills.bodyFor],
+    () => [...APP_CONFIG.prWorkflows, ...userWorkflows.workflows.map(userWorkflowToPr)],
+    [userWorkflows.workflows],
   );
 
   /** Click handler for a workflow pill on a PR row. Builds the runtime
@@ -1456,10 +1447,7 @@ export function App() {
         workflows={userWorkflows.workflows}
         onUpsert={userWorkflows.upsert}
         onRemove={userWorkflows.remove}
-        skills={skills.skills}
-        onOpenSkills={() => setSkillsManagerOpen(true)}
       />
-      <SkillsManager open={skillsManagerOpen} onClose={() => setSkillsManagerOpen(false)} />
 
       {tab !== 'issues' && tab !== 'calendar' && <PRList
         prs={activePRs}

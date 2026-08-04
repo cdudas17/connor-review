@@ -322,38 +322,6 @@ export const api = {
       body: JSON.stringify({ authorLogin: opts?.authorLogin ?? undefined }),
     });
   },
-  // --- Skills (reusable prompt templates) ---
-  listSkills(): Promise<{ skills: Array<{ slug: string; name: string }> }> {
-    return call('/api/skills');
-  },
-  getSkill(slug: string): Promise<{ slug: string; name: string; body: string; path: string }> {
-    return call(`/api/skills/${slug}`);
-  },
-  createSkill(body: { name: string; body?: string }): Promise<{ slug: string; name: string }> {
-    return call('/api/skills', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-  },
-  putSkillBody(slug: string, body: string): Promise<void> {
-    return call(`/api/skills/${slug}`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ body }),
-    });
-  },
-  renameSkill(slug: string, name: string): Promise<{ slug: string; name: string }> {
-    return call(`/api/skills/${slug}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-  },
-  deleteSkill(slug: string): Promise<void> {
-    return call(`/api/skills/${slug}`, { method: 'DELETE' });
-  },
-
   // --- Calendar (via local gcalcli CLI) ---
   getCalendarAuthStatus(): Promise<{ connected: boolean; configured: boolean; configurationError: string | null }> {
     return call('/api/calendar/auth-status');

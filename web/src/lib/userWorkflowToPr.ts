@@ -1,15 +1,6 @@
 import type { PrWorkflow } from './workflowTypes.js';
 import type { UserWorkflow, UserWorkflowStep } from './userWorkflowTypes.js';
 
-/** Optional dependencies threaded into the synthesised `run`. Kept
- *  small on purpose — only what a step type genuinely needs. */
-export interface UserWorkflowRunDeps {
-  /** Resolve a skill slug to its prompt body. Returns null when the
-   *  slug is unknown (e.g. user deleted the skill after the workflow
-   *  was authored) so the runner can fall back to the inline prompt. */
-  resolveSkillBody?: (slug: string) => string | null;
-}
-
 /**
  * Convert a declarative `UserWorkflow` (from the in-app editor) into a
  * runnable `PrWorkflow`. The synthesised `run` is a tiny linear
@@ -17,7 +8,7 @@ export interface UserWorkflowRunDeps {
  * step "failed" (action result `ok === false` or askAI threw), and
  * honours each step's `skipIfPrevFailed` / `onlyIfPrevFailed` gate.
  */
-export function userWorkflowToPr(uw: UserWorkflow, deps: UserWorkflowRunDeps = {}): PrWorkflow {
+export function userWorkflowToPr(uw: UserWorkflow): PrWorkflow {
   return {
     id: `user:${uw.id}`,
     label: uw.label,
@@ -30,7 +21,7 @@ export function userWorkflowToPr(uw: UserWorkflow, deps: UserWorkflowRunDeps = {
         const shouldRun = stepShouldRun(step, prevFailed);
         if (!shouldRun) continue;
         try {
-          prevFailed = await runStep(step, actions, deps);
+          prevFailed = await runStep(step, actions);
         } catch (e) {
           // askAI rejects on transport errors; treat as failed and
           // surface to the user via toast so the timeline isn't silently empty.
@@ -52,15 +43,9 @@ function stepShouldRun(step: UserWorkflowStep, prevFailed: boolean): boolean {
 async function runStep(
   step: UserWorkflowStep,
   actions: Parameters<PrWorkflow['run']>[0]['actions'],
-  deps: UserWorkflowRunDeps,
 ): Promise<boolean /* failed? */> {
   if (step.action === 'askAI') {
-    // Prefer the skill's body when a slug is bound; fall back to the
-    // inline prompt if the skill can't be resolved (deleted, offline,
-    // etc.) so a broken skill reference doesn't kill the whole run.
-    const resolved = step.skillSlug ? deps.resolveSkillBody?.(step.skillSlug) : null;
-    const prompt = (resolved && resolved.trim().length > 0) ? resolved : step.prompt;
-    await actions.askAI(prompt);
+    await actions.askAI(step.prompt);
     return false;
   }
   if (step.action === 'fixCi') {
