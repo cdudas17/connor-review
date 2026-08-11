@@ -84,6 +84,11 @@ function LogTailFallback({ jobName, jobWebUrl, jobId, onAskAI }: {
     | { kind: 'ok'; text: string; truncated: boolean; totalLines: number }
     | { kind: 'error'; code: string; message: string }
   >({ kind: 'loading' });
+  // Expand toggle — drops the max-height cap so the whole tail flows
+  // naturally in the drawer instead of behind an inner scrollbar. Also
+  // controls whether we refetch with ?full=1 to grab the full log.
+  const [expanded, setExpanded] = useState(false);
+  const [fetchingFull, setFetchingFull] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,6 +135,17 @@ function LogTailFallback({ jobName, jobWebUrl, jobId, onAskAI }: {
     '```',
   ].join('\n');
 
+  const fetchFull = () => {
+    setFetchingFull(true);
+    api.getBuildkiteJobLog(jobWebUrl, { full: true, ...(jobId ? { jobId } : {}) })
+      .then((r) => { setState({ kind: 'ok', text: r.text, truncated: r.truncated, totalLines: r.totalLines }); })
+      .catch((e) => {
+        const err = e as ApiCallError & { code?: string };
+        setState({ kind: 'error', code: err.code ?? 'UNKNOWN', message: err.message ?? 'Log fetch failed' });
+      })
+      .finally(() => { setFetchingFull(false); });
+  };
+
   return (
     <div className="rs-list">
       <div className="rs-group-actions">
@@ -138,9 +154,23 @@ function LogTailFallback({ jobName, jobWebUrl, jobId, onAskAI }: {
             Ask AI about this log
           </button>
         )}
+        <button
+          type="button"
+          className="rs-log-toggle"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded ? 'true' : 'false'}
+        >{expanded ? 'Collapse' : 'Expand'}</button>
+        {state.truncated && (
+          <button
+            type="button"
+            className="rs-log-toggle"
+            onClick={fetchFull}
+            disabled={fetchingFull}
+          >{fetchingFull ? 'Fetching full log…' : `Fetch full log (${state.totalLines} lines)`}</button>
+        )}
         <a href={jobWebUrl} target="_blank" rel="noopener noreferrer">Open on Buildkite ↗</a>
       </div>
-      <pre className="rs-log-tail">{state.text}
+      <pre className={`rs-log-tail${expanded ? ' rs-log-tail-expanded' : ''}`}>{state.text}
 {state.truncated && <span className="rs-log-truncated">
 … truncated (last 300 of {state.totalLines} lines)
 </span>}</pre>

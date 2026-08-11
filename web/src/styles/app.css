@@ -936,7 +936,14 @@ a.bk-chip-success:hover { background: rgba(63, 185, 80, 0.08); }
  * graphql-score-ratchet, pact, etc.). Bounded height with scroll so a
  * long tail doesn't hijack the entire drawer. */
 .rs-log-tail { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; line-height: 1.5; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin: 0; max-height: 480px; overflow: auto; white-space: pre; color: var(--fg); }
+/* Expanded: drop the height cap so the whole log flows and the drawer
+ * itself takes over scrolling. Kept x-scroll for wide lines. */
+.rs-log-tail-expanded { max-height: none; overflow-x: auto; overflow-y: visible; }
 .rs-log-truncated { display: block; margin-top: 12px; color: var(--muted); font-style: italic; }
+/* Small toolbar buttons above the log — "Expand" / "Fetch full log". */
+.rs-log-toggle { padding: 3px 10px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: 12px; }
+.rs-log-toggle:hover:not(:disabled) { color: var(--fg); background: var(--bg-subtle); border-color: var(--muted); }
+.rs-log-toggle:disabled { opacity: 0.6; cursor: progress; }
 .ci-checks-buildkite-annotation-body ul, .ci-checks-buildkite-annotation-body ol { padding-left: 18px; margin: 4px 0; }
 .ci-checks-buildkite-annotation-body details > summary { cursor: pointer; padding: 2px 0; }
 .ci-checks-buildkite-annotation-body pre,

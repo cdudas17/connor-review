@@ -132,11 +132,18 @@ export async function registerBuildkiteRoutes(app: FastifyInstance) {
 
       // Slim projection of every job in the build so the client can
       // render a Buildkite-style chip grid without needing to hit
-      // Buildkite again. Filter to actual command jobs — wait/trigger
-      // pseudo-jobs (no `command` in the API response, no state) are
-      // structural glue, not something the user cares about.
+      // Buildkite again. Two filters:
+      //   1. Actual command jobs — wait/trigger pseudo-jobs (no state,
+      //      no id) are structural glue.
+      //   2. Non-neutral outcomes only — skipped/broken/canceled jobs
+      //      are noise on a review-focused build overview (the user's
+      //      screenshot had a wall of grey "–" chips). Keeping just
+      //      failed / passed / pending gives the chip grid a signal-
+      //      to-noise ratio closer to Buildkite's own "Failures" tab.
+      const NEUTRAL_STATES = new Set(['skipped', 'broken', 'canceled', 'canceling', 'neutral']);
       const allJobs = (build.jobs ?? [])
         .filter((j) => j.state != null && j.id != null)
+        .filter((j) => !NEUTRAL_STATES.has((j.state ?? '').toLowerCase()))
         .map((j) => ({
           id: j.id,
           name: j.name,
