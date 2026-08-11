@@ -237,15 +237,25 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
                               )}
                             </div>
                           )}
-                          {bk!.kind === 'ok' && (
-                            <RspecFailureList
-                              jobName={c.name}
-                              jobWebUrl={c.url ?? undefined}
-                              buildWebUrl={bk!.detail.buildWebUrl}
-                              annotations={bk!.detail.annotations}
-                              onAskAI={onAskAI}
-                            />
-                          )}
+                          {bk!.kind === 'ok' && (() => {
+                            // Resolve the job UUID for the log-tail fallback.
+                            // Prefer focusedJob (URL had a #<uuid> fragment),
+                            // else match a failed job by name against the
+                            // clicked check, else fall back to the first
+                            // failed job so at least SOMETHING shows.
+                            const failedByName = bk!.detail.failedJobs.find((j) => j.name === c.name);
+                            const jobId = bk!.detail.focusedJob?.id ?? failedByName?.id ?? bk!.detail.failedJobs[0]?.id;
+                            return (
+                              <RspecFailureList
+                                jobName={c.name}
+                                jobWebUrl={c.url ?? undefined}
+                                buildWebUrl={bk!.detail.buildWebUrl}
+                                annotations={bk!.detail.annotations}
+                                jobId={jobId}
+                                onAskAI={onAskAI}
+                              />
+                            );
+                          })()}
                         </div>
                       )}
                     </span>

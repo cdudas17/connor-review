@@ -17,6 +17,11 @@ interface Props {
    *  the parser can't turn into structured failures falls back to raw
    *  HTML render inside a details block below the parsed list. */
   annotations: Annotation[];
+  /** Job UUID from Buildkite's REST API. Needed for the log-tail
+   *  fallback because check URLs (`c.url` in CiChecksDrawer) don't
+   *  always carry a `#<uuid>` fragment — without this we can't tell
+   *  the log endpoint which job to fetch. */
+  jobId?: string;
   /** Called with a prefilled prompt when the user clicks "Ask AI about
    *  these N failures". App-level handler wires this to the PR's
    *  persistent AI chat (askInChat). */
@@ -65,9 +70,10 @@ function CopyIcon({ text, label }: { text: string; label: string }) {
  *  spend the API call unless the user asks for it) and, once loaded,
  *  an "Ask AI about this log" button that seeds the PR chat with a
  *  prompt built from the log tail. */
-function LogTailFallback({ jobName, jobWebUrl, onAskAI }: {
+function LogTailFallback({ jobName, jobWebUrl, jobId, onAskAI }: {
   jobName: string;
   jobWebUrl: string;
+  jobId?: string;
   onAskAI?: (prompt: string) => void;
 }) {
   // Auto-fetch on mount. This component only renders after the user
@@ -81,7 +87,11 @@ function LogTailFallback({ jobName, jobWebUrl, onAskAI }: {
 
   useEffect(() => {
     let cancelled = false;
-    api.getBuildkiteJobLog(jobWebUrl)
+    // Pass jobId explicitly — the URL fragment isn't always present on
+    // check `url`s (GitHub sometimes strips it, and repo settings
+    // determine whether Buildkite emits fragments at all). Without a
+    // fallback the log endpoint responds with MISSING_JOB.
+    api.getBuildkiteJobLog(jobWebUrl, jobId ? { jobId } : undefined)
       .then((r) => { if (!cancelled) setState({ kind: 'ok', text: r.text, truncated: r.truncated, totalLines: r.totalLines }); })
       .catch((e) => {
         if (cancelled) return;
@@ -89,7 +99,7 @@ function LogTailFallback({ jobName, jobWebUrl, onAskAI }: {
         setState({ kind: 'error', code: err.code ?? 'UNKNOWN', message: err.message ?? 'Log fetch failed' });
       });
     return () => { cancelled = true; };
-  }, [jobWebUrl]);
+  }, [jobWebUrl, jobId]);
 
   if (state.kind === 'loading') {
     return <p className="ci-checks-buildkite-loading"><span className="loading-spinner" aria-hidden="true" /> Fetching log tail…</p>;
@@ -143,7 +153,7 @@ function LogTailFallback({ jobName, jobWebUrl, onAskAI }: {
  *  card per parsed failure with clickable-to-copy path + copy-icon on
  *  the expected/actual diff. Falls back to raw annotation HTML when the
  *  parser can't extract structured failures. */
-export function RspecFailureList({ jobName, jobWebUrl, buildWebUrl, annotations, onAskAI }: Props) {
+export function RspecFailureList({ jobName, jobWebUrl, buildWebUrl, annotations, jobId, onAskAI }: Props) {
   const { parsed, unparsed } = useMemo(() => {
     const parsed: RspecFailure[] = [];
     const unparsed: Annotation[] = [];
@@ -163,7 +173,7 @@ export function RspecFailureList({ jobName, jobWebUrl, buildWebUrl, annotations,
     // failure output for graphql-score-ratchet, pact-can-i-merge,
     // rubocop, etc. only exists in the log, not in an annotation.
     return (
-      <LogTailFallback jobName={jobName} jobWebUrl={jobWebUrl ?? buildWebUrl} onAskAI={onAskAI} />
+      <LogTailFallback jobName={jobName} jobWebUrl={jobWebUrl ?? buildWebUrl} jobId={jobId} onAskAI={onAskAI} />
     );
   }
 
