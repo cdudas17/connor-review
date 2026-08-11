@@ -139,6 +139,12 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
   // the next drawer open shouldn't show drill-ins from the previous PR.
   useEffect(() => { setBkExpanded({}); }, [target?.owner, target?.repo, target?.number]);
 
+  const fetchBuildkiteRow = (url: string) => {
+    api.getBuildkiteFailures(url)
+      .then((detail) => setBkExpanded((c) => ({ ...c, [url]: { kind: 'ok', detail } })))
+      .catch((e) => setBkExpanded((c) => ({ ...c, [url]: { kind: 'error', code: (e as ApiCallError).code ?? 'UNKNOWN', message: (e as Error).message } })));
+  };
+
   const toggleBuildkiteRow = (url: string) => {
     setBkExpanded((cur) => {
       const existing = cur[url];
@@ -149,14 +155,30 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
         delete next[url];
         return next;
       }
-      const next = { ...cur, [url]: { kind: 'loading' as const } };
       // Fire the fetch outside of setState (no await — let it land async).
-      api.getBuildkiteFailures(url)
-        .then((detail) => setBkExpanded((c) => ({ ...c, [url]: { kind: 'ok', detail } })))
-        .catch((e) => setBkExpanded((c) => ({ ...c, [url]: { kind: 'error', code: (e as ApiCallError).code ?? 'UNKNOWN', message: (e as Error).message } })));
-      return next;
+      fetchBuildkiteRow(url);
+      return { ...cur, [url]: { kind: 'loading' as const } };
     });
   };
+
+  // Auto-open every failing Buildkite check as soon as the contexts land.
+  // The user's workflow was always to expand red rows one-by-one — do it
+  // for them. Skips rows that are already loading/ok/errored (in the
+  // bkExpanded map) so a manual collapse doesn't get re-opened by a
+  // subsequent context refresh.
+  useEffect(() => {
+    if (!contexts) return;
+    const targets = contexts.filter((c) => c.isFailure && isBuildkite(c) && c.url && !(c.url in bkExpanded));
+    if (targets.length === 0) return;
+    // Set all to loading in one batch, then fire fetches in parallel.
+    setBkExpanded((cur) => {
+      const next = { ...cur };
+      for (const c of targets) next[c.url!] = { kind: 'loading' as const };
+      return next;
+    });
+    for (const c of targets) fetchBuildkiteRow(c.url!);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bkExpanded is used only to skip already-tracked rows; depending on it would loop.
+  }, [contexts]);
 
   if (!target) return null;
   return (
