@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, ApiCallError } from '../lib/api.js';
 import { RspecFailureList } from './RspecFailureList.js';
+import { BuildJobChips } from './BuildJobChips.js';
 
 function CloseIcon({ size = 16 }: { size?: number }) {
   return (
@@ -74,6 +75,16 @@ interface BkDetail {
   buildWebUrl: string;
   focusedJob: { id: string; name?: string; web_url?: string; state?: string; exit_status?: number | null } | null;
   failedJobs: Array<{ id: string; name?: string; web_url?: string; state?: string; exit_status?: number | null }>;
+  allJobs: Array<{
+    id: string;
+    name?: string;
+    step_key?: string;
+    state?: string;
+    exit_status: number | null;
+    web_url?: string;
+    parallel_group_index: number | null;
+    parallel_group_total: number | null;
+  }>;
   annotations: Array<{ id: string; context: string; style: 'success' | 'info' | 'warning' | 'error'; body_html: string }>;
 }
 
@@ -245,15 +256,26 @@ export function CiChecksDrawer({ target, contexts: seedContexts, onClose, onFixC
                             // failed job so at least SOMETHING shows.
                             const failedByName = bk!.detail.failedJobs.find((j) => j.name === c.name);
                             const jobId = bk!.detail.focusedJob?.id ?? failedByName?.id ?? bk!.detail.failedJobs[0]?.id;
+                            // The chip grid mirrors Buildkite's build overview
+                            // — highlights failing jobs at a glance. Active
+                            // group is the one the user clicked into.
+                            const activeStepKey = bk!.detail.allJobs.find((j) => j.id === jobId)?.step_key
+                              ?? bk!.detail.allJobs.find((j) => j.name === c.name)?.step_key
+                              ?? undefined;
                             return (
-                              <RspecFailureList
-                                jobName={c.name}
-                                jobWebUrl={c.url ?? undefined}
-                                buildWebUrl={bk!.detail.buildWebUrl}
-                                annotations={bk!.detail.annotations}
-                                jobId={jobId}
-                                onAskAI={onAskAI}
-                              />
+                              <>
+                                {bk!.detail.allJobs.length > 0 && (
+                                  <BuildJobChips jobs={bk!.detail.allJobs} activeStepKey={activeStepKey} />
+                                )}
+                                <RspecFailureList
+                                  jobName={c.name}
+                                  jobWebUrl={c.url ?? undefined}
+                                  buildWebUrl={bk!.detail.buildWebUrl}
+                                  annotations={bk!.detail.annotations}
+                                  jobId={jobId}
+                                  onAskAI={onAskAI}
+                                />
+                              </>
                             );
                           })()}
                         </div>

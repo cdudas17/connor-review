@@ -367,6 +367,18 @@ export const api = {
     buildWebUrl: string;
     focusedJob: { id: string; name?: string; web_url?: string; state?: string; exit_status?: number | null } | null;
     failedJobs: Array<{ id: string; name?: string; web_url?: string; state?: string; exit_status?: number | null }>;
+    /** Every command job in the build — used by the chip grid at the top
+     *  of the drilldown. Slim projection to keep the response small. */
+    allJobs: Array<{
+      id: string;
+      name?: string;
+      step_key?: string;
+      state?: string;
+      exit_status: number | null;
+      web_url?: string;
+      parallel_group_index: number | null;
+      parallel_group_total: number | null;
+    }>;
     annotations: Array<{ id: string; context: string; style: 'success' | 'info' | 'warning' | 'error'; body_html: string }>;
   }> {
     return call(`/api/buildkite/failures?url=${encodeURIComponent(url)}`);

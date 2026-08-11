@@ -58,6 +58,10 @@ interface BuildkiteJob {
   exit_status?: number | null;
   web_url?: string;
   log_url?: string;
+  /** Set on parallelised jobs — Buildkite groups these by step_key
+   *  under the hood but reports each shard as its own job. */
+  parallel_group_index?: number | null;
+  parallel_group_total?: number | null;
 }
 
 interface BuildkiteBuild {
@@ -126,6 +130,24 @@ export async function registerBuildkiteRoutes(app: FastifyInstance) {
       const failedJobs = (build.jobs ?? []).filter((j) => j.state === 'failed' || (typeof j.exit_status === 'number' && j.exit_status !== 0));
       const focusedJob = parsed.jobId ? (build.jobs ?? []).find((j) => j.id === parsed.jobId) ?? null : null;
 
+      // Slim projection of every job in the build so the client can
+      // render a Buildkite-style chip grid without needing to hit
+      // Buildkite again. Filter to actual command jobs — wait/trigger
+      // pseudo-jobs (no `command` in the API response, no state) are
+      // structural glue, not something the user cares about.
+      const allJobs = (build.jobs ?? [])
+        .filter((j) => j.state != null && j.id != null)
+        .map((j) => ({
+          id: j.id,
+          name: j.name,
+          step_key: j.step_key,
+          state: j.state,
+          exit_status: j.exit_status ?? null,
+          web_url: j.web_url,
+          parallel_group_index: j.parallel_group_index ?? null,
+          parallel_group_total: j.parallel_group_total ?? null,
+        }));
+
       return {
         org: parsed.org,
         pipeline: parsed.pipeline,
@@ -133,6 +155,7 @@ export async function registerBuildkiteRoutes(app: FastifyInstance) {
         buildWebUrl: `https://buildkite.com/${parsed.org}/${parsed.pipeline}/builds/${parsed.build}`,
         focusedJob,
         failedJobs,
+        allJobs,
         annotations: surface.map((a) => ({
           id: a.id,
           context: a.context,
