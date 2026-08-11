@@ -32,6 +32,10 @@ export interface ClaudeExecOptions {
    * Set to 'acceptEdits' for batch/headless flows where blocking on per-edit
    * prompts would deadlock. */
   permissionMode?: 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions';
+  /** Pin the model — e.g. 'claude-sonnet-5' for the review-chat surface
+   *  that wants a faster/cheaper tier than the caller's default. Passed
+   *  through as `--model <name>`; unset lets the CLI use its own default. */
+  model?: string;
 }
 
 /** Shells out to the user's local `claude` CLI in non-interactive mode and
@@ -50,6 +54,9 @@ export function claudeExec(prompt: string, opts: ClaudeExecOptions = {}): Promis
   }
   if (opts.permissionMode) {
     args.push('--permission-mode', opts.permissionMode);
+  }
+  if (opts.model) {
+    args.push('--model', opts.model);
   }
   return new Promise((resolve, reject) => {
     const child = execFile('claude', args, { maxBuffer: 50 * 1024 * 1024, timeout: timeoutMs, cwd: opts.cwd }, (err, stdout, stderr) => {
