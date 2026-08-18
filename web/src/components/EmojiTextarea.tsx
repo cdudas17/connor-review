@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState, type TextareaHTMLAttributes, type KeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { search as searchEmoji, get as getEmoji } from 'node-emoji';
 import { handlePasteLinkify } from '../lib/pasteLinkify.js';
 import { useMentionCandidates } from '../contexts/MentionsContext.js';
@@ -127,7 +128,11 @@ export const EmojiTextarea = forwardRef<HTMLTextAreaElement, Props>(function Emo
   const mentionCandidates = useMentionCandidates();
   const [suggestions, setSuggestions] = useState<ActiveSuggestions>(null);
   const [active, setActive] = useState(0);
-  const [caret, setCaret] = useState<{ top: number; left: number; lineHeight: number; flipUp: boolean } | null>(null);
+  // Viewport-relative popup anchor (position: fixed). Portalled to
+  // document.body so drawer/panel `overflow: hidden|auto` can't clip
+  // the dropdown. `flipUp` says whether the popup should render its
+  // BOTTOM edge at `top` (i.e. sit above the caret) or its top edge.
+  const [caret, setCaret] = useState<{ top: number; left: number; flipUp: boolean } | null>(null);
 
   const updateSuggestions = useCallback(() => {
     const el = ref.current;
@@ -148,16 +153,26 @@ export const EmojiTextarea = forwardRef<HTMLTextAreaElement, Props>(function Emo
     setSuggestions(items);
     setActive(0);
     const c = getCaretPixelOffset(el, el.selectionStart ?? 0);
-    // Estimate dropdown size (7 rows × ~34px + 8px padding) and flip above the caret
-    // if it would otherwise clip the viewport bottom.
+    // Convert the textarea-relative caret offset into viewport
+    // coordinates so we can render the popup with position: fixed
+    // (via portal to document.body). This escapes any parent's
+    // overflow: hidden / auto that was clipping the dropdown.
+    const elRect = el.getBoundingClientRect();
+    // Account for the textarea's internal scroll — c.top is measured
+    // against the mirror's static text, not the visible viewport.
+    const viewportTop = elRect.top + c.top - el.scrollTop;
+    const viewportLeft = elRect.left + c.left - el.scrollLeft;
+    // Estimate dropdown size (7 rows × ~34px + 8px padding) and flip
+    // above the caret if it would otherwise clip the viewport bottom.
     const rowCount = items.kind === 'emoji' ? items.items.length : items.items.length;
     const DROPDOWN_HEIGHT = rowCount * 34 + 12;
-    const elRect = el.getBoundingClientRect();
-    const caretBottomInViewport = elRect.top + c.top + c.lineHeight;
-    const spaceBelow = window.innerHeight - caretBottomInViewport;
-    const spaceAbove = elRect.top + c.top;
+    const spaceBelow = window.innerHeight - (viewportTop + c.lineHeight);
+    const spaceAbove = viewportTop;
     const flipUp = spaceBelow < DROPDOWN_HEIGHT && spaceAbove > spaceBelow;
-    setCaret({ ...c, flipUp });
+    // `top` = caret's viewport y. Popup will offset from there in the
+    // style block below (below the caret in normal mode, above it in
+    // flipUp mode via a transform + line-height offset).
+    setCaret({ top: viewportTop + c.lineHeight, left: viewportLeft, flipUp });
   }, [mentionCandidates]);
 
   /** Replace the active trigger token with `replacement` (the emoji glyph
@@ -216,48 +231,58 @@ export const EmojiTextarea = forwardRef<HTMLTextAreaElement, Props>(function Emo
   // they can browse. The change handler already runs on every keystroke;
   // updateSuggestions handles the empty-query mention case.
 
+  // Popup lives in document.body (via portal) so drawer / panel
+  // overflow rules can't clip it. Anchored with position: fixed to the
+  // viewport coordinates computed in updateSuggestions.
+  const popup = suggestions && caret ? (
+    <ul
+      className={`emoji-suggestions${suggestions.kind === 'mention' ? ' emoji-suggestions-mention' : ''}`}
+      role="listbox"
+      style={caret.flipUp
+        // flipUp: pin the popup's BOTTOM edge just above the caret line.
+        // caret.top is the caret's baseline (already includes lineHeight
+        // from updateSuggestions), so `bottom = 100vh - caret.top`
+        // sits the bottom edge exactly on that line; a 2px gap makes it
+        // breathable.
+        ? { position: 'fixed', bottom: `calc(100vh - ${caret.top}px + 2px)`, left: caret.left }
+        : { position: 'fixed', top: caret.top + 2, left: caret.left }}
+    >
+      {suggestions.kind === 'emoji'
+        ? suggestions.items.map((s, i) => (
+            <li key={s.name}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={i === active}
+                className={`emoji-suggestion${i === active ? ' emoji-suggestion-active' : ''}`}
+                onMouseDown={(e) => { e.preventDefault(); insert(s.emoji); }}
+              >
+                <span className="emoji-suggestion-emoji">{s.emoji}</span>
+                <span className="emoji-suggestion-name">{s.name}</span>
+              </button>
+            </li>
+          ))
+        : suggestions.items.map((login, i) => (
+            <li key={login}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={i === active}
+                className={`emoji-suggestion${i === active ? ' emoji-suggestion-active' : ''}`}
+                onMouseDown={(e) => { e.preventDefault(); insert(`@${login} `); }}
+              >
+                <span className="emoji-suggestion-emoji" aria-hidden="true">@</span>
+                <span className="emoji-suggestion-name">{login}</span>
+              </button>
+            </li>
+          ))}
+    </ul>
+  ) : null;
+
   return (
     <div className="emoji-textarea">
       <textarea {...props} ref={ref} onChange={handleChange} onKeyDown={handleKeyDown} onBlur={handleBlur} onPaste={handlePaste} />
-      {suggestions && caret && (
-        <ul
-          className={`emoji-suggestions${suggestions.kind === 'mention' ? ' emoji-suggestions-mention' : ''}`}
-          role="listbox"
-          style={caret.flipUp
-            ? { bottom: `calc(100% - ${caret.top}px + 2px)`, left: caret.left }
-            : { top: caret.top + caret.lineHeight + 2, left: caret.left }}
-        >
-          {suggestions.kind === 'emoji'
-            ? suggestions.items.map((s, i) => (
-                <li key={s.name}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={i === active}
-                    className={`emoji-suggestion${i === active ? ' emoji-suggestion-active' : ''}`}
-                    onMouseDown={(e) => { e.preventDefault(); insert(s.emoji); }}
-                  >
-                    <span className="emoji-suggestion-emoji">{s.emoji}</span>
-                    <span className="emoji-suggestion-name">{s.name}</span>
-                  </button>
-                </li>
-              ))
-            : suggestions.items.map((login, i) => (
-                <li key={login}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={i === active}
-                    className={`emoji-suggestion${i === active ? ' emoji-suggestion-active' : ''}`}
-                    onMouseDown={(e) => { e.preventDefault(); insert(`@${login} `); }}
-                  >
-                    <span className="emoji-suggestion-emoji" aria-hidden="true">@</span>
-                    <span className="emoji-suggestion-name">{login}</span>
-                  </button>
-                </li>
-              ))}
-        </ul>
-      )}
+      {popup && createPortal(popup, document.body)}
     </div>
   );
 });
